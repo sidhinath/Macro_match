@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="MacroMatch">
+  <title>MacroMatch</title>
+  <path fill="#1F3864" fill-rule="evenodd" d="M 184 410 C 184 646.5 472.6 916.7 512 973 C 551.4 916.7 840 646.5 840 410 A 328 328 0 1 1 184 410 Z
+           M 722 410 A 210 210 0 1 0 302 410 A 210 210 0 1 0 722 410 Z"/>
+  <g fill="none" stroke-width="45">
+    <path stroke="#1F3864" d="M 671 410 A 159 159 0 0 1 484.4 566.6"/>
+    <path stroke="#2E74B5" d="M 432.5 547.7 A 159 159 0 0 1 390.2 507.8"/>
+    <path stroke="#548235" d="M 432.5 272.3 A 159 159 0 0 1 661.4 355.6"/>
+  </g>
+</svg>

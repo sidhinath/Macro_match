@@ -22,9 +22,11 @@ load_dotenv()
 # ─────────────────────────────────────────────
 # Page config — must be the FIRST st call
 # ─────────────────────────────────────────────
+_ICON_PATH = Path(__file__).resolve().parent.parent / "assets" / "macromatch_icon.png"
+
 st.set_page_config(
     page_title="MacroMatch",
-    page_icon="🥗",
+    page_icon=str(_ICON_PATH) if _ICON_PATH.exists() else "🥗",
     layout="wide",
     initial_sidebar_state="expanded",
 )

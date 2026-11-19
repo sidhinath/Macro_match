@@ -1,4 +1,8 @@
-# 🥗 MacroMatch
+<p align="center">
+  <img src="assets/macromatch_logo.png" alt="MacroMatch logo" width="460">
+</p>
+
+# MacroMatch
 
 **Your macros, anywhere.**
 
