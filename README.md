@@ -118,31 +118,58 @@ Macro_match/
 └── render.yaml          # optional Render blueprint for the API
 ```
 
-## Quickstart
+## Running the Project
 
-### Prerequisites
+### Option 1: Use the Deployed Application (Recommended)
 
-- Python **3.10+** (developed and tested on 3.13)
-- An Anthropic API key is **optional** — without it you get fallback explanations
+Frontend (Streamlit):
+<https://macromatchgit-8qnnjnxumw4sjopvkcpttz.streamlit.app/>
 
-### 1. Install
+Backend API (Render):
+<https://macro-match.onrender.com>
+
+Users can open the Streamlit URL in any browser and use the application
+directly without installing anything.
+
+**Note:**
+
+- The backend is hosted on Render's **free tier**.
+- The first request may take **30–60 seconds** if the backend is waking up from
+  inactivity.
+- After the backend wakes up, the application works normally.
+
+### Option 2: Run Locally
+
+**Prerequisites:** Python **3.10+** (developed and tested on 3.13). An Anthropic
+API key is **optional** — without it the app uses fallback explanations.
+
+#### 1. Clone the repository
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/sidhinath/Macro_match.git
 cd Macro_match
+```
 
+#### 2. Create and activate a virtual environment
+
+```bash
 python -m venv venv
+
 # macOS / Linux
 source venv/bin/activate
 # Windows (PowerShell)
 .\venv\Scripts\Activate.ps1
 # Windows (cmd.exe)
 venv\Scripts\activate.bat
+```
 
+#### 3. Install dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure the environment (optional)
+#### 4. Configure the environment (optional)
 
 ```bash
 cp .env.example .env        # Windows: copy .env.example .env
@@ -160,7 +187,7 @@ Leave it unset or empty to use fallback explanations. `.env` is git-ignored.
 > file such as `.env.example`, revoke it in the
 > [Anthropic console](https://console.anthropic.com/settings/keys) and issue a new one.
 
-### 3. Run the API
+#### 5. Start the backend (terminal 1)
 
 From the project root:
 
@@ -171,17 +198,29 @@ python -m uvicorn backend.main:app --reload
 - API: <http://127.0.0.1:8000>
 - Interactive docs: <http://127.0.0.1:8000/docs>
 
-### 4. Run the UI
+#### 6. Start the frontend (terminal 2)
 
-In a second terminal, with the same virtual environment active:
+With the same virtual environment active:
 
 ```bash
 python -m streamlit run frontend/app.py
 ```
 
-Streamlit opens <http://localhost:8501>. The UI reads the API URL from
-`MACROMATCH_API_URL` (or its Streamlit secret), defaulting to
-`http://127.0.0.1:8000`.
+Streamlit opens <http://localhost:8501>. The UI reads the API URL from the
+`MACROMATCH_API_URL` environment variable (or its Streamlit secret), defaulting
+to `http://127.0.0.1:8000`.
+
+#### 7. Run the tests (optional)
+
+```bash
+pytest tests -q
+```
+
+For a live end-to-end check against a running API:
+
+```bash
+python tests/smoke_test.py
+```
 
 ## API reference
 
