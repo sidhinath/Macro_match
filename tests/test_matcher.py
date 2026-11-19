@@ -25,7 +25,7 @@ from backend.matcher import find_alternatives
 # ═══════════════════════════════════════════════════════════════════
 #
 # WHAT WE TEST:
-#   "Kolkata" is not in our dataset at all.
+#   "Shimla" is not in our dataset at all.
 #   After the city filter, zero candidates remain.
 #   The function must raise a ValueError with a useful message.
 #
@@ -40,7 +40,7 @@ def test_no_products_in_city():
     with pytest.raises(ValueError, match="No alternatives found"):
         find_alternatives(
             product_name="Paneer",
-            city="Kolkata",          # city not in our dataset
+            city="Shimla",           # city not in our dataset
             diet_rules=[],
             allergens=[],
         )

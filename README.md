@@ -113,7 +113,7 @@ Macro_match/
 ├── frontend/
 │   └── app.py           # Streamlit UI
 ├── data/
-│   └── products.csv     # 30 products, 5 cities, macro + diet/allergen flags
+│   └── products.csv     # 30 products, 14 cities, macro + diet/allergen flags
 ├── tests/
 │   ├── test_matcher.py  # pytest suite (5 tests, no network)
 │   └── smoke_test.py    # manual live API check (run as a script)
@@ -334,7 +334,7 @@ the API), including secrets, cold starts, and troubleshooting, are in
 
 ## Design notes & limitations
 
-- **Small curated dataset.** 30 products across 5 cities. It is a demonstration,
+- **Small curated dataset.** 30 products across 14 cities. It is a demonstration,
   not a nutrition database. City availability is hand-maintained.
 - **Scores are relative.** Min-max normalization uses the original product plus
   the filtered candidates for that query, so adding a product can shift scores.

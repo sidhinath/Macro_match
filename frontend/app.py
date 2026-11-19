@@ -58,7 +58,7 @@ def _resolve_api_base() -> str:
 API_BASE         = _resolve_api_base()
 GET_TIMEOUT      = 20   # seconds; free-tier hosts can need ~1 min to wake from sleep
 POST_TIMEOUT     = 90   # seconds; includes the optional Claude call
-CITIES           = ["Delhi", "Mumbai", "Bangalore", "Dehradun", "Pune"]
+CITIES_FALLBACK   = ["Delhi", "Mumbai", "Bangalore", "Dehradun", "Pune"]
 DIET_OPTIONS    = ["vegan", "gluten_free", "keto"]
 ALLERGEN_OPTIONS= ["soy", "nuts", "dairy"]
 MACRO_COLS      = ["protein", "carbs", "fat", "fiber", "calories"]
@@ -254,6 +254,26 @@ def load_product_csv() -> pd.DataFrame:
     return df
 
 
+@st.cache_data
+def load_city_list() -> list[str]:
+    """Destination cities derived from the dataset so the UI never drifts from the data."""
+    try:
+        df = load_product_csv()
+    except (FileNotFoundError, pd.errors.ParserError):
+        return []
+
+    cities: set[str] = set()
+    for value in df["cities"].dropna():
+        for part in str(value).split(","):
+            part = part.strip()
+            if part:
+                cities.add(part)
+
+    # Keep the original five first (Delhi stays the default), then the rest A-Z.
+    preferred = {name: i for i, name in enumerate(CITIES_FALLBACK)}
+    return sorted(cities, key=lambda name: (preferred.get(name, len(preferred)), name))
+
+
 def get_original_macros(product_name: str) -> dict | None:
     """Return the macro dict for the original product from local CSV."""
     df = load_product_csv()
@@ -317,9 +337,10 @@ with st.sidebar:
     )
 
     st.markdown("## 📍 Destination")
+    city_options = load_city_list() or CITIES_FALLBACK
     selected_city = st.selectbox(
         "Which city are you travelling to?",
-        options=CITIES,
+        options=city_options,
     )
 
     st.markdown("## 🥦 Diet Rules")
