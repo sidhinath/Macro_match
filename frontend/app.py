@@ -9,6 +9,7 @@ Requires the FastAPI backend to be running at http://127.0.0.1:8000
 """
 
 import os
+import base64
 
 import streamlit as st
 import requests
@@ -36,6 +37,14 @@ st.set_page_config(
 # ─────────────────────────────────────────────
 
 DEFAULT_API_BASE = "http://127.0.0.1:8000"
+
+# ── Hero logo (base64-embedded so it loads in Streamlit's served context) ──
+_LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "macromatch_logo.png"
+if _LOGO_PATH.exists():
+    _LOGO_B64 = base64.b64encode(_LOGO_PATH.read_bytes()).decode("ascii")
+    LOGO_SRC = f"data:image/png;base64,{_LOGO_B64}"
+else:
+    LOGO_SRC = ""
 
 
 def _resolve_api_base() -> str:
@@ -448,10 +457,10 @@ def call_api(payload: dict) -> requests.Response | None:
 # ─────────────────────────────────────────────
 # Hero header
 # ─────────────────────────────────────────────
-st.markdown("""
+st.markdown(f"""
 <div class="hero-block">
     <div class="hero-brand">
-        <img src="assets/macromatch_logo.png" alt="MacroMatch logo" class="hero-logo">
+        <img src="{LOGO_SRC}" alt="MacroMatch logo" class="hero-logo">
         <div class="hero-title">MacroMatch</div>
     </div>
     <div class="hero-tagline">Your macros, anywhere.</div>
