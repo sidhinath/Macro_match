@@ -361,29 +361,38 @@ html, body, [class*="css"] {
 
 /* ── Sidebar header ── */
 .sidebar-header {
-    text-align: center;
-    padding: 0.75rem 0.5rem 1rem 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.75rem 0.6rem 1rem 0.6rem;
     border-bottom: 1px solid #334155;
     margin-bottom: 1rem;
+    max-width: 100%;
 }
 .sidebar-header .sidebar-logo {
-    height: 2.6rem;
+    height: 2.2rem;
     width: auto;
-    display: block;
-    margin: 0 auto 0.5rem;
+    flex-shrink: 0;
+}
+.sidebar-header .sidebar-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 .sidebar-header .sidebar-title {
-    font-size: 1.35rem;
+    font-size: 1.15rem;
     font-weight: 700;
     color: #f1f5f9;
-    margin: 0 0 0.25rem;
+    margin: 0 0 0.1rem;
     letter-spacing: -0.02em;
+    line-height: 1.1;
 }
 .sidebar-header .sidebar-tagline {
-    font-size: 0.82rem;
+    font-size: 0.75rem;
     color: #94a3b8;
     margin: 0;
     font-weight: 400;
+    line-height: 1.1;
 }
 
 /* ── Error state ── */
@@ -503,8 +512,10 @@ with st.sidebar:
     st.markdown(f"""
     <div class="sidebar-header">
         <img src="{LOGO_SRC}" alt="MacroMatch logo" class="sidebar-logo">
-        <div class="sidebar-title">MacroMatch</div>
-        <div class="sidebar-tagline">Your macros, anywhere.</div>
+        <div class="sidebar-text">
+            <div class="sidebar-title">MacroMatch</div>
+            <div class="sidebar-tagline">Your macros, anywhere.</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("## 🛒 Your Product")
