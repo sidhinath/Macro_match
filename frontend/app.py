@@ -359,6 +359,33 @@ html, body, [class*="css"] {
     .steps { grid-template-columns: 1fr; }
 }
 
+/* ── Sidebar header ── */
+.sidebar-header {
+    text-align: center;
+    padding: 0.75rem 0.5rem 1rem 0.5rem;
+    border-bottom: 1px solid #334155;
+    margin-bottom: 1rem;
+}
+.sidebar-header .sidebar-logo {
+    height: 2.6rem;
+    width: auto;
+    display: block;
+    margin: 0 auto 0.5rem;
+}
+.sidebar-header .sidebar-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.02em;
+}
+.sidebar-header .sidebar-tagline {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    margin: 0;
+    font-weight: 400;
+}
+
 /* ── Error state ── */
 .error-box {
     background: #1e1015;
@@ -473,6 +500,13 @@ st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 # Sidebar — inputs
 # ─────────────────────────────────────────────
 with st.sidebar:
+    st.markdown(f"""
+    <div class="sidebar-header">
+        <img src="{LOGO_SRC}" alt="MacroMatch logo" class="sidebar-logo">
+        <div class="sidebar-title">MacroMatch</div>
+        <div class="sidebar-tagline">Your macros, anywhere.</div>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("## 🛒 Your Product")
     products = fetch_product_list()
 
