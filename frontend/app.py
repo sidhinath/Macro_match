@@ -106,11 +106,17 @@ html, body, [class*="css"] {
     border-right: 1px solid #334155;
 }
 [data-testid="stSidebar"] .stMarkdown h2 {
-    color: #94a3b8;
-    font-size: 0.75rem;
+    color: #f1f5f9;
+    font-size: 0.8rem;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.15em;
     margin-bottom: 0.25rem;
+    font-weight: 700;
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(96, 165, 250, 0.15);
+    border: 1px solid rgba(96, 165, 250, 0.35);
 }
 
 /* ── Hero header ── */
