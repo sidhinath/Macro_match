@@ -109,6 +109,17 @@ html, body, [class*="css"] {
     text-align: center;
     padding: 1.2rem 1rem 0.8rem;
 }
+/* Logo + heading grouped together */
+.hero-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.hero-logo {
+    height: 2.9rem;
+    width: auto;
+    display: block;
+}
 /* Streamlit's own paragraph rules outrank a bare class, hence !important. */
 .hero-title {
     display: inline-block;          /* keep the gradient inside the word */
@@ -439,7 +450,10 @@ def call_api(payload: dict) -> requests.Response | None:
 # ─────────────────────────────────────────────
 st.markdown("""
 <div class="hero-block">
-    <div class="hero-title">MacroMatch</div>
+    <div class="hero-brand">
+        <img src="assets/macromatch_logo.png" alt="MacroMatch logo" class="hero-logo">
+        <div class="hero-title">MacroMatch</div>
+    </div>
     <div class="hero-tagline">Your macros, anywhere.</div>
 </div>
 """, unsafe_allow_html=True)
