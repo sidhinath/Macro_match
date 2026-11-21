@@ -1339,7 +1339,7 @@ for alt in alternatives:
                 <div class="result-card-body">
                     <span class="rank-badge" style="background:{color}22;color:{color};">{label}</span>
                     <p class="card-product-name">{alt['name']}
-                        <span class="score-pill">score {alt['match_score']}</span>
+                        <span class="score-pill">{round((1 - alt['match_score']) * 100)}% Match</span>
                     </p>
                     <p class="card-category">{alt['category']} &nbsp;·&nbsp; Available in: {alt['cities'].replace(',', ', ')}</p>
                 </div>
@@ -1395,7 +1395,51 @@ for alt in alternatives:
                     ],
                 }, index=["Protein", "Carbs", "Fat", "Fiber"])
 
-                st.bar_chart(chart_df, use_container_width=True, height=220)
+                # Melt to long format for Altair
+                import altair as alt_chart
+                chart_long = chart_df.reset_index().melt(
+                    id_vars="index",
+                    var_name="Product",
+                    value_name="Value (g)",
+                )
+                chart_long = chart_long.rename(columns={"index": "Nutrient"})
+
+                bars = (
+                    alt_chart.Chart(chart_long)
+                    .mark_bar()
+                    .encode(
+                        x=alt_chart.X(
+                            "Nutrient:N",
+                            sort=["Protein", "Carbs", "Fat", "Fiber"],
+                            axis=alt_chart.Axis(
+                                labelAngle=0,          # horizontal labels
+                                labelFontSize=12,
+                                titleFontSize=13,
+                                labelPadding=6,
+                            ),
+                            title=None,
+                        ),
+                        xOffset=alt_chart.XOffset("Product:N"),
+                        y=alt_chart.Y(
+                            "Value (g):Q",
+                            axis=alt_chart.Axis(labelFontSize=11),
+                        ),
+                        color=alt_chart.Color(
+                            "Product:N",
+                            legend=alt_chart.Legend(
+                                orient="bottom",
+                                labelFontSize=11,
+                                titleFontSize=11,
+                            ),
+                        ),
+                        tooltip=["Nutrient:N", "Product:N", "Value (g):Q"],
+                    )
+                    .properties(height=220)
+                    .configure_view(strokeWidth=0)
+                    .configure_axis(grid=True, gridColor="#334155")
+                    .configure_legend(labelColor="#cbd5e1", titleColor="#94a3b8")
+                )
+                st.altair_chart(bars, use_container_width=True)
 
         # ── Explanation ──
         explanation = alt.get("explanation", "").strip()
