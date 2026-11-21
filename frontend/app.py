@@ -400,6 +400,40 @@ PRIORITY_KEYS = list(PRIORITY_LABELS.keys())
 RANK_COLORS = ["#4ade80", "#60a5fa", "#f472b6"]   # green, blue, pink
 RANK_LABELS = ["🥇 Best Match", "🥈 Second Match", "🥉 Third Match"]
 
+# ── Canonical serving sizes in grams (used for Per-Serving toggle) ──────────
+PRODUCT_SERVING_G: dict[str, int] = {
+    "Whey Protein Powder":        25,
+    "Pea Protein Powder":         25,
+    "Soya Chunks (TVP)":          30,
+    "Tofu (Firm)":               100,
+    "Tempeh":                     80,
+    "Edamame":                   155,
+    "Paneer":                     80,
+    "Greek Yogurt":              150,
+    "Cottage Cheese (Low Fat)":  100,
+    "Masoor Dal (Red Lentils)":   50,
+    "Chana Dal":                  50,
+    "Moong Dal":                  50,
+    "Chickpeas (Kabuli Chana)":   80,
+    "Rajma (Kidney Beans)":       80,
+    "Rolled Oats":                40,
+    "Quinoa":                     45,
+    "Brown Rice":                 50,
+    "Peanut Butter":              15,
+    "Almond Butter":              15,
+    "Almonds":                    20,
+    "Cashews":                    20,
+    "Walnuts":                    20,
+    "Chia Seeds":                 10,
+    "Flaxseeds":                  10,
+    "Pumpkin Seeds":              20,
+    "Sunflower Seeds":            20,
+    "Soy Milk":                  200,
+    "Almond Milk":               200,
+    "Oat Milk":                  200,
+    "Coconut Milk (Canned)":      50,
+}
+
 # ─────────────────────────────────────────────
 # Custom CSS — clean, modern, card-based design
 # ─────────────────────────────────────────────
@@ -576,7 +610,7 @@ html, body, [class*="css"] {
 }
 .card-category {
     font-size: 0.85rem;
-    color: #64748b;
+    color: #b0b8c4;
     margin-bottom: 0.4rem;
     overflow-wrap: anywhere;
 }
@@ -602,7 +636,7 @@ html, body, [class*="css"] {
     border-radius: 999px;
     padding: 2px 10px;
     font-size: 0.8rem;
-    color: #94a3b8;
+    color: #cbd5e1;
     margin-left: 0.5rem;
     font-family: monospace;
 }
@@ -647,7 +681,7 @@ html, body, [class*="css"] {
     max-width: 660px;
     margin: 0 auto 1.2rem !important;
     text-align: center;
-    color: #94a3b8 !important;
+    color: #cbd5e1 !important;
     font-size: 0.95rem !important;
     line-height: 1.65;
 }
@@ -690,7 +724,7 @@ html, body, [class*="css"] {
     margin: 0;
     font-size: 0.84rem;
     line-height: 1.55;
-    color: #94a3b8;
+    color: #cbd5e1;
 }
 .landing-cta {
     display: flex;
@@ -758,7 +792,7 @@ html, body, [class*="css"] {
 }
 .sidebar-header .sidebar-tagline {
     font-size: 0.75rem;
-    color: #94a3b8;
+    color: #cbd5e1;
     margin: 0;
     font-weight: 400;
     line-height: 1.1;
@@ -776,7 +810,7 @@ html, body, [class*="css"] {
 
 /* ── Comparison table ── */
 .macro-table th {
-    color: #94a3b8;
+    color: #cbd5e1;
     font-weight: 500;
     font-size: 0.8rem;
     text-transform: uppercase;
@@ -897,14 +931,30 @@ def load_product_details() -> dict[str, dict]:
     return details
 
 
-def _macro_line(detail: dict) -> str:
+def _macro_line(detail: dict, serving_g: int | None = None) -> str:
+    """Return a one-line macro summary. If serving_g is given, scales per-serving."""
+    if serving_g:
+        factor = serving_g / 100.0
+        label  = f"per {serving_g} g serving"
+        prot   = round(detail["protein"]  * factor, 1)
+        carbs  = round(detail["carbs"]    * factor, 1)
+        fat    = round(detail["fat"]      * factor, 1)
+        fiber  = round(detail["fiber"]    * factor, 1)
+        kcal   = round(detail["calories"] * factor)
+    else:
+        label = "per 100 g"
+        prot  = detail["protein"]
+        carbs = detail["carbs"]
+        fat   = detail["fat"]
+        fiber = detail["fiber"]
+        kcal  = detail["calories"]
     return (
-        f"**Protein** {detail['protein']:g} g &nbsp;·&nbsp; "
-        f"**Carbs** {detail['carbs']:g} g &nbsp;·&nbsp; "
-        f"**Fat** {detail['fat']:g} g<br>"
-        f"**Fibre** {detail['fiber']:g} g &nbsp;·&nbsp; "
-        f"**{detail['calories']:g} kcal** "
-        "<span style='color:#64748b;'>(per 100 g)</span>"
+        f"**Protein** {prot:g} g &nbsp;·&nbsp; "
+        f"**Carbs** {carbs:g} g &nbsp;·&nbsp; "
+        f"**Fat** {fat:g} g<br>"
+        f"**Fibre** {fiber:g} g &nbsp;·&nbsp; "
+        f"**{kcal:g} kcal** "
+        f"<span style='color:#b0b8c4;'>({label})</span>"
     )
 
 
@@ -968,7 +1018,7 @@ def render_product_spotlight(name: str, detail: dict) -> None:
                     padding:0.8rem 1rem;
                     margin-bottom:0.5rem;
                 ">
-                    <p style="margin:0 0 0.2rem;color:#94a3b8;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;">Serving Size</p>
+                    <p style="margin:0 0 0.2rem;color:#b0b8c4;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;">Serving Size</p>
                     <p style="margin:0;font-size:1rem;font-weight:600;color:#f1f5f9;">{how_to['serving']}</p>
                 </div>
                 <div style="
@@ -977,7 +1027,7 @@ def render_product_spotlight(name: str, detail: dict) -> None:
                     border-radius:12px;
                     padding:0.8rem 1rem;
                 ">
-                    <p style="margin:0 0 0.2rem;color:#94a3b8;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;">⏰ Best Time to Have</p>
+                    <p style="margin:0 0 0.2rem;color:#b0b8c4;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;">⏰ Best Time to Have</p>
                     <p style="margin:0;font-size:0.95rem;color:#f1f5f9;">{how_to['best_time']}</p>
                 </div>
                 """,
@@ -997,7 +1047,7 @@ def render_product_spotlight(name: str, detail: dict) -> None:
                     padding:0.8rem 1rem;
                     height:100%;
                 ">
-                    <p style="margin:0 0 0.5rem;color:#94a3b8;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;">💡 Tips & Ways to Eat</p>
+                    <p style="margin:0 0 0.5rem;color:#b0b8c4;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;">💡 Tips & Ways to Eat</p>
                     <ul style="margin:0;padding-left:1.1rem;list-style:none;">
                         {tips_html}
                     </ul>
@@ -1314,11 +1364,41 @@ summary_html = (
 st.markdown(summary_html, unsafe_allow_html=True)
 
 # ── Result cards ──────────────────────────────
+
+# ── Per-serving toggle (one shared toggle above all cards) ────────────────
+_srv_col, _lbl_col = st.columns([2, 5], gap="small")
+with _srv_col:
+    per_serving_on = st.toggle(
+        "Per Serving",
+        value=False,
+        key="per_serving_toggle",
+        help="Switch between Per 100 g (default) and the product's defined serving size",
+    )
+_unit_label = "per serving" if per_serving_on else "per 100 g"
+
+def _scale(macros: dict, product_name: str) -> dict:
+    """Return a copy of macros dict scaled to serving size (if toggle is on)."""
+    if not per_serving_on:
+        return macros
+    srv_g = PRODUCT_SERVING_G.get(product_name, 100)
+    factor = srv_g / 100.0
+    return {
+        "protein":  round(macros["protein"]  * factor, 1),
+        "carbs":    round(macros["carbs"]    * factor, 1),
+        "fat":      round(macros["fat"]      * factor, 1),
+        "fiber":    round(macros["fiber"]    * factor, 1),
+        "calories": round(macros["calories"] * factor),
+    }
+
 for alt in alternatives:
     rank     = alt["rank"] - 1          # 0-indexed for color/label arrays
     color    = RANK_COLORS[rank]
     label    = RANK_LABELS[rank]
     nutr     = alt["nutrition"]
+
+    # Scale both original and alternative macros based on toggle
+    orig_scaled = _scale(orig_macros, selected_product) if orig_macros else None
+    nutr_scaled = _scale(nutr, alt["name"])
 
     with st.container():
         # ── Card header ──
@@ -1351,23 +1431,23 @@ for alt in alternatives:
         col_table, col_chart = st.columns([1, 1], gap="medium")
 
         with col_table:
-            st.markdown(f"**Macro Comparison** *(per 100g)*")
-            if orig_macros:
+            st.markdown(f"**Macro Comparison** *({_unit_label})*")
+            if orig_scaled:
                 comparison_df = pd.DataFrame({
                     "Nutrient":     ["Protein (g)", "Carbs (g)", "Fat (g)", "Fiber (g)", "Calories (kcal)"],
                     f"🏠 {selected_product}": [
-                        orig_macros["protein"],
-                        orig_macros["carbs"],
-                        orig_macros["fat"],
-                        orig_macros["fiber"],
-                        orig_macros["calories"],
+                        orig_scaled["protein"],
+                        orig_scaled["carbs"],
+                        orig_scaled["fat"],
+                        orig_scaled["fiber"],
+                        orig_scaled["calories"],
                     ],
                     f"📍 {alt['name']}": [
-                        nutr["protein"],
-                        nutr["carbs"],
-                        nutr["fat"],
-                        nutr["fiber"],
-                        nutr["calories"],
+                        nutr_scaled["protein"],
+                        nutr_scaled["carbs"],
+                        nutr_scaled["fat"],
+                        nutr_scaled["fiber"],
+                        nutr_scaled["calories"],
                     ],
                 })
                 st.dataframe(
@@ -1378,20 +1458,20 @@ for alt in alternatives:
                 st.info("Original product macros not available for comparison.")
 
         with col_chart:
-            st.markdown("**Visual Comparison** *(excl. calories)*")
-            if orig_macros:
+            st.markdown(f"**Visual Comparison** *(excl. calories · {_unit_label})*")
+            if orig_scaled:
                 chart_df = pd.DataFrame({
                     f"🏠 {selected_product}": [
-                        orig_macros["protein"],
-                        orig_macros["carbs"],
-                        orig_macros["fat"],
-                        orig_macros["fiber"],
+                        orig_scaled["protein"],
+                        orig_scaled["carbs"],
+                        orig_scaled["fat"],
+                        orig_scaled["fiber"],
                     ],
                     f"📍 {alt['name']}": [
-                        nutr["protein"],
-                        nutr["carbs"],
-                        nutr["fat"],
-                        nutr["fiber"],
+                        nutr_scaled["protein"],
+                        nutr_scaled["carbs"],
+                        nutr_scaled["fat"],
+                        nutr_scaled["fiber"],
                     ],
                 }, index=["Protein", "Carbs", "Fat", "Fiber"])
 
@@ -1412,7 +1492,7 @@ for alt in alternatives:
                             "Nutrient:N",
                             sort=["Protein", "Carbs", "Fat", "Fiber"],
                             axis=alt_chart.Axis(
-                                labelAngle=0,          # horizontal labels
+                                labelAngle=0,
                                 labelFontSize=12,
                                 titleFontSize=13,
                                 labelPadding=6,
@@ -1437,7 +1517,7 @@ for alt in alternatives:
                     .properties(height=220)
                     .configure_view(strokeWidth=0)
                     .configure_axis(grid=True, gridColor="#334155")
-                    .configure_legend(labelColor="#cbd5e1", titleColor="#94a3b8")
+                    .configure_legend(labelColor="#cbd5e1", titleColor="#b0b8c4")
                 )
                 st.altair_chart(bars, use_container_width=True)
 
