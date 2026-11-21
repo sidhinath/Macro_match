@@ -1266,7 +1266,7 @@ if not find_btn:
     )
 
     if selected_detail:
-        st.markdown("### 🔎 About your product")
+        st.markdown("### 🥗 Your Regular Food")
         render_product_spotlight(selected_product, selected_detail)
         st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
@@ -1352,8 +1352,7 @@ summary_html = (
     '<span style="font-size:1.5rem">✅</span>'
     '<div>'
     '<span style="color:#f1f5f9;font-weight:600;">'
-    f"Found {len(alternatives)} alternative{'s' if len(alternatives) != 1 else ''} "
-    f"for <em>{selected_product}</em> in {selected_city}"
+    f"Top {len(alternatives)} Swap{'s' if len(alternatives) != 1 else ''} for <em>{selected_product}</em> in {selected_city}"
     '</span><br>'
     '<span style="color:#64748b;font-size:0.85rem;">'
     f"Priority: {PRIORITY_LABELS[priority_label].split('—')[0].strip()}"
@@ -1431,7 +1430,7 @@ for alt in alternatives:
         col_table, col_chart = st.columns([1, 1], gap="medium")
 
         with col_table:
-            st.markdown(f"**Macro Comparison** *({_unit_label})*")
+            st.markdown(f"**Nutrition Breakdown** *({_unit_label})*")
             if orig_scaled:
                 comparison_df = pd.DataFrame({
                     "Nutrient":     ["Protein (g)", "Carbs (g)", "Fat (g)", "Fiber (g)", "Calories (kcal)"],
@@ -1458,7 +1457,7 @@ for alt in alternatives:
                 st.info("Original product macros not available for comparison.")
 
         with col_chart:
-            st.markdown(f"**Visual Comparison** *(excl. calories · {_unit_label})*")
+            st.markdown(f"**Nutrient Chart** *(excl. calories · {_unit_label})*")
             if orig_scaled:
                 chart_df = pd.DataFrame({
                     f"🏠 {selected_product}": [
