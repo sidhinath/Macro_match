@@ -45,8 +45,11 @@ nutrition data, constrained by availability, diet rules, and allergens.**
 - **LLM explanations with a safety net** — Claude describes *why* each match
   fits; authentication, rate-limit, network, and parsing failures fall back to
   deterministic, data-driven text.
-- **Rich Streamlit UI** — ranked cards, macro comparison tables, bar charts,
-  and a dark, card-based layout.
+- **Rich Streamlit UI** — ranked cards with product thumbnails, macro comparison
+  tables, bar charts, and a dark, card-based layout.
+- **Product guide with photos** — the selected product and every catalogue item
+  show a photo, category, macros per 100 g, diet/allergen badges and city
+  availability, so unfamiliar foods are easy to recognise.
 - **Auto-generated API docs** at `/docs` (Swagger UI) and `/redoc`.
 - **Test suite** covering city filtering, invalid products, vegan and allergen
   invariants, and weight sensitivity.
@@ -112,6 +115,9 @@ Macro_match/
 │   └── schemas.py       # Pydantic request/response models
 ├── frontend/
 │   └── app.py           # Streamlit UI
+├── assets/
+│   ├── macromatch_logo.png
+│   └── products/        # 30 product photos + CREDITS.md
 ├── data/
 │   └── products.csv     # 30 products, 14 cities, macro + diet/allergen flags
 ├── tests/
@@ -307,6 +313,12 @@ or a stable cross-query metric.
 
 To add products, append rows with unique names and keep the boolean columns as
 `TRUE`/`FALSE`. Unknown cities simply yield `no_alternatives_found`.
+
+Product photos live in `assets/products/`, named after the product
+(`lowercase-with-hyphens.jpg`). If a photo is missing, the UI falls back to an
+emoji so the page still works. The photos were sourced from Wikimedia Commons;
+see [`assets/products/CREDITS.md`](assets/products/CREDITS.md) for the author
+and license of each image.
 
 ## Tests
 

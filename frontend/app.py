@@ -9,6 +9,7 @@ Requires the FastAPI backend to be running at http://127.0.0.1:8000
 """
 
 import os
+import re
 import base64
 
 import streamlit as st
@@ -71,6 +72,41 @@ CITIES_FALLBACK   = ["Delhi", "Mumbai", "Bangalore", "Dehradun", "Pune"]
 DIET_OPTIONS    = ["vegan", "gluten_free", "keto"]
 ALLERGEN_OPTIONS= ["soy", "nuts", "dairy"]
 MACRO_COLS      = ["protein", "carbs", "fat", "fiber", "calories"]
+
+PRODUCT_IMAGE_DIR = Path(__file__).resolve().parent.parent / "assets" / "products"
+
+PRODUCT_EMOJI = {
+    "Whey Protein Powder": "🥤",
+    "Pea Protein Powder": "🥤",
+    "Soya Chunks (TVP)": "🫘",
+    "Tofu (Firm)": "🧊",
+    "Tempeh": "🫘",
+    "Edamame": "🫛",
+    "Paneer": "🧀",
+    "Greek Yogurt": "🥣",
+    "Cottage Cheese (Low Fat)": "🧀",
+    "Masoor Dal (Red Lentils)": "🫘",
+    "Chana Dal": "🫘",
+    "Moong Dal": "🫘",
+    "Chickpeas (Kabuli Chana)": "🫘",
+    "Rajma (Kidney Beans)": "🫘",
+    "Rolled Oats": "🌾",
+    "Quinoa": "🌾",
+    "Brown Rice": "🍚",
+    "Peanut Butter": "🥜",
+    "Almond Butter": "🥜",
+    "Almonds": "🌰",
+    "Cashews": "🌰",
+    "Walnuts": "🌰",
+    "Chia Seeds": "🌱",
+    "Flaxseeds": "🌾",
+    "Pumpkin Seeds": "🎃",
+    "Sunflower Seeds": "🌻",
+    "Soy Milk": "🥛",
+    "Almond Milk": "🥛",
+    "Oat Milk": "🥛",
+    "Coconut Milk (Canned)": "🥥",
+}
 
 
 class BackendUnavailable(Exception):
@@ -196,6 +232,50 @@ html, body, [class*="css"] {
 }
 .result-card:hover {
     border-color: #4ade80;
+}
+
+/* ── Product guide / spotlight ── */
+.product-emoji {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 170px;
+    font-size: 5rem;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 12px;
+}
+.tag {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin: 0.15rem 0.25rem 0.15rem 0;
+}
+.result-card-head {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+}
+.result-card-body {
+    flex: 1;
+    min-width: 0;
+}
+.result-thumb {
+    width: 78px;
+    height: 78px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 1px solid #334155;
+    flex-shrink: 0;
+}
+.result-thumb-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    background: #0f172a;
 }
 
 /* ── Rank badge ── */
@@ -487,6 +567,172 @@ def get_original_macros(product_name: str) -> dict | None:
     return {col: float(r[col]) for col in MACRO_COLS}
 
 
+def _slug(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+
+def _as_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().upper() == "TRUE"
+
+
+def product_image(name: str) -> Path | None:
+    """Return the locally stored photo for a product, if one exists."""
+    for ext in (".jpg", ".jpeg", ".png", ".webp"):
+        candidate = PRODUCT_IMAGE_DIR / f"{_slug(name)}{ext}"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def product_image_src(name: str) -> str | None:
+    """Return a data-URI for embedding a product photo in custom HTML."""
+    image = product_image(name)
+    if not image:
+        return None
+    mime = "image/png" if image.suffix.lower() == ".png" else "image/jpeg"
+    encoded = base64.b64encode(image.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
+
+
+@st.cache_data
+def load_product_details() -> dict[str, dict]:
+    """Every product row as a dict, with the city list parsed out."""
+    df = load_product_csv()
+    details: dict[str, dict] = {}
+    for _, row in df.iterrows():
+        details[str(row["name"])] = {
+            "category": str(row["category"]),
+            "protein": float(row["protein"]),
+            "carbs": float(row["carbs"]),
+            "fat": float(row["fat"]),
+            "fiber": float(row["fiber"]),
+            "calories": float(row["calories"]),
+            "vegan": _as_bool(row["vegan"]),
+            "gluten_free": _as_bool(row["gluten_free"]),
+            "contains_soy": _as_bool(row["contains_soy"]),
+            "contains_nuts": _as_bool(row["contains_nuts"]),
+            "contains_dairy": _as_bool(row["contains_dairy"]),
+            "cities": [c.strip() for c in str(row["cities"]).split(",") if c.strip()],
+        }
+    return details
+
+
+def _macro_line(detail: dict) -> str:
+    return (
+        f"**Protein** {detail['protein']:g} g &nbsp;·&nbsp; "
+        f"**Carbs** {detail['carbs']:g} g &nbsp;·&nbsp; "
+        f"**Fat** {detail['fat']:g} g<br>"
+        f"**Fibre** {detail['fiber']:g} g &nbsp;·&nbsp; "
+        f"**{detail['calories']:g} kcal** "
+        "<span style='color:#64748b;'>(per 100 g)</span>"
+    )
+
+
+def _badges_html(detail: dict) -> str:
+    badges = []
+    if detail["vegan"]:
+        badges.append(("🌱 Vegan", "good"))
+    if detail["gluten_free"]:
+        badges.append(("🌾 Gluten-free", "good"))
+    if detail["contains_soy"]:
+        badges.append(("⚠️ Soy", "warn"))
+    if detail["contains_nuts"]:
+        badges.append(("⚠️ Nuts", "warn"))
+    if detail["contains_dairy"]:
+        badges.append(("⚠️ Dairy", "warn"))
+
+    colors = {
+        "good": ("rgba(74,222,128,0.12)", "#4ade80", "rgba(74,222,128,0.35)"),
+        "warn": ("rgba(251,191,36,0.12)", "#fbbf24", "rgba(251,191,36,0.35)"),
+    }
+    return "".join(
+        f'<span class="tag" style="background:{colors[tone][0]};color:{colors[tone][1]};'
+        f'border:1px solid {colors[tone][2]};">{label}</span>'
+        for label, tone in badges
+    )
+
+
+def render_product_spotlight(name: str, detail: dict) -> None:
+    """Photo + full nutrition and diet/allergen details for one product."""
+    with st.container(border=True):
+        col_img, col_info = st.columns([1, 2.2], gap="medium")
+        with col_img:
+            image = product_image(name)
+            if image:
+                st.image(str(image), use_container_width=True)
+            else:
+                st.markdown(
+                    f'<div class="product-emoji">{PRODUCT_EMOJI.get(name, "🥗")}</div>',
+                    unsafe_allow_html=True,
+                )
+        with col_info:
+            st.markdown(f"### {PRODUCT_EMOJI.get(name, '🥗')} {name}")
+            st.caption(detail["category"])
+            st.markdown(_macro_line(detail), unsafe_allow_html=True)
+            st.markdown(_badges_html(detail), unsafe_allow_html=True)
+            with st.expander(f"📍 Available in {len(detail['cities'])} cities"):
+                st.write(", ".join(detail["cities"]))
+
+
+def render_product_guide(details: dict[str, dict]) -> None:
+    """Searchable grid of every product with a photo and its key details."""
+    col_search, col_category = st.columns([2, 1], gap="medium")
+    with col_search:
+        query = st.text_input(
+            "Search products",
+            placeholder="Search by name or category…",
+            label_visibility="collapsed",
+            key="guide_search",
+        ).strip().lower()
+    with col_category:
+        categories = sorted({d["category"] for d in details.values()})
+        category = st.selectbox(
+            "Category",
+            ["All categories", *categories],
+            label_visibility="collapsed",
+            key="guide_category",
+        )
+
+    names = sorted(details)
+    if query:
+        names = [
+            n for n in names
+            if query in n.lower() or query in details[n]["category"].lower()
+        ]
+    if category != "All categories":
+        names = [n for n in names if details[n]["category"] == category]
+
+    if not names:
+        st.info("No products match that search.")
+        return
+
+    cols = st.columns(3, gap="medium")
+    for i, name in enumerate(names):
+        detail = details[name]
+        with cols[i % 3]:
+            with st.container(border=True):
+                image = product_image(name)
+                if image:
+                    st.image(str(image), use_container_width=True)
+                else:
+                    st.markdown(
+                        f'<div class="product-emoji">{PRODUCT_EMOJI.get(name, "🥗")}</div>',
+                        unsafe_allow_html=True,
+                    )
+                st.markdown(f"**{PRODUCT_EMOJI.get(name, '🥗')} {name}**")
+                st.caption(detail["category"])
+                st.markdown(_macro_line(detail), unsafe_allow_html=True)
+                st.markdown(_badges_html(detail), unsafe_allow_html=True)
+                st.caption(f"📍 {len(detail['cities'])} cities")
+
+    st.caption(
+        "Product photos: Wikipedia / Wikimedia Commons — "
+        "see `assets/products/CREDITS.md` for the source of each image."
+    )
+
+
 def call_api(payload: dict) -> requests.Response | None:
     """
     POST to /suggest-alternative.
@@ -597,6 +843,9 @@ with st.sidebar:
 # Main area — results
 # ─────────────────────────────────────────────
 
+product_details = load_product_details()
+selected_detail = product_details.get(selected_product)
+
 if not find_btn:
     # Built as one unindented HTML string: Markdown ends an HTML block at the
     # first blank line and would turn any indented remainder into a code block.
@@ -634,6 +883,20 @@ if not find_btn:
         "</div>",
         unsafe_allow_html=True,
     )
+
+    if selected_detail:
+        st.markdown("### 🔎 About your product")
+        render_product_spotlight(selected_product, selected_detail)
+        st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+
+    st.markdown("### 📖 Product guide")
+    st.caption(
+        "New to a food? Browse the catalogue to see what it looks like, "
+        "its macros per 100 g, diet rules and allergens."
+    )
+    if st.toggle(f"Show all {len(product_details)} products", key="show_product_guide"):
+        render_product_guide(product_details)
+
     st.stop()
 
 
@@ -722,13 +985,28 @@ for alt in alternatives:
 
     with st.container():
         # ── Card header ──
+        thumb = product_image_src(alt["name"])
+        if thumb:
+            thumb_html = (
+                f'<img class="result-thumb" src="{thumb}" alt="{alt["name"]}">'
+            )
+        else:
+            thumb_html = (
+                f'<div class="result-thumb result-thumb-fallback">'
+                f'{PRODUCT_EMOJI.get(alt["name"], "🥗")}</div>'
+            )
         st.markdown(f"""
         <div class="result-card">
-            <span class="rank-badge" style="background:{color}22;color:{color};">{label}</span>
-            <p class="card-product-name">{alt['name']}
-                <span class="score-pill">score {alt['match_score']}</span>
-            </p>
-            <p class="card-category">{alt['category']} &nbsp;·&nbsp; Available in: {alt['cities']}</p>
+            <div class="result-card-head">
+                {thumb_html}
+                <div class="result-card-body">
+                    <span class="rank-badge" style="background:{color}22;color:{color};">{label}</span>
+                    <p class="card-product-name">{alt['name']}
+                        <span class="score-pill">score {alt['match_score']}</span>
+                    </p>
+                    <p class="card-category">{alt['category']} &nbsp;·&nbsp; Available in: {alt['cities']}</p>
+                </div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
