@@ -385,6 +385,78 @@ PRODUCT_HOW_TO_USE = {
     },
 }
 
+# ─────────────────────────────────────────────────────────────
+# Local / regional Indian names for each product
+# ─────────────────────────────────────────────────────────────
+PRODUCT_LOCAL_NAMES: dict[str, str] = {
+    "Whey Protein Powder":       "Whey Protein / व्हे प्रोटीन पाउडर",
+    "Pea Protein Powder":        "Matar Protein / मटर प्रोटीन पाउडर",
+    "Soya Chunks (TVP)":         "Soya Badi / सोया बड़ी",
+    "Tofu (Firm)":               "Tofu / टोफू",
+    "Tempeh":                    "Tempeh / टेम्पेह",
+    "Edamame":                   "Edamame / हरी सोयाबीन",
+    "Paneer":                    "Paneer / पनीर",
+    "Greek Yogurt":              "Greek Dahi / ग्रीक दही",
+    "Cottage Cheese (Low Fat)":  "Chenna / छेना",
+    "Masoor Dal (Red Lentils)":  "Masoor Dal / मसूर दाल",
+    "Chana Dal":                 "Chana Dal / चना दाल",
+    "Moong Dal":                 "Moong Dal / मूंग दाल",
+    "Chickpeas (Kabuli Chana)":  "Kabuli Chana / काबुली चना",
+    "Rajma (Kidney Beans)":      "Rajma / राजमा",
+    "Rolled Oats":               "Jai / जई (Oats)",
+    "Quinoa":                    "Quinoa / क्विनोआ",
+    "Brown Rice":                "Bhoora Chawal / भूरे चावल",
+    "Peanut Butter":             "Mungfali Makhan / मूंगफली का मक्खन",
+    "Almond Butter":             "Badam Makhan / बादाम का मक्खन",
+    "Almonds":                   "Badam / बादाम",
+    "Cashews":                   "Kaju / काजू",
+    "Walnuts":                   "Akhrot / अखरोट",
+    "Chia Seeds":                "Chia Beej / चिया बीज",
+    "Flaxseeds":                 "Alsi / अलसी",
+    "Pumpkin Seeds":             "Kaddu ke Beej / कद्दू के बीज",
+    "Sunflower Seeds":           "Surajmukhi ke Beej / सूरजमुखी के बीज",
+    "Soy Milk":                  "Soya Doodh / सोया दूध",
+    "Almond Milk":               "Badam Doodh / बादाम दूध",
+    "Oat Milk":                  "Oat Doodh / ओट दूध",
+    "Coconut Milk (Canned)":     "Nariyal ka Doodh / नारियल का दूध",
+}
+
+# ─────────────────────────────────────────────────────────────
+# Safety / Consumption Precautions
+# ─────────────────────────────────────────────────────────────
+PRODUCT_CAUTIONS: dict[str, str | None] = {
+    "Whey Protein Powder":       "Contains dairy (lactose) — not suitable for lactose-intolerant individuals. Excessive intake may stress kidneys; stay within recommended dosage.",
+    "Pea Protein Powder":        None,
+    "Soya Chunks (TVP)":         "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
+    "Tofu (Firm)":               "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
+    "Tempeh":                    "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
+    "Edamame":                   "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
+    "Paneer":                    "Contains dairy — avoid if lactose intolerant or dairy-allergic.",
+    "Greek Yogurt":              "Contains dairy — avoid if lactose intolerant or dairy-allergic.",
+    "Cottage Cheese (Low Fat)":  "Contains dairy — avoid if lactose intolerant or dairy-allergic.",
+    "Masoor Dal (Red Lentils)":  "High in FODMAPs — may cause bloating in those with IBS. Soak and cook thoroughly for better digestibility.",
+    "Chana Dal":                 "High in FODMAPs — may cause bloating in those with IBS. Soak and cook thoroughly for better digestibility.",
+    "Moong Dal":                 "High in FODMAPs — may cause bloating in those with IBS. Soak and cook thoroughly for better digestibility.",
+    "Chickpeas (Kabuli Chana)":  "High in FODMAPs — may cause bloating in those with IBS. Soak and cook thoroughly for better digestibility.",
+    "Rajma (Kidney Beans)":      "Raw or undercooked kidney beans contain toxic lectins. Always soak 8–12 hours and boil thoroughly — never eat raw.",
+    "Rolled Oats":               "Contains oats — may not be suitable for those with severe gluten intolerance unless certified gluten-free.",
+    "Quinoa":                    "Rinse thoroughly to remove saponins which can irritate digestion. Those with oxalate kidney stones should moderate intake.",
+    "Brown Rice":                None,
+    "Peanut Butter":             "Contains peanuts — avoid with peanut or groundnut allergy.",
+    "Almond Butter":             "Contains tree nuts — avoid if you have a tree-nut allergy.",
+    "Almonds":                   "Contains tree nuts — avoid if you have a tree-nut allergy.",
+    "Cashews":                   "Contains tree nuts — avoid if you have a tree-nut allergy. High in oxalates — moderate intake if prone to kidney stones.",
+    "Walnuts":                   "Contains tree nuts — avoid if you have a tree-nut allergy.",
+    "Chia Seeds":                "Always soak before consuming — dry chia seeds can swell in the throat. Drink plenty of water throughout the day.",
+    "Flaxseeds":                 "May interact with blood thinners (warfarin) and blood-pressure medication. Avoid in large amounts during pregnancy.",
+    "Pumpkin Seeds":             None,
+    "Sunflower Seeds":           None,
+    "Soy Milk":                  "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
+    "Almond Milk":               None,
+    "Oat Milk":                  "Made from oats — not suitable for those with severe gluten intolerance or coeliac disease unless certified gluten-free.",
+    "Coconut Milk (Canned)":     "High in saturated fat — consume in moderation if managing cholesterol or cardiovascular health.",
+}
+
 
 class BackendUnavailable(Exception):
     """Raised when GET /products cannot reach the API."""
@@ -815,7 +887,59 @@ html, body, [class*="css"] {
     font-size: 0.8rem;
     text-transform: uppercase;
 }
-</style>
+
+/* ── Net Carbs keto highlight badge ── */
+.net-carbs-keto {
+    display: inline-block;
+    background: rgba(251,191,36,0.15);
+    border: 1px solid rgba(251,191,36,0.4);
+    color: #fbbf24;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-left: 0.4rem;
+}
+.net-carbs-normal {
+    display: inline-block;
+    background: rgba(148,163,184,0.1);
+    border: 1px solid #334155;
+    color: #cbd5e1;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 0.78rem;
+    margin-left: 0.4rem;
+}
+
+/* ── Local name tag ── */
+.local-name-tag {
+    display: inline-block;
+    background: rgba(96,165,250,0.1);
+    border: 1px solid rgba(96,165,250,0.3);
+    color: #93c5fd;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    margin-top: 0.25rem;
+    letter-spacing: 0.01em;
+}
+
+/* ── Caution callout ── */
+.caution-box {
+    background: rgba(239,68,68,0.07);
+    border-left: 3px solid rgba(239,68,68,0.5);
+    border-radius: 0 8px 8px 0;
+    padding: 0.55rem 0.9rem;
+    margin-top: 0.6rem;
+    font-size: 0.84rem;
+    color: #fca5a5;
+    line-height: 1.55;
+}
+.caution-box strong {
+    color: #f87171;
+    font-weight: 600;
+}</style>
 """, unsafe_allow_html=True)
 
 
@@ -982,8 +1106,22 @@ def _badges_html(detail: dict) -> str:
     )
 
 
-def render_product_spotlight(name: str, detail: dict) -> None:
-    """Photo + full nutrition, diet/allergen details, and how-to-use for one product."""
+def render_product_spotlight(name: str, detail: dict, keto: bool = False) -> None:
+    """Photo + nutrition, local name, net carbs (keto-highlighted), how-to-use, and caution."""
+    # ── Pre-compute net carbs ──────────────────────────────────────────
+    net_carbs = max(0.0, detail["carbs"] - detail["fiber"])
+    nc_cls    = "net-carbs-keto" if keto else "net-carbs-normal"
+    nc_badge  = (
+        f'<span class="{nc_cls}">⚡ Net Carbs {net_carbs:g} g</span>'
+    )
+
+    # ── Local name tag ─────────────────────────────────────────────────
+    local_name = PRODUCT_LOCAL_NAMES.get(name, "")
+    local_tag  = (
+        f'<span class="local-name-tag">🗺️ {local_name}</span>'
+        if local_name else ""
+    )
+
     with st.container(border=True):
         col_img, col_info = st.columns([1, 2.2], gap="medium")
         with col_img:
@@ -996,15 +1134,23 @@ def render_product_spotlight(name: str, detail: dict) -> None:
                     unsafe_allow_html=True,
                 )
         with col_info:
-            st.markdown(f"### {PRODUCT_EMOJI.get(name, '🥗')} {name}")
+            st.markdown(
+                f"### {PRODUCT_EMOJI.get(name, '🥗')} {name}",
+            )
+            # Local name tag below the title
+            if local_tag:
+                st.markdown(local_tag, unsafe_allow_html=True)
             st.caption(detail["category"])
             st.markdown(_macro_line(detail), unsafe_allow_html=True)
+            # Net carbs badge (highlighted amber when keto is active)
+            st.markdown(nc_badge, unsafe_allow_html=True)
             st.markdown(_badges_html(detail), unsafe_allow_html=True)
             with st.expander(f"📍 Available in {len(detail['cities'])} cities"):
                 st.write(", ".join(detail["cities"]))
 
     # ── How to Use / Eat section ──────────────────────────────────────
-    how_to = PRODUCT_HOW_TO_USE.get(name)
+    how_to  = PRODUCT_HOW_TO_USE.get(name)
+    caution = PRODUCT_CAUTIONS.get(name)
     if how_to:
         st.markdown("#### 🍽️ How to Eat / Use")
         col_a, col_b = st.columns([1, 1], gap="medium")
@@ -1053,6 +1199,12 @@ def render_product_spotlight(name: str, detail: dict) -> None:
                     </ul>
                 </div>
                 """,
+                unsafe_allow_html=True,
+            )
+        # ── Caution callout ───────────────────────────────────────────
+        if caution:
+            st.markdown(
+                f'<div class="caution-box"><strong>⚠️ Caution / Who Should Avoid:</strong> {caution}</div>',
                 unsafe_allow_html=True,
             )
 
@@ -1267,7 +1419,11 @@ if not find_btn:
 
     if selected_detail:
         st.markdown("### 🥗 Your Regular Food")
-        render_product_spotlight(selected_product, selected_detail)
+        render_product_spotlight(
+            selected_product,
+            selected_detail,
+            keto="keto" in selected_diets,
+        )
         st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
     st.markdown("### 📖 Product guide")
@@ -1374,6 +1530,7 @@ with _srv_col:
         help="Switch between Per 100 g (default) and the product's defined serving size",
     )
 _unit_label = "per serving" if per_serving_on else "per 100 g"
+keto_on     = "keto" in selected_diets   # used for net-carbs highlight
 
 def _scale(macros: dict, product_name: str) -> dict:
     """Return a copy of macros dict scaled to serving size (if toggle is on)."""
@@ -1411,6 +1568,15 @@ for alt in alternatives:
                 f'<div class="result-thumb result-thumb-fallback">'
                 f'{PRODUCT_EMOJI.get(alt["name"], "🥗")}</div>'
             )
+        # Local name + net carbs for the alt product
+        alt_local   = PRODUCT_LOCAL_NAMES.get(alt["name"], "")
+        alt_local_tag = (
+            f'<span class="local-name-tag" style="margin-left:0;">🗺️ {alt_local}</span>'
+            if alt_local else ""
+        )
+        alt_nc      = max(0.0, nutr["carbs"] - nutr["fiber"])
+        alt_nc_cls  = "net-carbs-keto" if keto_on else "net-carbs-normal"
+        alt_nc_tag  = f'<span class="{alt_nc_cls}">⚡ Net Carbs {alt_nc:g} g</span>'
         st.markdown(f"""
         <div class="result-card">
             <div class="result-card-head">
@@ -1419,7 +1585,9 @@ for alt in alternatives:
                     <span class="rank-badge" style="background:{color}22;color:{color};">{label}</span>
                     <p class="card-product-name">{alt['name']}
                         <span class="score-pill">{round((1 - alt['match_score']) * 100)}% Match</span>
+                        {alt_nc_tag}
                     </p>
+                    {f'<p style="margin:0 0 0.2rem;">{alt_local_tag}</p>' if alt_local_tag else ''}
                     <p class="card-category">{alt['category']} &nbsp;·&nbsp; Available in: {alt['cities'].replace(',', ', ')}</p>
                 </div>
             </div>
@@ -1432,13 +1600,20 @@ for alt in alternatives:
         with col_table:
             st.markdown(f"**Nutrition Breakdown** *({_unit_label})*")
             if orig_scaled:
+                # Net carbs rows (scaled same way as other macros)
+                orig_nc_val = max(0.0, round(orig_scaled["carbs"] - orig_scaled["fiber"], 1))
+                nutr_nc_val = max(0.0, round(nutr_scaled["carbs"] - nutr_scaled["fiber"], 1))
                 comparison_df = pd.DataFrame({
-                    "Nutrient":     ["Protein (g)", "Carbs (g)", "Fat (g)", "Fiber (g)", "Calories (kcal)"],
+                    "Nutrient": [
+                        "Protein (g)", "Carbs (g)", "Fat (g)",
+                        "Fiber (g)", "⚡ Net Carbs (g)", "Calories (kcal)",
+                    ],
                     f"🏠 {selected_product}": [
                         orig_scaled["protein"],
                         orig_scaled["carbs"],
                         orig_scaled["fat"],
                         orig_scaled["fiber"],
+                        orig_nc_val,
                         orig_scaled["calories"],
                     ],
                     f"📍 {alt['name']}": [
@@ -1446,6 +1621,7 @@ for alt in alternatives:
                         nutr_scaled["carbs"],
                         nutr_scaled["fat"],
                         nutr_scaled["fiber"],
+                        nutr_nc_val,
                         nutr_scaled["calories"],
                     ],
                 })
