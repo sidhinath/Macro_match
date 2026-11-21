@@ -301,6 +301,7 @@ html, body, [class*="css"] {
     font-size: 0.85rem;
     color: #64748b;
     margin-bottom: 0.4rem;
+    overflow-wrap: anywhere;
 }
 
 /* ── Explanation box ── */
@@ -949,32 +950,38 @@ data         = response.json()
 alternatives = data.get("alternatives", [])
 orig_macros  = get_original_macros(selected_product)
 
+# ── Back to home ──────────────────────────────
+# Clicking this reruns the script with find_btn False, which renders the landing page.
+st.button("🏠 Back to home", key="back_to_home", help="Return to the start page")
+
 # ── Summary strip ─────────────────────────────
-st.markdown(f"""
-<div style="
-    background:#1e293b;
-    border:1px solid #334155;
-    border-radius:12px;
-    padding:0.75rem 1.25rem;
-    margin-bottom:1.25rem;
-    display:flex;
-    align-items:center;
-    gap:1rem;
-">
-    <span style="font-size:1.5rem">✅</span>
-    <div>
-        <span style="color:#f1f5f9;font-weight:600;">
-            Found {len(alternatives)} alternative{'s' if len(alternatives) != 1 else ''}
-            for <em>{selected_product}</em> in {selected_city}
-        </span><br>
-        <span style="color:#64748b;font-size:0.85rem;">
-            Priority: {PRIORITY_LABELS[priority_label].split('—')[0].strip()}
-            {"&nbsp;·&nbsp; Diet: " + ", ".join(selected_diets) if selected_diets else ""}
-            {"&nbsp;·&nbsp; Avoiding: " + ", ".join(selected_allergens) if selected_allergens else ""}
-        </span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+# Built as one unindented string: a whitespace-only line would end the Markdown
+# HTML block and turn the closing tags into a code block.
+diet_text = (
+    f"&nbsp;·&nbsp; Diet: {', '.join(selected_diets)}" if selected_diets else ""
+)
+allergen_text = (
+    f"&nbsp;·&nbsp; Avoiding: {', '.join(selected_allergens)}"
+    if selected_allergens
+    else ""
+)
+summary_html = (
+    '<div style="background:#1e293b;border:1px solid #334155;border-radius:12px;'
+    'padding:0.75rem 1.25rem;margin-bottom:1.25rem;display:flex;'
+    'align-items:center;gap:1rem;">'
+    '<span style="font-size:1.5rem">✅</span>'
+    '<div>'
+    '<span style="color:#f1f5f9;font-weight:600;">'
+    f"Found {len(alternatives)} alternative{'s' if len(alternatives) != 1 else ''} "
+    f"for <em>{selected_product}</em> in {selected_city}"
+    '</span><br>'
+    '<span style="color:#64748b;font-size:0.85rem;">'
+    f"Priority: {PRIORITY_LABELS[priority_label].split('—')[0].strip()}"
+    f"{diet_text}{allergen_text}"
+    '</span>'
+    '</div></div>'
+)
+st.markdown(summary_html, unsafe_allow_html=True)
 
 # ── Result cards ──────────────────────────────
 for alt in alternatives:
@@ -1004,7 +1011,7 @@ for alt in alternatives:
                     <p class="card-product-name">{alt['name']}
                         <span class="score-pill">score {alt['match_score']}</span>
                     </p>
-                    <p class="card-category">{alt['category']} &nbsp;·&nbsp; Available in: {alt['cities']}</p>
+                    <p class="card-category">{alt['category']} &nbsp;·&nbsp; Available in: {alt['cities'].replace(',', ', ')}</p>
                 </div>
             </div>
         </div>
