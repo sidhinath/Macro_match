@@ -65,12 +65,17 @@ def _resolve_api_base() -> str:
 
 
 API_BASE         = _resolve_api_base()
-GET_TIMEOUT      = 20   # seconds; free-tier hosts can need ~1 min to wake from sleep
+GET_TIMEOUT      = 90   # seconds; Render's free tier can need 30-60 s to wake from sleep
 POST_TIMEOUT     = 90   # seconds; includes the optional Claude call
 CITIES_FALLBACK   = ["Delhi", "Mumbai", "Bangalore", "Dehradun", "Pune"]
 DIET_OPTIONS    = ["vegan", "gluten_free", "keto"]
 ALLERGEN_OPTIONS= ["soy", "nuts", "dairy"]
 MACRO_COLS      = ["protein", "carbs", "fat", "fiber", "calories"]
+
+
+class BackendUnavailable(Exception):
+    """Raised when GET /products cannot reach the API."""
+
 
 PRIORITY_LABELS = {
     "protein":  "🥩 Protein-first — match protein content most closely",
@@ -428,15 +433,19 @@ html, body, [class*="css"] {
 
 @st.cache_data(ttl=60)
 def fetch_product_list() -> list[str]:
-    """Fetch all product names from GET /products. Returns [] if unreachable."""
+    """
+    Fetch all product names from GET /products.
+
+    Raises BackendUnavailable on failure so the failure is never cached: the
+    next rerun retries the API instead of replaying a stale "unreachable" result.
+    """
     try:
         resp = requests.get(f"{API_BASE}/products", timeout=GET_TIMEOUT)
         resp.raise_for_status()
         return resp.json().get("products", [])
-    except requests.exceptions.RequestException:
-        # Connection error, timeout, or non-2xx status — the sidebar shows a
-        # single "cannot reach backend" message, so no detail is needed here.
-        return []
+    except requests.exceptions.RequestException as exc:
+        # Connection error, timeout, or non-2xx status.
+        raise BackendUnavailable(API_BASE) from exc
 
 
 @st.cache_data
@@ -525,15 +534,25 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     st.markdown("## 🛒 Your Product")
-    products = fetch_product_list()
-
-    if not products:
+    try:
+        with st.spinner(
+            "Connecting to the backend — free hosting can take up to a minute to wake…"
+        ):
+            products = fetch_product_list()
+    except BackendUnavailable:
         st.error(
             f"⚠️ Cannot reach the backend at `{API_BASE}`.\n\n"
-            "If it is a free-tier deployment, it may still be waking up — "
-            "wait about a minute and reload. Locally, start it with:\n\n"
+            "The free-tier API may be asleep or still starting. Retry in a "
+            "moment; locally, start it with:\n\n"
             "`uvicorn backend.main:app --reload`"
         )
+        if st.button("🔄 Retry", use_container_width=True):
+            fetch_product_list.clear()
+            st.rerun()
+        st.stop()
+
+    if not products:
+        st.error("The backend returned an empty product list. Please try again.")
         st.stop()
 
     selected_product = st.selectbox(
