@@ -84,14 +84,14 @@ def _build_prompt(data: ExplainerInput) -> str:
     # Format each alternative with its exact macro numbers
     alternatives_section = ""
     for i, alt in enumerate(data.alternatives, start=1):
+        match_pct = round((1 - alt.match_score) * 100)
         alternatives_section += (
-            f"\nAlternative {i}: {alt.name}\n"
+            f"\nAlternative {i}: {alt.name}  ({match_pct}% match)\n"
             f"  - Protein  : {alt.protein}g per 100g\n"
             f"  - Carbs    : {alt.carbs}g per 100g\n"
             f"  - Fat      : {alt.fat}g per 100g\n"
             f"  - Fiber    : {alt.fiber}g per 100g\n"
             f"  - Calories : {alt.calories} kcal per 100g\n"
-            f"  - Match score: {alt.match_score} (lower = closer to original)\n"
             f"  - Available in: {alt.cities}\n"
         )
 
@@ -117,6 +117,7 @@ Write exactly 2 sentences for each alternative. Each explanation must:
 
 Rules you MUST follow:
 - Use ONLY the numbers given above. Do NOT perform any calculations. Do NOT add, subtract, compare, or derive any new numbers.
+- Do NOT include the match percentage or any score number in your sentences — the app displays it separately in the UI.
 - Do NOT use markdown, bullet points, headers, or bold text.
 - Do NOT number the alternatives in your response.
 - Write in a friendly, simple, non-technical tone — as if speaking to someone tracking macros for the first time.
@@ -137,17 +138,20 @@ def _build_fallback_explanations(data: ExplainerInput) -> list[str]:
     If the Claude API call fails (network error, missing key, rate limit, etc.),
     this generates safe, data-driven fallback text using only Python string formatting.
     No LLM is involved — this is deterministic.
+
+    Design note: macro numbers and match score are intentionally NOT embedded in
+    this string — the frontend renders them live (with per-serving scaling) in its
+    own data footer. Only narrative context (city, diet, allergens) goes here.
     """
     fallbacks = []
     diet_str     = ", ".join(data.diet_rules) if data.diet_rules else "no specific diet"
     allergen_str = ", ".join(data.allergens)  if data.allergens  else "no allergens"
 
     for alt in data.alternatives:
+        match_pct = round((1 - alt.match_score) * 100)
         text = (
-            f"{alt.name} is a close nutritional match for {data.original_product}, "
-            f"with {alt.protein}g protein, {alt.carbs}g carbs, {alt.fat}g fat, "
-            f"and {alt.calories} kcal per 100g (match score: {alt.match_score}). "
-            f"It is available in {data.city}, and is compatible with your diet "
+            f"{alt.name} is a {match_pct}% nutritional match for {data.original_product}. "
+            f"It is available in {data.city} and is compatible with your diet "
             f"({diet_str}) and allergen requirements ({allergen_str})."
         )
         fallbacks.append(text)

@@ -1699,9 +1699,57 @@ for alt in alternatives:
         # ── Explanation ──
         explanation = alt.get("explanation", "").strip()
         if explanation:
+            # ── Sanitise any leaked raw score patterns from the backend ──────
+            # Handles: "match score: 0.0873", "(match score: 0.0873)", etc.
+            import re as _re
+            match_pct_str = f"{round((1 - alt['match_score']) * 100)}% match"
+            explanation = _re.sub(
+                r"\(?\s*match\s+score\s*[:\-]?\s*[\d]+\.[\d]+\s*\)?",
+                f"({match_pct_str})",
+                explanation,
+                flags=_re.IGNORECASE,
+            )
+            # Remove stray standalone raw decimal score artifacts e.g. "0.0873"
+            explanation = _re.sub(
+                r"\b0\.\d{3,6}\b",
+                "",
+                explanation,
+            ).strip()
+
+            # ── Build the live data footer (always in sync with toggle) ──────
+            srv_g   = PRODUCT_SERVING_G.get(alt["name"], 100) if per_serving_on else None
+            if srv_g:
+                factor      = srv_g / 100.0
+                p_val       = round(nutr_scaled["protein"],  1)
+                c_val       = round(nutr_scaled["carbs"],    1)
+                f_val       = round(nutr_scaled["fat"],      1)
+                kcal_val    = round(nutr_scaled["calories"])
+                unit_detail = f"per {srv_g} g serving"
+            else:
+                p_val       = nutr["protein"]
+                c_val       = nutr["carbs"]
+                f_val       = nutr["fat"]
+                kcal_val    = nutr["calories"]
+                unit_detail = "per 100 g"
+
+            data_footer = (
+                f'<span style="opacity:0.7;font-style:normal;">'
+                f'📊 {p_val:g}g protein · {c_val:g}g carbs · {f_val:g}g fat · '
+                f'{kcal_val:g} kcal'
+                f'<span style="margin-left:0.4rem;font-size:0.8em;opacity:0.75;">'
+                f'({unit_detail})</span>'
+                f' · <strong style="color:#4ade80;">{match_pct_str}</strong>'
+                f'</span>'
+            )
+
             st.markdown(f"""
             <div class="explanation-box">
                 💬 {explanation}
+                <div style="margin-top:0.5rem;padding-top:0.45rem;
+                            border-top:1px solid rgba(74,222,128,0.2);
+                            font-size:0.83rem;">
+                    {data_footer}
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
