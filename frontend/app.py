@@ -109,6 +109,283 @@ PRODUCT_EMOJI = {
 }
 
 
+# ─────────────────────────────────────────────────────────────
+# How-to-use / serving tips for each product
+# ─────────────────────────────────────────────────────────────
+PRODUCT_HOW_TO_USE = {
+    "Whey Protein Powder": {
+        "serving": "1–2 scoops (25–50 g)",
+        "tips": [
+            "🥤 Post-workout shake: Mix 1 scoop with 200–250 ml cold water or milk.",
+            "🫙 Add to Greek yogurt or oatmeal for a protein boost.",
+            "🧁 Use in protein pancakes, muffins, or energy balls.",
+        ],
+        "best_time": "Within 30 min after workout",
+    },
+    "Pea Protein Powder": {
+        "serving": "1–2 scoops (25–40 g)",
+        "tips": [
+            "🥤 Blend with plant milk, banana, and nut butter for a vegan shake.",
+            "🍲 Stir into soups or curries to increase protein without changing taste much.",
+            "🧁 Works well in baked goods like protein cookies or bars.",
+        ],
+        "best_time": "Post-workout or as a meal supplement",
+    },
+    "Soya Chunks (TVP)": {
+        "serving": "30–50 g dry (doubles when soaked)",
+        "tips": [
+            "💧 Soak in hot water for 15–20 min, then squeeze out water before cooking.",
+            "🍛 Use in curries, bhurji, biryani, or pulao.",
+            "🥗 Marinate and grill for a high-protein snack.",
+        ],
+        "best_time": "Lunch or dinner as main protein source",
+    },
+    "Tofu (Firm)": {
+        "serving": "100–150 g per serving",
+        "tips": [
+            "🔪 Press firmly for 15–20 min to remove extra moisture before cooking.",
+            "🍳 Pan-fry or bake at 200°C for 20 min for crispy texture.",
+            "🍛 Add to stir-fries, curries, or scramble like eggs with turmeric.",
+        ],
+        "best_time": "Lunch or dinner",
+    },
+    "Tempeh": {
+        "serving": "80–100 g per serving",
+        "tips": [
+            "🔪 Slice thin and marinate in soy sauce + garlic for 30 min.",
+            "🍳 Stir-fry, bake, or grill until golden brown.",
+            "🌯 Use in wraps, sandwiches, or rice bowls.",
+        ],
+        "best_time": "Lunch or dinner",
+    },
+    "Edamame": {
+        "serving": "1 cup (155 g) shelled",
+        "tips": [
+            "♨️ Boil in salted water for 5 min or microwave from frozen.",
+            "🧂 Sprinkle with sea salt and eat straight from the pod.",
+            "🥗 Toss into salads, grain bowls, or fried rice.",
+        ],
+        "best_time": "Snack or side dish anytime",
+    },
+    "Paneer": {
+        "serving": "80–100 g per serving",
+        "tips": [
+            "🍳 Cube and sauté in oil until golden, then add to curries.",
+            "🔥 Grill as paneer tikka with spices and yogurt marinade.",
+            "🥗 Crumble into salads or bhurji with vegetables.",
+        ],
+        "best_time": "Lunch or dinner",
+    },
+    "Greek Yogurt": {
+        "serving": "150–200 g",
+        "tips": [
+            "🍓 Top with berries, honey, and granola for a quick breakfast.",
+            "🥣 Use as a base for smoothie bowls or dips (like tzatziki).",
+            "🍲 Use as a healthy substitute for cream in curries and marinades.",
+        ],
+        "best_time": "Breakfast or post-workout snack",
+    },
+    "Cottage Cheese (Low Fat)": {
+        "serving": "100–150 g",
+        "tips": [
+            "🥗 Eat plain with fruit or mix with herbs and salt as a dip.",
+            "🥞 Blend into pancake batter or scrambled eggs for added protein.",
+            "🫙 Top on toast or crackers for a quick high-protein snack.",
+        ],
+        "best_time": "Breakfast, snack, or pre-sleep (slow-digesting protein)",
+    },
+    "Masoor Dal (Red Lentils)": {
+        "serving": "50–75 g dry (makes ~1 cup cooked)",
+        "tips": [
+            "💧 No soaking needed — rinse and cook directly in 2–3x water.",
+            "🍲 Cook as simple dal tadka with cumin, turmeric, and tomatoes.",
+            "🫙 Make dal soup or add to khichdi for a balanced meal.",
+        ],
+        "best_time": "Lunch or dinner",
+    },
+    "Chana Dal": {
+        "serving": "50–75 g dry",
+        "tips": [
+            "💧 Soak 1–2 hours before cooking for faster, creamier results.",
+            "🍲 Cook as dal or use in chana dal khichdi with rice.",
+            "🥘 Use in stuffed parathas or as a base for snack like dalmoth.",
+        ],
+        "best_time": "Lunch or dinner",
+    },
+    "Moong Dal": {
+        "serving": "50–75 g dry",
+        "tips": [
+            "💧 Soak split moong for 30 min; whole moong for 4–6 hours.",
+            "🍲 Make classic moong dal, khichdi, or moong dal soup.",
+            "🫘 Sprout whole moong for a raw, nutrient-dense salad topping.",
+        ],
+        "best_time": "Any meal; sprouted as breakfast",
+    },
+    "Chickpeas (Kabuli Chana)": {
+        "serving": "80–100 g cooked (~35 g dry)",
+        "tips": [
+            "💧 Soak overnight (8–10 hrs) and pressure cook for 2–3 whistles.",
+            "🍛 Use in chole curry, chaat, or hummus.",
+            "🫙 Roast with spices at 200°C for crispy high-protein snack.",
+        ],
+        "best_time": "Lunch or dinner",
+    },
+    "Rajma (Kidney Beans)": {
+        "serving": "80–100 g cooked (~40 g dry)",
+        "tips": [
+            "💧 Must soak 8–12 hours and boil thoroughly — never eat raw.",
+            "🍛 Classic rajma chawal: cook in tomato-onion masala.",
+            "🌯 Use in burritos, wraps, or bean salads.",
+        ],
+        "best_time": "Lunch or dinner",
+    },
+    "Rolled Oats": {
+        "serving": "40–50 g dry",
+        "tips": [
+            "🥣 Overnight oats: Mix with milk/curd and refrigerate overnight.",
+            "🍳 Cook with water or milk for 3–5 min; top with fruits and nuts.",
+            "🧁 Use in homemade granola bars, protein muffins, or chilla.",
+        ],
+        "best_time": "Breakfast or pre-workout",
+    },
+    "Quinoa": {
+        "serving": "45–60 g dry (makes ~1 cup cooked)",
+        "tips": [
+            "💧 Rinse well before cooking to remove bitterness (saponins).",
+            "🍚 Cook in 2x water for 15 min; fluff with fork — use like rice.",
+            "🥗 Use in grain bowls, stuffed peppers, or quinoa upma.",
+        ],
+        "best_time": "Lunch or dinner",
+    },
+    "Brown Rice": {
+        "serving": "50–75 g dry (makes ~1 cup cooked)",
+        "tips": [
+            "💧 Soak 30 min for fluffier texture; cook in 2–2.5x water.",
+            "🍚 Use as a base for dal, sabzi, or protein bowls.",
+            "🥗 Make brown rice salad with veggies and lemon dressing.",
+        ],
+        "best_time": "Lunch or dinner",
+    },
+    "Peanut Butter": {
+        "serving": "1–2 tbsp (15–30 g)",
+        "tips": [
+            "🍞 Spread on whole grain toast with banana slices.",
+            "🥤 Blend into smoothies or protein shakes for healthy fats.",
+            "🍎 Dip apple, celery, or rice cakes for a balanced snack.",
+        ],
+        "best_time": "Breakfast or pre-workout snack",
+    },
+    "Almond Butter": {
+        "serving": "1–2 tbsp (15–30 g)",
+        "tips": [
+            "🍞 Spread on toast, roti, or rice cakes for a nutritious snack.",
+            "🥤 Add to smoothies, overnight oats, or protein shakes.",
+            "🍎 Pair with fruit slices (apple, banana) for a balanced snack.",
+        ],
+        "best_time": "Morning snack or pre-workout",
+    },
+    "Almonds": {
+        "serving": "20–30 g (a small handful, ~20 nuts)",
+        "tips": [
+            "🌰 Eat raw or dry-roasted as a quick snack between meals.",
+            "🥣 Chop and sprinkle on oatmeal, yogurt, or salads.",
+            "💧 Soak overnight for easier digestion and better nutrient absorption.",
+        ],
+        "best_time": "Morning (soaked) or mid-day snack",
+    },
+    "Cashews": {
+        "serving": "20–30 g",
+        "tips": [
+            "🌰 Eat raw as a snack or mix into trail mix.",
+            "🫙 Blend soaked cashews with water to make creamy cashew milk/cream.",
+            "🍛 Use in curries like paneer makhani or korma for richness.",
+        ],
+        "best_time": "Snack or as cooking ingredient",
+    },
+    "Walnuts": {
+        "serving": "20–28 g (4–7 halves)",
+        "tips": [
+            "🌰 Eat raw — best consumed as-is to preserve omega-3 content.",
+            "🥗 Chop and add to salads, oatmeal, or baked goods.",
+            "💧 Soak overnight to reduce bitterness and improve digestibility.",
+        ],
+        "best_time": "Morning (empty stomach if soaked) or afternoon snack",
+    },
+    "Chia Seeds": {
+        "serving": "1–2 tbsp (10–20 g)",
+        "tips": [
+            "💧 Soak in 3x liquid for 15–30 min to form a gel — do not eat dry.",
+            "🥣 Make chia pudding with milk/yogurt overnight; top with fruits.",
+            "🥤 Add soaked chia to smoothies, juices, or lemonade.",
+        ],
+        "best_time": "Breakfast or pre-sleep snack",
+    },
+    "Flaxseeds": {
+        "serving": "1–2 tbsp (10–15 g)",
+        "tips": [
+            "⚠️ Grind before eating — whole seeds pass undigested.",
+            "🍞 Add ground flax to roti dough, oatmeal, or smoothies.",
+            "🥣 Mix with water (1 tbsp + 3 tbsp water) as an egg replacer.",
+        ],
+        "best_time": "Morning with breakfast",
+    },
+    "Pumpkin Seeds": {
+        "serving": "20–30 g",
+        "tips": [
+            "🌰 Eat raw or lightly roasted with a pinch of salt.",
+            "🥗 Sprinkle on salads, soups, or yogurt for crunch.",
+            "🧁 Add to granola, trail mix, or homemade energy bars.",
+        ],
+        "best_time": "Snack anytime",
+    },
+    "Sunflower Seeds": {
+        "serving": "20–30 g",
+        "tips": [
+            "🌻 Eat hulled seeds raw or roasted as a snack.",
+            "🥗 Add to salads, stir-fries, or baked goods.",
+            "🫙 Blend into sunflower seed butter as a nut-free alternative.",
+        ],
+        "best_time": "Snack or topping",
+    },
+    "Soy Milk": {
+        "serving": "200–250 ml",
+        "tips": [
+            "☕ Use as a 1:1 replacement for dairy milk in tea, coffee, or cereal.",
+            "🥤 Blend into smoothies or protein shakes.",
+            "🍳 Use in cooking — soups, curries, pancake batter.",
+        ],
+        "best_time": "Anytime — with breakfast or as a snack drink",
+    },
+    "Almond Milk": {
+        "serving": "200–250 ml",
+        "tips": [
+            "☕ Add to coffee, tea, or pour over cereal and oats.",
+            "🥤 Use as a smoothie base instead of dairy milk.",
+            "🍳 Use in baking, pancake batter, or creamy soups.",
+        ],
+        "best_time": "Breakfast or anytime",
+    },
+    "Oat Milk": {
+        "serving": "200–250 ml",
+        "tips": [
+            "☕ Best for coffee — it froths well and complements mild bitterness.",
+            "🥣 Pour over muesli or use in overnight oats.",
+            "🍳 Use in cooking and baking as a dairy-milk substitute.",
+        ],
+        "best_time": "Morning or with meals",
+    },
+    "Coconut Milk (Canned)": {
+        "serving": "50–100 ml (shake/stir before opening)",
+        "tips": [
+            "🍛 Use full-fat in curries, dals, or rice dishes for creaminess.",
+            "🥥 Refrigerate overnight — the cream rises; use cream for desserts.",
+            "🥤 Dilute 1:1 with water for a lighter cooking or smoothie base.",
+        ],
+        "best_time": "With meals; great in post-workout curry bowls",
+    },
+}
+
+
 class BackendUnavailable(Exception):
     """Raised when GET /products cannot reach the API."""
 
@@ -656,7 +933,7 @@ def _badges_html(detail: dict) -> str:
 
 
 def render_product_spotlight(name: str, detail: dict) -> None:
-    """Photo + full nutrition and diet/allergen details for one product."""
+    """Photo + full nutrition, diet/allergen details, and how-to-use for one product."""
     with st.container(border=True):
         col_img, col_info = st.columns([1, 2.2], gap="medium")
         with col_img:
@@ -675,6 +952,59 @@ def render_product_spotlight(name: str, detail: dict) -> None:
             st.markdown(_badges_html(detail), unsafe_allow_html=True)
             with st.expander(f"📍 Available in {len(detail['cities'])} cities"):
                 st.write(", ".join(detail["cities"]))
+
+    # ── How to Use / Eat section ──────────────────────────────────────
+    how_to = PRODUCT_HOW_TO_USE.get(name)
+    if how_to:
+        st.markdown("#### 🍽️ How to Eat / Use")
+        col_a, col_b = st.columns([1, 1], gap="medium")
+        with col_a:
+            st.markdown(
+                f"""
+                <div style="
+                    background:#1e293b;
+                    border:1px solid #334155;
+                    border-radius:12px;
+                    padding:0.8rem 1rem;
+                    margin-bottom:0.5rem;
+                ">
+                    <p style="margin:0 0 0.2rem;color:#94a3b8;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;">Serving Size</p>
+                    <p style="margin:0;font-size:1rem;font-weight:600;color:#f1f5f9;">{how_to['serving']}</p>
+                </div>
+                <div style="
+                    background:#1e293b;
+                    border:1px solid #334155;
+                    border-radius:12px;
+                    padding:0.8rem 1rem;
+                ">
+                    <p style="margin:0 0 0.2rem;color:#94a3b8;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;">⏰ Best Time to Have</p>
+                    <p style="margin:0;font-size:0.95rem;color:#f1f5f9;">{how_to['best_time']}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with col_b:
+            tips_html = "".join(
+                f'<li style="margin-bottom:0.4rem;color:#cbd5e1;">{tip}</li>'
+                for tip in how_to["tips"]
+            )
+            st.markdown(
+                f"""
+                <div style="
+                    background:#1e293b;
+                    border:1px solid #334155;
+                    border-radius:12px;
+                    padding:0.8rem 1rem;
+                    height:100%;
+                ">
+                    <p style="margin:0 0 0.5rem;color:#94a3b8;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;">💡 Tips & Ways to Eat</p>
+                    <ul style="margin:0;padding-left:1.1rem;list-style:none;">
+                        {tips_html}
+                    </ul>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
 
 def render_product_guide(details: dict[str, dict]) -> None:
