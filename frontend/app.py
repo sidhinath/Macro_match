@@ -717,24 +717,30 @@ h1, h2, h3, .stHeading {
     letter-spacing: 0.02em;
 }
 
-/* ── Primary action (mint green) ── */
+/* ── Primary action (emerald gradient) ── */
 .stButton > button[kind="primary"],
-.stButton > button[data-testid="stBaseButton-primary"] {
-    background: var(--accent-mint) !important;
+.stButton > button[data-testid="stBaseButton-primary"],
+button[kind="primary"],
+button[kind="primary"] p {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
     border: none !important;
-    color: var(--accent-mint-text) !important;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-weight: 700;
-    border-radius: 10px;
-    transition: all 0.2s ease;
-    box-shadow: 0 0 0 rgba(52, 211, 153, 0);
+    color: #FFFFFF !important;
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.3px !important;
+    border-radius: 10px !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
 }
 .stButton > button[kind="primary"]:hover,
-.stButton > button[data-testid="stBaseButton-primary"]:hover {
-    background: #2FC78A !important;
-    color: var(--accent-mint-text) !important;
-    transform: translateY(-1px);
-    box-shadow: 0 0 20px rgba(52, 211, 153, 0.35);
+.stButton > button[data-testid="stBaseButton-primary"]:hover,
+button[kind="primary"]:hover,
+button[kind="primary"] p:hover {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+    color: #FFFFFF !important;
+    transform: translateY(-1px) !important;
+    filter: brightness(1.08) !important;
+    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.5) !important;
 }
 
 /* ── Section divider ── */
