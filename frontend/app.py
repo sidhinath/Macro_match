@@ -511,11 +511,44 @@ PRODUCT_SERVING_G: dict[str, int] = {
 # ─────────────────────────────────────────────
 st.markdown("""
 <style>
-/* ── Google Font ── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* ── Google Fonts ── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
 
+/* ── Hide default Streamlit chrome ── */
+/* Top-right action bar (Share / GitHub / star / more-options menu) */
+#MainMenu, [data-testid="stToolbar"], .stAppToolbar { visibility: hidden !important; }
+/* Default Streamlit footer ("Made with Streamlit") */
+footer { visibility: hidden !important; }
+/* Keep the sidebar expand/collapse arrow visible and functional */
+button[kind="header"] { visibility: visible !important; }
+/* Content sits cleanly at the top of the page */
+section.main > div[data-testid="stMainBlockContainer"],
+div.block-container { padding-top: 1.5rem !important; }
+
+/* ── Base typography ── */
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
+}
+/* Sidebar inputs, buttons, and labels */
+input, select, textarea, button, label,
+.stSelectbox, .stTextInput, .stNumberInput, .stMultiselect,
+.stRadio, .stCheckbox, .stSlider, .stDateInput, .stTimeInput,
+.stButton button, .stDownloadButton button {
+    font-family: 'Inter', sans-serif;
+}
+
+/* ── Headings ── */
+h1, h2, h3, .stHeading {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* ── Tabular numbers for clean metric alignment ── */
+[data-testid="stMetricContainer"],
+[data-testid="stMetricValue"],
+[data-testid="stMetricDelta"],
+[data-testid="stMetricLabel"],
+.stMetric {
+    font-variant-numeric: tabular-nums;
 }
 
 /* ── App background ── */
