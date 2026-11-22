@@ -515,12 +515,14 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
 
 /* ── Hide default Streamlit chrome ── */
-/* Top-right action bar (Share / GitHub / star / more-options menu) */
-#MainMenu, [data-testid="stToolbar"], .stAppToolbar { visibility: hidden !important; }
+/* Top-right action bar (Share / GitHub / star / edit / hamburger menu) */
+#MainMenu, [data-testid="stToolbar"], .stAppToolbar,
+header button:not([kind="header"]) { visibility: hidden !important; }
 /* Default Streamlit footer ("Made with Streamlit") */
 footer { visibility: hidden !important; }
 /* Keep the sidebar expand/collapse arrow visible and functional */
-button[kind="header"] { visibility: visible !important; }
+button[kind="header"],
+button[data-testid="baseButton-header"] { visibility: visible !important; opacity: 1 !important; }
 /* Content sits cleanly at the top of the page */
 section.main > div[data-testid="stMainBlockContainer"],
 div.block-container { padding-top: 1.5rem !important; }
