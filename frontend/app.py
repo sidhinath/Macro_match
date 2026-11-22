@@ -537,6 +537,8 @@ header button:not([kind="header"]):not([data-testid="baseButton-header"]) {
 }
 /* Default Streamlit footer ("Made with Streamlit") */
 footer { display: none !important; }
+/* Remove empty dark bar left by the hidden Streamlit header */
+header[data-testid="stHeader"] { height: 0px; background: transparent !important; }
 /* Keep the sidebar expand/collapse arrow visible and functional */
 button[kind="header"],
 button[data-testid="baseButton-header"] {
@@ -544,9 +546,9 @@ button[data-testid="baseButton-header"] {
     visibility: visible !important;
     opacity: 1 !important;
 }
-/* Content sits cleanly at the top of the page */
+/* Content sits cleanly at the top of the page with breathing room */
 section.main > div[data-testid="stMainBlockContainer"],
-div.block-container { padding-top: 1.5rem !important; }
+div.block-container { padding-top: 2.5rem !important; }
 
 /* ── Base typography ── */
 html, body, [class*="css"] {
