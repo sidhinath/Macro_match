@@ -786,6 +786,9 @@ button[kind="primary"] p:hover {
     object-fit: cover;
     border-radius: 12px;
     border: 1px solid var(--border);
+    padding: 4px;
+    background: #FFFFFF;
+    box-sizing: border-box;
     flex-shrink: 0;
     aspect-ratio: 1;
 }
@@ -798,9 +801,11 @@ button[kind="primary"] p:hover {
     min-width: 88px;
     min-height: 88px;
     font-size: 2rem;
-    background: #0B0F19;
+    background: #FFFFFF;
     border: 1px solid var(--border);
     border-radius: 12px;
+    padding: 4px;
+    box-sizing: border-box;
     flex-shrink: 0;
     aspect-ratio: 1;
 }
@@ -1075,6 +1080,14 @@ button[kind="primary"] p:hover {
     text-transform: uppercase;
 }
 
+/* Center-align Streamlit dataframe (Nutrition Breakdown) headers & cells */
+[data-testid="stDataFrame"] th,
+[data-testid="stDataFrame"] td,
+.stDataFrame th,
+.stDataFrame td {
+    text-align: center !important;
+}
+
 /* ── Net Carbs keto highlight badge ── */
 .net-carbs-keto {
     display: inline-block;
@@ -1187,7 +1200,7 @@ def get_original_macros(product_name: str) -> dict | None:
     if row.empty:
         return None
     r = row.iloc[0]
-    return {col: float(r[col]) for col in MACRO_COLS}
+    return {col: float(r.get(col, 0.0)) for col in MACRO_COLS}
 
 
 def _slug(name: str) -> str:
@@ -1221,26 +1234,30 @@ def product_image_src(name: str) -> str | None:
 
 @st.cache_data
 def load_product_details() -> dict[str, dict]:
-    """Every product row as a dict, with the city list parsed out."""
+    """Every product row as a dict, with the city list parsed out.
+
+    Uses row.get(...) with safe defaults so a missing/older CSV column can
+    never raise a KeyError — the app simply falls back to False / 0.0.
+    """
     df = load_product_csv()
     details: dict[str, dict] = {}
     for _, row in df.iterrows():
         details[str(row["name"])] = {
-            "category": str(row["category"]),
-            "protein": float(row["protein"]),
-            "carbs": float(row["carbs"]),
-            "fat": float(row["fat"]),
-            "fiber": float(row["fiber"]),
-            "calories": float(row["calories"]),
-            "vegetarian": _as_bool(row["vegetarian"]),
-            "vegan": _as_bool(row["vegan"]),
-            "dairy_free": _as_bool(row["dairy_free"]),
-            "gluten_free": _as_bool(row["gluten_free"]),
-            "low_sugar": _as_bool(row["low_sugar"]),
-            "contains_soy": _as_bool(row["contains_soy"]),
-            "contains_nuts": _as_bool(row["contains_nuts"]),
-            "contains_dairy": _as_bool(row["contains_dairy"]),
-            "cities": [c.strip() for c in str(row["cities"]).split(",") if c.strip()],
+            "category": str(row.get("category", "")),
+            "protein": float(row.get("protein", 0.0)),
+            "carbs": float(row.get("carbs", 0.0)),
+            "fat": float(row.get("fat", 0.0)),
+            "fiber": float(row.get("fiber", 0.0)),
+            "calories": float(row.get("calories", 0.0)),
+            "vegetarian": _as_bool(row.get("vegetarian", False)),
+            "vegan": _as_bool(row.get("vegan", False)),
+            "dairy_free": _as_bool(row.get("dairy_free", False)),
+            "gluten_free": _as_bool(row.get("gluten_free", False)),
+            "low_sugar": _as_bool(row.get("low_sugar", False)),
+            "contains_soy": _as_bool(row.get("contains_soy", False)),
+            "contains_nuts": _as_bool(row.get("contains_nuts", False)),
+            "contains_dairy": _as_bool(row.get("contains_dairy", False)),
+            "cities": [c.strip() for c in str(row.get("cities", "")).split(",") if c.strip()],
         }
     return details
 
