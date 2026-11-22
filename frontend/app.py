@@ -520,6 +520,8 @@ st.markdown("""
     --border-hover: rgba(52, 211, 153, 0.35);
     --accent-mint: #34D399;
     --accent-mint-text: #0B0F19;
+    --text-heading: #F8FAFC;
+    --text-body: #E2E8F0;
     --text-muted: #94A3B8;
     --radius: 14px;
 }
@@ -543,6 +545,9 @@ div.block-container { padding-top: 1.5rem !important; }
 /* ── Base typography ── */
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--text-body);
 }
 /* Sidebar inputs, buttons, and labels */
 input, select, textarea, button, label,
@@ -550,11 +555,14 @@ input, select, textarea, button, label,
 .stRadio, .stCheckbox, .stSlider, .stDateInput, .stTimeInput,
 .stButton button, .stDownloadButton button {
     font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    color: var(--text-body);
 }
 
 /* ── Headings ── */
 h1, h2, h3, .stHeading {
     font-family: 'Plus Jakarta Sans', sans-serif;
+    color: var(--text-heading);
 }
 
 /* ── Tabular numbers for clean metric alignment ── */
@@ -569,7 +577,7 @@ h1, h2, h3, .stHeading {
 /* ── App background ── */
 .stApp {
     background: var(--bg-obsidian);
-    color: #e2e8f0;
+    color: var(--text-body);
 }
 
 /* ── Sidebar ── */
@@ -578,17 +586,34 @@ h1, h2, h3, .stHeading {
     border-right: 1px solid var(--border);
 }
 [data-testid="stSidebar"] .stMarkdown h2 {
-    color: #f1f5f9;
-    font-size: 0.8rem;
+    color: var(--text-body);
+    font-size: 0.875rem;
     text-transform: uppercase;
     letter-spacing: 0.15em;
     margin-bottom: 0.25rem;
-    font-weight: 700;
+    font-weight: 600;
     display: inline-block;
-    padding: 0.15rem 0.6rem;
+    padding: 0.2rem 0.7rem;
     border-radius: 999px;
     background: rgba(52, 211, 153, 0.12);
     border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+/* Sidebar widget labels — crisp white, 14px–15px */
+[data-testid="stSidebar"] label {
+    color: var(--text-heading) !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+}
+
+/* Sidebar checkbox / radio options — crisp white, 14px–15px */
+[data-testid="stSidebar"] .stCheckbox > label > div,
+[data-testid="stSidebar"] .stCheckbox > label > span,
+[data-testid="stSidebar"] .stRadio > label > div,
+[data-testid="stSidebar"] .stRadio > label > span {
+    color: var(--text-heading) !important;
+    font-size: 0.9rem !important;
+    font-weight: 500 !important;
 }
 
 /* Sidebar form elements — cleaner borders & rounded corners */
@@ -639,8 +664,8 @@ h1, h2, h3, .stHeading {
     line-height: 1.1;
 }
 .sidebar-header .sidebar-tagline {
-    font-size: 0.72rem;
-    color: var(--text-muted);
+    font-size: 0.875rem;
+    color: var(--text-body);
     margin: 0;
     font-weight: 400;
     line-height: 1.1;
@@ -670,6 +695,7 @@ h1, h2, h3, .stHeading {
     display: inline-block;
     font-size: 2.5rem !important;
     font-weight: 800;
+    color: var(--text-heading);
     background: linear-gradient(90deg, #34D399, #60a5fa);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -679,7 +705,7 @@ h1, h2, h3, .stHeading {
 }
 .hero-tagline {
     font-size: 1rem !important;
-    color: var(--text-muted) !important;
+    color: var(--text-body) !important;
     margin: 0.4rem 0 0 !important;
     font-weight: 400;
     letter-spacing: 0.02em;
@@ -768,21 +794,22 @@ h1, h2, h3, .stHeading {
 /* ── Tag / pill badges ── */
 .tag {
     display: inline-block;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 600;
-    padding: 1.5px 7px;
+    padding: 2px 8px;
     border-radius: 999px;
-    margin: 0.12rem 0.2rem 0.12rem 0;
+    margin: 0.15rem 0.25rem 0.15rem 0;
+    color: var(--text-body);
 }
 .macro-pill {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     font-weight: 600;
     font-family: 'Inter', sans-serif;
     font-variant-numeric: tabular-nums;
-    padding: 3px 9px;
+    padding: 4px 10px;
     border-radius: 999px;
     margin: 0.1rem 0.25rem 0.1rem 0;
     border: 1px solid;
@@ -796,13 +823,14 @@ h1, h2, h3, .stHeading {
 /* ── Rank badge ── */
 .rank-badge {
     display: inline-block;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     padding: 3px 10px;
     border-radius: 999px;
     margin-bottom: 0.35rem;
+    color: var(--text-heading);
 }
 
 /* ── Product name in card ── */
@@ -810,12 +838,12 @@ h1, h2, h3, .stHeading {
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 1.35rem;
     font-weight: 700;
-    color: #f1f5f9;
+    color: var(--text-heading);
     margin: 0 0 0.15rem;
 }
 .card-category {
-    font-size: 0.8rem;
-    color: var(--text-muted);
+    font-size: 0.95rem;
+    color: var(--text-body);
     margin-bottom: 0.35rem;
     overflow-wrap: anywhere;
 }
@@ -826,9 +854,9 @@ h1, h2, h3, .stHeading {
     border-left: 3px solid var(--accent-mint);
     border-radius: 0 8px 8px 0;
     padding: 0.7rem 1rem;
-    font-size: 0.9rem;
-    color: #cbd5e1;
-    line-height: 1.6;
+    font-size: 0.95rem;
+    color: var(--text-body);
+    line-height: 1.5;
     margin-top: 0.6rem;
     font-style: italic;
 }
@@ -840,8 +868,8 @@ h1, h2, h3, .stHeading {
     border: 1px solid var(--border);
     border-radius: 999px;
     padding: 2px 10px;
-    font-size: 0.8rem;
-    color: var(--text-muted);
+    font-size: 0.875rem;
+    color: var(--text-body);
     margin-left: 0.5rem;
     font-family: 'Inter', sans-serif;
     font-variant-numeric: tabular-nums;
@@ -870,7 +898,7 @@ h1, h2, h3, .stHeading {
 .landing-eyebrow {
     text-align: center;
     color: #60a5fa;
-    font-size: 0.68rem;
+    font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.18em;
     text-transform: uppercase;
@@ -879,31 +907,31 @@ h1, h2, h3, .stHeading {
 .landing-title {
     font-family: 'Plus Jakarta Sans', sans-serif;
     text-align: center;
-    color: #f1f5f9;
-    font-size: 1.6rem;
+    color: var(--text-heading);
+    font-size: 1.75rem;
     font-weight: 800;
-    line-height: 1.2;
-    margin: 0 0 0.45rem;
+    line-height: 1.25;
+    margin: 0 0 0.5rem;
 }
 .landing-sub {
     max-width: 640px;
     margin: 0 auto 0.9rem !important;
     text-align: center;
-    color: #cbd5e1 !important;
-    font-size: 0.9rem !important;
-    line-height: 1.55;
+    color: var(--text-body) !important;
+    font-size: 0.95rem !important;
+    line-height: 1.5;
 }
 .steps {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 0.45rem;
+    gap: 0.5rem;
     margin: 0.5rem 0;
 }
 .step {
     background: rgba(11, 15, 25, 0.5);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 0.65rem 0.6rem 0.7rem;
+    padding: 0.75rem 0.7rem 0.8rem;
     transition: all 0.2s ease;
 }
 .step:hover {
@@ -914,11 +942,11 @@ h1, h2, h3, .stHeading {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border-radius: 8px;
-    margin-bottom: 0.3rem;
-    font-size: 0.8rem;
+    margin-bottom: 0.35rem;
+    font-size: 0.85rem;
     font-weight: 800;
     color: var(--bg-obsidian);
     background: var(--accent-mint);
@@ -926,49 +954,50 @@ h1, h2, h3, .stHeading {
 .step h3 {
     font-family: 'Plus Jakarta Sans', sans-serif;
     margin: 0 0 0.15rem;
-    font-size: 0.88rem;
+    font-size: 0.95rem;
     font-weight: 700;
-    color: #e2e8f0;
+    color: var(--text-heading);
 }
 .step p {
     margin: 0;
-    font-size: 0.78rem;
-    line-height: 1.45;
-    color: #cbd5e1;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--text-body);
 }
 .landing-cta {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 0.45rem;
-    margin-top: 0.75rem;
-    padding-top: 0.65rem;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+    padding-top: 0.7rem;
     border-top: 1px dashed var(--border);
     color: var(--text-muted);
-    font-size: 0.85rem;
+    font-size: 0.9rem;
 }
 .landing-cta .arrow { color: #60a5fa; font-weight: 700; }
 .landing-facts {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 0.4rem;
-    margin-top: 0.5rem;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
 }
 .landing-facts span {
-    font-size: 0.68rem;
+    font-size: 0.8rem;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    color: var(--text-muted);
+    color: var(--text-body);
     background: rgba(11, 15, 25, 0.5);
     border: 1px solid var(--border);
     border-radius: 999px;
-    padding: 0.18rem 0.6rem;
+    padding: 0.2rem 0.7rem;
+    font-weight: 600;
 }
 @media (max-width: 820px) {
     .landing { padding: 0.9rem 1rem 0.8rem; }
-    .landing-title { font-size: 1.3rem; }
+    .landing-title { font-size: 1.4rem; }
     .steps { grid-template-columns: 1fr; }
 }
 
@@ -1020,14 +1049,15 @@ h1, h2, h3, .stHeading {
     border-radius: 10px;
     padding: 1rem 1.25rem;
     color: #FCA5A5;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
 }
 
 /* ── Comparison table ── */
 .macro-table th {
-    color: #cbd5e1;
-    font-weight: 500;
-    font-size: 0.8rem;
+    color: var(--text-body);
+    font-weight: 600;
+    font-size: 0.875rem;
     text-transform: uppercase;
 }
 
@@ -1039,7 +1069,7 @@ h1, h2, h3, .stHeading {
     color: #fbbf24;
     border-radius: 6px;
     padding: 2px 8px;
-    font-size: 0.78rem;
+    font-size: 0.8rem;
     font-weight: 600;
     margin-left: 0.4rem;
 }
@@ -1047,10 +1077,10 @@ h1, h2, h3, .stHeading {
     display: inline-block;
     background: rgba(148,163,184,0.1);
     border: 1px solid var(--border);
-    color: #cbd5e1;
+    color: var(--text-body);
     border-radius: 6px;
     padding: 2px 8px;
-    font-size: 0.78rem;
+    font-size: 0.8rem;
     margin-left: 0.4rem;
 }
 
@@ -1062,8 +1092,8 @@ h1, h2, h3, .stHeading {
     color: #93c5fd;
     border-radius: 999px;
     padding: 2px 10px;
-    font-size: 0.78rem;
-    font-weight: 500;
+    font-size: 0.8rem;
+    font-weight: 600;
     margin-top: 0.25rem;
     letter-spacing: 0.01em;
 }
@@ -1075,9 +1105,9 @@ h1, h2, h3, .stHeading {
     border-radius: 0 8px 8px 0;
     padding: 0.55rem 0.9rem;
     margin-top: 0.6rem;
-    font-size: 0.84rem;
+    font-size: 0.9rem;
     color: #fca5a5;
-    line-height: 1.55;
+    line-height: 1.5;
 }
 .caution-box strong {
     color: #f87171;
