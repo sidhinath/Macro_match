@@ -507,10 +507,23 @@ PRODUCT_SERVING_G: dict[str, int] = {
 }
 
 # ─────────────────────────────────────────────
-# Custom CSS — clean, modern, card-based design
+# Custom CSS — sleek, modern, consumer-grade dark-mode SaaS look
 # ─────────────────────────────────────────────
 st.markdown("""
 <style>
+/* ── Design tokens ── */
+:root {
+    --bg-obsidian: #0B0F19;
+    --bg-sidebar: #111827;
+    --bg-card: #151C2C;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-hover: rgba(52, 211, 153, 0.35);
+    --accent-mint: #34D399;
+    --accent-mint-text: #0B0F19;
+    --text-muted: #94A3B8;
+    --radius: 14px;
+}
+
 /* ── Google Fonts ── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
 
@@ -555,14 +568,14 @@ h1, h2, h3, .stHeading {
 
 /* ── App background ── */
 .stApp {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    background: var(--bg-obsidian);
     color: #e2e8f0;
 }
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] {
-    background: #1e293b;
-    border-right: 1px solid #334155;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
 }
 [data-testid="stSidebar"] .stMarkdown h2 {
     color: #f1f5f9;
@@ -574,133 +587,217 @@ h1, h2, h3, .stHeading {
     display: inline-block;
     padding: 0.15rem 0.6rem;
     border-radius: 999px;
-    background: rgba(96, 165, 250, 0.15);
-    border: 1px solid rgba(96, 165, 250, 0.35);
+    background: rgba(52, 211, 153, 0.12);
+    border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+/* Sidebar form elements — cleaner borders & rounded corners */
+[data-testid="stSidebar"] .stSelectbox > div > div,
+[data-testid="stSidebar"] .stTextInput > div > div,
+[data-testid="stSidebar"] .stNumberInput > div > div,
+[data-testid="stSidebar"] .stMultiselect > div > div {
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+}
+[data-testid="stSidebar"] .stCheckbox > label,
+[data-testid="stSidebar"] .stRadio > label {
+    font-family: 'Inter', sans-serif;
+}
+
+/* ── Sidebar logo pill ── */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 0.9rem 1.1rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.25rem;
+    max-width: 100%;
+}
+.sidebar-header .sidebar-logo {
+    height: 2.4rem;
+    width: auto;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: #0B0F19;
+    padding: 0.12rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.sidebar-header .sidebar-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.sidebar-header .sidebar-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #f1f5f9;
+    margin: 0 0 0.1rem;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+.sidebar-header .sidebar-tagline {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin: 0;
+    font-weight: 400;
+    line-height: 1.1;
 }
 
 /* ── Hero header ── */
 .hero-block {
     text-align: center;
-    padding: 1.2rem 1rem 0.8rem;
+    padding: 0.9rem 1rem 0.6rem;
 }
-/* Logo + heading grouped together */
 .hero-brand {
     display: inline-flex;
     align-items: center;
     gap: 0.75rem;
 }
 .hero-logo {
-    height: 2.9rem;
+    height: 2.7rem;
     width: auto;
     display: block;
+    border-radius: 10px;
+    background: #0B0F19;
+    padding: 0.12rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
-/* Streamlit's own paragraph rules outrank a bare class, hence !important. */
 .hero-title {
-    display: inline-block;          /* keep the gradient inside the word */
-    font-size: 2.6rem !important;
-    font-weight: 700;
-    background: linear-gradient(90deg, #4ade80, #60a5fa);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    display: inline-block;
+    font-size: 2.5rem !important;
+    font-weight: 800;
+    background: linear-gradient(90deg, #34D399, #60a5fa);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    line-height: 1.15;
+    line-height: 1.1;
     margin: 0 !important;
 }
 .hero-tagline {
-    font-size: 1.05rem !important;
-    color: #94a3b8 !important;
-    margin: 0.45rem 0 0 !important;
-    font-weight: 300;
-    letter-spacing: 0.03em;
+    font-size: 1rem !important;
+    color: var(--text-muted) !important;
+    margin: 0.4rem 0 0 !important;
+    font-weight: 400;
+    letter-spacing: 0.02em;
 }
 
-/* ── Primary action ── */
+/* ── Primary action (mint green) ── */
 .stButton > button[kind="primary"],
 .stButton > button[data-testid="stBaseButton-primary"] {
-    background: #2E74B5;
-    border: 1px solid #3b82f6;
-    color: #f8fafc;
-    font-weight: 600;
+    background: var(--accent-mint) !important;
+    border: none !important;
+    color: var(--accent-mint-text) !important;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700;
     border-radius: 10px;
-    transition: background 0.2s, transform 0.15s;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 0 rgba(52, 211, 153, 0);
 }
 .stButton > button[kind="primary"]:hover,
 .stButton > button[data-testid="stBaseButton-primary"]:hover {
-    background: #3b82f6;
-    border-color: #60a5fa;
-    color: #f8fafc;
+    background: #2FC78A !important;
+    color: var(--accent-mint-text) !important;
     transform: translateY(-1px);
+    box-shadow: 0 0 20px rgba(52, 211, 153, 0.35);
 }
 
 /* ── Section divider ── */
 .section-divider {
     border: none;
-    border-top: 1px solid #334155;
-    margin: 0.8rem 0;
+    border-top: 1px solid var(--border);
+    margin: 0.7rem 0;
 }
 
 /* ── Result card ── */
 .result-card {
-    background: #1e293b;
-    border-radius: 16px;
-    border: 1px solid #334155;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     padding: 1rem 1.25rem;
     margin-bottom: 1rem;
-    transition: border-color 0.2s;
+    transition: all 0.2s ease;
 }
 .result-card:hover {
-    border-color: #4ade80;
+    transform: translateY(-3px);
+    border-color: var(--border-hover);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 
-/* ── Product guide / spotlight ── */
+/* ── Product images — fixed aspect ratio ── */
 .product-emoji {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 170px;
-    font-size: 5rem;
-    background: #0f172a;
-    border: 1px solid #334155;
+    min-height: 150px;
+    font-size: 4.2rem;
+    background: #0B0F19;
+    border: 1px solid var(--border);
     border-radius: 12px;
-}
-.tag {
-    display: inline-block;
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 999px;
-    margin: 0.15rem 0.25rem 0.15rem 0;
-}
-.result-card-head {
-    display: flex;
-    align-items: center;
-    gap: 0.9rem;
-}
-.result-card-body {
-    flex: 1;
-    min-width: 0;
 }
 .result-thumb {
-    width: 78px;
-    height: 78px;
+    width: 88px;
+    height: 88px;
+    min-width: 88px;
+    min-height: 88px;
     object-fit: cover;
     border-radius: 12px;
-    border: 1px solid #334155;
+    border: 1px solid var(--border);
     flex-shrink: 0;
+    aspect-ratio: 1;
 }
 .result-thumb-fallback {
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 88px;
+    height: 88px;
+    min-width: 88px;
+    min-height: 88px;
     font-size: 2rem;
-    background: #0f172a;
+    background: #0B0F19;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    flex-shrink: 0;
+    aspect-ratio: 1;
 }
+
+/* ── Tag / pill badges ── */
+.tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 1.5px 7px;
+    border-radius: 999px;
+    margin: 0.12rem 0.2rem 0.12rem 0;
+}
+.macro-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    font-variant-numeric: tabular-nums;
+    padding: 3px 9px;
+    border-radius: 999px;
+    margin: 0.1rem 0.25rem 0.1rem 0;
+    border: 1px solid;
+}
+.macro-pill.protein { background: rgba(52, 211, 153, 0.12); color: #34D399; border-color: rgba(52, 211, 153, 0.35); }
+.macro-pill.carbs   { background: rgba(96, 165, 250, 0.12); color: #60A5FA; border-color: rgba(96, 165, 250, 0.35); }
+.macro-pill.fat     { background: rgba(244, 114, 182, 0.12); color: #F472B6; border-color: rgba(244, 114, 182, 0.35); }
+.macro-pill.fiber   { background: rgba(168, 85, 247, 0.12); color: #A855F7; border-color: rgba(168, 85, 247, 0.35); }
+.macro-pill.calories{ background: rgba(251, 191, 36, 0.12); color: #FBBF24; border-color: rgba(251, 191, 36, 0.35); }
 
 /* ── Rank badge ── */
 .rank-badge {
     display: inline-block;
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 0.7rem;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     padding: 3px 10px;
@@ -710,22 +807,23 @@ h1, h2, h3, .stHeading {
 
 /* ── Product name in card ── */
 .card-product-name {
-    font-size: 1.4rem;
-    font-weight: 600;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 1.35rem;
+    font-weight: 700;
     color: #f1f5f9;
     margin: 0 0 0.15rem;
 }
 .card-category {
-    font-size: 0.85rem;
-    color: #b0b8c4;
-    margin-bottom: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
     overflow-wrap: anywhere;
 }
 
 /* ── Explanation box ── */
 .explanation-box {
-    background: #0f172a;
-    border-left: 3px solid #4ade80;
+    background: #0B0F19;
+    border-left: 3px solid var(--accent-mint);
     border-radius: 0 8px 8px 0;
     padding: 0.7rem 1rem;
     font-size: 0.9rem;
@@ -738,99 +836,104 @@ h1, h2, h3, .stHeading {
 /* ── Match score pill ── */
 .score-pill {
     display: inline-block;
-    background: #0f172a;
-    border: 1px solid #334155;
+    background: #0B0F19;
+    border: 1px solid var(--border);
     border-radius: 999px;
     padding: 2px 10px;
     font-size: 0.8rem;
-    color: #cbd5e1;
+    color: var(--text-muted);
     margin-left: 0.5rem;
-    font-family: monospace;
+    font-family: 'Inter', sans-serif;
+    font-variant-numeric: tabular-nums;
 }
 
-/* ── Landing (empty state) ── */
+/* ── Landing (empty state) — compact ── */
 .landing {
     position: relative;
     max-width: 1060px;
-    margin: 1rem auto 0;
-    padding: 1.6rem 1.8rem 1.3rem;
-    background: rgba(30, 41, 59, 0.55);
-    border: 1px solid #263449;
-    border-radius: 20px;
-    box-shadow: 0 24px 60px rgba(2, 6, 23, 0.35);
+    margin: 0.75rem auto 0;
+    padding: 1.1rem 1.4rem 0.9rem;
+    background: rgba(21, 28, 44, 0.6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 20px 50px rgba(2, 6, 23, 0.35);
     overflow: hidden;
 }
 .landing::before {
     content: "";
     position: absolute;
     inset: 0 0 auto 0;
-    height: 3px;
-    background: linear-gradient(90deg, #4ade80, #60a5fa);
+    height: 2px;
+    background: linear-gradient(90deg, #34D399, #60a5fa);
     opacity: 0.9;
 }
 .landing-eyebrow {
     text-align: center;
     color: #60a5fa;
-    font-size: 0.7rem;
-    font-weight: 600;
+    font-size: 0.68rem;
+    font-weight: 700;
     letter-spacing: 0.18em;
     text-transform: uppercase;
+    margin-bottom: 0.35rem;
 }
 .landing-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
     text-align: center;
     color: #f1f5f9;
-    font-size: 1.85rem;
-    font-weight: 600;
-    line-height: 1.25;
-    margin: 0.55rem 0 0.5rem;
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1.2;
+    margin: 0 0 0.45rem;
 }
 .landing-sub {
-    max-width: 660px;
-    margin: 0 auto 1.2rem !important;
+    max-width: 640px;
+    margin: 0 auto 0.9rem !important;
     text-align: center;
     color: #cbd5e1 !important;
-    font-size: 0.95rem !important;
-    line-height: 1.65;
+    font-size: 0.9rem !important;
+    line-height: 1.55;
 }
 .steps {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 0.6rem;
+    gap: 0.45rem;
+    margin: 0.5rem 0;
 }
 .step {
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid #334155;
-    border-radius: 14px;
-    padding: 0.9rem 0.95rem 1rem;
-    transition: border-color 0.2s, transform 0.2s;
+    background: rgba(11, 15, 25, 0.5);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.65rem 0.6rem 0.7rem;
+    transition: all 0.2s ease;
 }
 .step:hover {
-    border-color: #475569;
+    border-color: rgba(255, 255, 255, 0.18);
     transform: translateY(-2px);
 }
 .step-num {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 9px;
-    margin-bottom: 0.4rem;
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #052e16;
-    background: linear-gradient(135deg, #4ade80, #60a5fa);
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    margin-bottom: 0.3rem;
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: var(--bg-obsidian);
+    background: var(--accent-mint);
 }
 .step h3 {
-    margin: 0 0 0.2rem;
-    font-size: 0.97rem;
-    font-weight: 600;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    margin: 0 0 0.15rem;
+    font-size: 0.88rem;
+    font-weight: 700;
     color: #e2e8f0;
 }
 .step p {
     margin: 0;
-    font-size: 0.84rem;
-    line-height: 1.55;
+    font-size: 0.78rem;
+    line-height: 1.45;
     color: #cbd5e1;
 }
 .landing-cta {
@@ -839,33 +942,33 @@ h1, h2, h3, .stHeading {
     align-items: center;
     justify-content: center;
     gap: 0.45rem;
-    margin-top: 0.9rem;
-    padding-top: 0.8rem;
-    border-top: 1px dashed #334155;
-    color: #cbd5e1;
-    font-size: 0.9rem;
+    margin-top: 0.75rem;
+    padding-top: 0.65rem;
+    border-top: 1px dashed var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
 }
 .landing-cta .arrow { color: #60a5fa; font-weight: 700; }
 .landing-facts {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 0.45rem;
-    margin-top: 0.6rem;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
 }
 .landing-facts span {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    color: #94a3b8;
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid #334155;
+    color: var(--text-muted);
+    background: rgba(11, 15, 25, 0.5);
+    border: 1px solid var(--border);
     border-radius: 999px;
-    padding: 0.22rem 0.65rem;
+    padding: 0.18rem 0.6rem;
 }
 @media (max-width: 820px) {
-    .landing { padding: 1.2rem 1rem 1rem; }
-    .landing-title { font-size: 1.4rem; }
+    .landing { padding: 0.9rem 1rem 0.8rem; }
+    .landing-title { font-size: 1.3rem; }
     .steps { grid-template-columns: 1fr; }
 }
 
@@ -873,16 +976,20 @@ h1, h2, h3, .stHeading {
 .sidebar-header {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.75rem 0.6rem 1rem 0.6rem;
-    border-bottom: 1px solid #334155;
-    margin-bottom: 1rem;
+    gap: 0.75rem;
+    padding: 0.9rem 0.9rem 1.1rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.25rem;
     max-width: 100%;
 }
 .sidebar-header .sidebar-logo {
-    height: 2.2rem;
+    height: 2.4rem;
     width: auto;
     flex-shrink: 0;
+    border-radius: 10px;
+    background: #0B0F19;
+    padding: 0.12rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 .sidebar-header .sidebar-text {
     display: flex;
@@ -890,16 +997,17 @@ h1, h2, h3, .stHeading {
     justify-content: center;
 }
 .sidebar-header .sidebar-title {
-    font-size: 1.15rem;
-    font-weight: 700;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
     color: #f1f5f9;
     margin: 0 0 0.1rem;
     letter-spacing: -0.02em;
     line-height: 1.1;
 }
 .sidebar-header .sidebar-tagline {
-    font-size: 0.75rem;
-    color: #cbd5e1;
+    font-size: 0.72rem;
+    color: var(--text-muted);
     margin: 0;
     font-weight: 400;
     line-height: 1.1;
@@ -907,11 +1015,11 @@ h1, h2, h3, .stHeading {
 
 /* ── Error state ── */
 .error-box {
-    background: #1e1015;
-    border: 1px solid #7f1d1d;
+    background: #1E1015;
+    border: 1px solid #7F1D1D;
     border-radius: 10px;
     padding: 1rem 1.25rem;
-    color: #fca5a5;
+    color: #FCA5A5;
     font-size: 0.9rem;
 }
 
@@ -938,7 +1046,7 @@ h1, h2, h3, .stHeading {
 .net-carbs-normal {
     display: inline-block;
     background: rgba(148,163,184,0.1);
-    border: 1px solid #334155;
+    border: 1px solid var(--border);
     color: #cbd5e1;
     border-radius: 6px;
     padding: 2px 8px;
@@ -1108,12 +1216,12 @@ def _macro_line(detail: dict, serving_g: int | None = None) -> str:
         fiber = detail["fiber"]
         kcal  = detail["calories"]
     return (
-        f"**Protein** {prot:g} g &nbsp;·&nbsp; "
-        f"**Carbs** {carbs:g} g &nbsp;·&nbsp; "
-        f"**Fat** {fat:g} g<br>"
-        f"**Fibre** {fiber:g} g &nbsp;·&nbsp; "
-        f"**{kcal:g} kcal** "
-        f"<span style='color:#b0b8c4;'>({label})</span>"
+        f'<span class="macro-pill protein">P {prot:g}g</span>'
+        f'<span class="macro-pill carbs">C {carbs:g}g</span>'
+        f'<span class="macro-pill fat">F {fat:g}g</span>'
+        f'<span class="macro-pill fiber">Fibre {fiber:g}g</span>'
+        f'<span class="macro-pill calories">{kcal:g} kcal</span>'
+        f' <span style="color:#64748b;font-size:0.78rem;">({label})</span>'
     )
 
 
@@ -1537,7 +1645,7 @@ allergen_text = (
     else ""
 )
 summary_html = (
-    '<div style="background:#1e293b;border:1px solid #334155;border-radius:12px;'
+    '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;'
     'padding:0.75rem 1.25rem;margin-bottom:1.25rem;display:flex;'
     'align-items:center;gap:1rem;">'
     '<span style="font-size:1.5rem">✅</span>'
@@ -1545,7 +1653,7 @@ summary_html = (
     '<span style="color:#f1f5f9;font-weight:600;">'
     f"Top {len(alternatives)} Swap{'s' if len(alternatives) != 1 else ''} for <em>{selected_product}</em> in {selected_city}"
     '</span><br>'
-    '<span style="color:#64748b;font-size:0.85rem;">'
+    '<span style="color:var(--text-muted);font-size:0.85rem;">'
     f"Priority: {PRIORITY_LABELS[priority_label].split('—')[0].strip()}"
     f"{diet_text}{allergen_text}"
     '</span>'
