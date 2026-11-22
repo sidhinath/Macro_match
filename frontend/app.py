@@ -1536,9 +1536,10 @@ with st.sidebar:
 
     st.markdown("## 🥦 Diet Rules")
     selected_diets = []
-    if st.checkbox("Vegan",        key="vegan"):        selected_diets.append("vegan")
-    if st.checkbox("Gluten-Free",  key="gluten_free"):  selected_diets.append("gluten_free")
-    if st.checkbox("Keto",         key="keto"):         selected_diets.append("keto")
+    _dc1, _dc2, _dc3 = st.columns(3)
+    if _dc1.checkbox("Vegan",       key="vegan"):        selected_diets.append("vegan")
+    if _dc2.checkbox("Gluten-Free", key="gluten_free"):  selected_diets.append("gluten_free")
+    if _dc3.checkbox("Keto",        key="keto"):         selected_diets.append("keto")
 
     st.markdown("## ⚠️ Allergens to Avoid")
     selected_allergens = st.multiselect(
@@ -1548,10 +1549,12 @@ with st.sidebar:
     )
 
     st.markdown("## 🎯 Priority")
+    # Thin non-breaking space between the emoji and the label text gives the
+    # radio circle a little breathing room without touching any logic.
     priority_label = st.radio(
         "What matters most in the match?",
         options=PRIORITY_KEYS,
-        format_func=lambda k: PRIORITY_LABELS[k],
+        format_func=lambda k: PRIORITY_LABELS[k].replace(" ", "\u00a0", 1),
         index=2,   # default: balanced
     )
 
