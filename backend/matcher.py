@@ -13,6 +13,8 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
+from backend.schemas import normalize_diet_rule
+
 # ─────────────────────────────────────────────
 # Constants
 # ─────────────────────────────────────────────
@@ -105,7 +107,9 @@ def apply_diet_filter(df: pd.DataFrame, diet_rules: list[str]) -> pd.DataFrame:
     Example: diet_rules=["vegan", "gluten_free"]
     """
     for rule in diet_rules:
-        rule_lower = rule.lower().strip()
+        # Normalize keys, display names ("Dairy-Free"), and emoji pill
+        # labels ("🥛 Dairy-Free") to the canonical snake_case key.
+        rule_lower = normalize_diet_rule(rule)
 
         if rule_lower == "keto":
             # Keto = very low carb (not a boolean flag in our data)
@@ -233,7 +237,8 @@ def find_alternatives(
     Parameters:
         product_name : Name of the user's usual product (must match CSV exactly).
         city         : Destination city (e.g., "Delhi", "Bangalore").
-        diet_rules   : List of diet constraints, e.g. ["vegan", "gluten_free", "keto"].
+        diet_rules   : List of diet constraints, e.g. ["vegetarian", "vegan",
+                       "dairy_free", "gluten_free", "keto", "low_sugar"].
         allergens    : List of allergens to avoid, e.g. ["dairy", "nuts"].
         weights      : Dict of nutrient importance weights.
                        Default gives more importance to protein and calories.

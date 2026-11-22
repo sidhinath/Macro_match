@@ -67,8 +67,8 @@ app = FastAPI(
     title="MacroMatch API",
     description=(
         "Find the closest nutritional substitute for your usual product "
-        "when you travel to a new city. Supports vegan, keto, and gluten-free "
-        "diets with allergen filtering."
+        "when you travel to a new city. Supports vegetarian, vegan, dairy-free, "
+        "gluten-free, keto, and low-sugar diets with allergen filtering."
     ),
     version="1.0.0",
     contact={
