@@ -868,11 +868,11 @@ button[kind="primary"] p:hover {
     border-left: 3px solid var(--accent-mint);
     border-radius: 0 8px 8px 0;
     padding: 0.7rem 1rem;
-    font-size: 0.95rem;
-    color: var(--text-body);
+    font-size: 14.5px;
+    color: #F1F5F9;
     line-height: 1.5;
     margin-top: 0.6rem;
-    font-style: italic;
+    font-style: normal;
 }
 
 /* ── Match score pill ── */
@@ -1748,7 +1748,12 @@ for alt in alternatives:
         thumb = product_image_src(alt["name"])
         if thumb:
             thumb_html = (
-                f'<img class="result-thumb" src="{thumb}" alt="{alt["name"]}">'
+                f'<div style="width:88px;height:88px;min-width:88px;min-height:88px;'
+                f'flex-shrink:0;border-radius:12px;background:#FFFFFF;padding:4px;'
+                f'box-sizing:border-box;overflow:hidden;display:flex;align-items:center;justify-content:center;">'
+                f'<img src="{thumb}" alt="{alt["name"]}" style="width:100%;height:100%;'
+                f'object-fit:cover;border-radius:8px;display:block;">'
+                f'</div>'
             )
         else:
             thumb_html = (
@@ -1761,9 +1766,11 @@ for alt in alternatives:
             f'<span class="local-name-tag" style="margin-left:0;">🗺️ {alt_local}</span>'
             if alt_local else ""
         )
-        alt_nc      = max(0.0, nutr["carbs"] - nutr["fiber"])
+        # Net carbs: use scaled value when Per Serving toggle is active
+        alt_nc      = max(0.0, nutr_scaled["carbs"] - nutr_scaled["fiber"])
         alt_nc_cls  = "net-carbs-keto" if keto_on else "net-carbs-normal"
-        alt_nc_tag  = f'<span class="{alt_nc_cls}">⚡ Net Carbs {alt_nc:g} g</span>'
+        nc_unit_note = f" ({_unit_label})" if per_serving_on else ""
+        alt_nc_tag  = f'<span class="{alt_nc_cls}">⚡ Net Carbs {alt_nc:g} g{nc_unit_note}</span>'
         st.markdown(f"""
         <div class="result-card">
             <div class="result-card-head">
@@ -1790,12 +1797,14 @@ for alt in alternatives:
                 # Net carbs rows (scaled same way as other macros)
                 orig_nc_val = max(0.0, round(orig_scaled["carbs"] - orig_scaled["fiber"], 1))
                 nutr_nc_val = max(0.0, round(nutr_scaled["carbs"] - nutr_scaled["fiber"], 1))
+                col_a = f"🏠 {selected_product}"
+                col_b = f"📍 {alt['name']}"
                 comparison_df = pd.DataFrame({
                     "Nutrient": [
                         "Protein (g)", "Carbs (g)", "Fat (g)",
                         "Fiber (g)", "⚡ Net Carbs (g)", "Calories (kcal)",
                     ],
-                    f"🏠 {selected_product}": [
+                    col_a: [
                         orig_scaled["protein"],
                         orig_scaled["carbs"],
                         orig_scaled["fat"],
@@ -1803,7 +1812,7 @@ for alt in alternatives:
                         orig_nc_val,
                         orig_scaled["calories"],
                     ],
-                    f"📍 {alt['name']}": [
+                    col_b: [
                         nutr_scaled["protein"],
                         nutr_scaled["carbs"],
                         nutr_scaled["fat"],
@@ -1815,6 +1824,10 @@ for alt in alternatives:
                 st.dataframe(
                     comparison_df.set_index("Nutrient"),
                     use_container_width=True,
+                    column_config={
+                        col_a: st.column_config.NumberColumn(col_a, format="%.1f"),
+                        col_b: st.column_config.NumberColumn(col_b, format="%.1f"),
+                    },
                 )
             else:
                 st.info("Original product macros not available for comparison.")
@@ -1920,7 +1933,7 @@ for alt in alternatives:
                 unit_detail = "per 100 g"
 
             data_footer = (
-                f'<span style="opacity:0.7;font-style:normal;">'
+                f'<span style="color:#F1F5F9;font-style:normal;font-size:14.5px;">'
                 f'📊 {p_val:g}g protein · {c_val:g}g carbs · {f_val:g}g fat · '
                 f'{kcal_val:g} kcal'
                 f'<span style="margin-left:0.4rem;font-size:0.8em;opacity:0.75;">'
