@@ -69,7 +69,7 @@ API_BASE         = _resolve_api_base()
 GET_TIMEOUT      = 90   # seconds; Render's free tier can need 30-60 s to wake from sleep
 POST_TIMEOUT     = 90   # seconds; includes the optional Claude call
 CITIES_FALLBACK   = ["Delhi", "Mumbai", "Bangalore", "Dehradun", "Pune"]
-DIET_OPTIONS    = ["vegan", "gluten_free", "keto"]
+DIET_OPTIONS    = ["vegetarian", "vegan", "dairy_free", "gluten_free", "keto", "low_sugar"]
 ALLERGEN_OPTIONS= ["soy", "nuts", "dairy"]
 MACRO_COLS      = ["protein", "carbs", "fat", "fiber", "calories"]
 
@@ -1232,8 +1232,11 @@ def load_product_details() -> dict[str, dict]:
             "fat": float(row["fat"]),
             "fiber": float(row["fiber"]),
             "calories": float(row["calories"]),
+            "vegetarian": _as_bool(row["vegetarian"]),
             "vegan": _as_bool(row["vegan"]),
+            "dairy_free": _as_bool(row["dairy_free"]),
             "gluten_free": _as_bool(row["gluten_free"]),
+            "low_sugar": _as_bool(row["low_sugar"]),
             "contains_soy": _as_bool(row["contains_soy"]),
             "contains_nuts": _as_bool(row["contains_nuts"]),
             "contains_dairy": _as_bool(row["contains_dairy"]),
@@ -1271,10 +1274,16 @@ def _macro_line(detail: dict, serving_g: int | None = None) -> str:
 
 def _badges_html(detail: dict) -> str:
     badges = []
+    if detail.get("vegetarian") and not detail.get("vegan"):
+        badges.append(("🌿 Vegetarian", "good"))
     if detail["vegan"]:
         badges.append(("🌱 Vegan", "good"))
+    if detail.get("dairy_free") and not detail["vegan"]:
+        badges.append(("🥛 Dairy-Free", "good"))
     if detail["gluten_free"]:
         badges.append(("🌾 Gluten-free", "good"))
+    if detail.get("low_sugar"):
+        badges.append(("🍬 Low-Sugar", "good"))
     if detail["contains_soy"]:
         badges.append(("⚠️ Soy", "warn"))
     if detail["contains_nuts"]:
@@ -1535,11 +1544,24 @@ with st.sidebar:
     )
 
     st.markdown("## 🥦 Diet Rules")
-    selected_diets = []
-    _dc1, _dc2, _dc3 = st.columns(3)
-    if _dc1.checkbox("Vegan",       key="vegan"):        selected_diets.append("vegan")
-    if _dc2.checkbox("Gluten-Free", key="gluten_free"):  selected_diets.append("gluten_free")
-    if _dc3.checkbox("Keto",        key="keto"):         selected_diets.append("keto")
+    # Human-readable labels for each diet key
+    _DIET_LABELS = {
+        "vegetarian": "🌿 Vegetarian",
+        "vegan":      "🌱 Vegan",
+        "dairy_free": "🥛 Dairy-Free",
+        "gluten_free":"🌾 Gluten-Free",
+        "keto":       "⚡ Keto",
+        "low_sugar":  "🍬 Low-Sugar",
+    }
+    selected_diet_labels = st.pills(
+        "Diet Rules",
+        options=list(_DIET_LABELS.values()),
+        selection_mode="multi",
+        label_visibility="collapsed",
+    )
+    # Map selected display labels back to API keys
+    _LABEL_TO_KEY = {v: k for k, v in _DIET_LABELS.items()}
+    selected_diets = [_LABEL_TO_KEY[lbl] for lbl in selected_diet_labels]
 
     st.markdown("## ⚠️ Allergens to Avoid")
     selected_allergens = st.multiselect(
@@ -1684,7 +1706,8 @@ st.button("🏠 Back to home", key="back_to_home", help="Return to the start pag
 # Built as one unindented string: a whitespace-only line would end the Markdown
 # HTML block and turn the closing tags into a code block.
 diet_text = (
-    f"&nbsp;·&nbsp; Diet: {', '.join(selected_diets)}" if selected_diets else ""
+    f"&nbsp;·&nbsp; Diet: {', '.join(_DIET_LABELS[d] for d in selected_diets)}"
+    if selected_diets else ""
 )
 allergen_text = (
     f"&nbsp;·&nbsp; Avoiding: {', '.join(selected_allergens)}"

@@ -32,12 +32,17 @@ ALLERGEN_MAP = {
 
 # Columns that flag diet compliance (True = safe for that diet)
 DIET_MAP = {
+    "vegetarian":  "vegetarian",
     "vegan":       "vegan",
+    "dairy_free":  "dairy_free",
     "gluten_free": "gluten_free",
 }
 
 # For keto, we apply a carb ceiling instead of a boolean column
-KETO_CARB_LIMIT = 10.0  # grams per 100g
+KETO_CARB_LIMIT = 10.0   # grams per 100g
+
+# For low_sugar, we apply a carb ceiling (total carbs used as proxy for sugar)
+LOW_SUGAR_CARB_LIMIT = 15.0  # grams per 100g
 
 
 # ─────────────────────────────────────────────
@@ -52,7 +57,10 @@ def load_data() -> pd.DataFrame:
     df = pd.read_csv(DATA_PATH)
 
     # Normalize boolean columns (CSV stores TRUE/FALSE as strings sometimes)
-    bool_cols = ["vegan", "gluten_free", "contains_soy", "contains_nuts", "contains_dairy"]
+    bool_cols = [
+        "vegan", "gluten_free", "vegetarian", "dairy_free", "low_sugar",
+        "contains_soy", "contains_nuts", "contains_dairy",
+    ]
     for col in bool_cols:
         df[col] = df[col].astype(str).str.strip().str.upper() == "TRUE"
 
@@ -87,9 +95,12 @@ def apply_diet_filter(df: pd.DataFrame, diet_rules: list[str]) -> pd.DataFrame:
     Keep only products that satisfy ALL specified diet rules.
 
     Supported rules:
+        "vegetarian"  → product must have vegetarian == True
         "vegan"       → product must have vegan == True
+        "dairy_free"  → product must have dairy_free == True
         "gluten_free" → product must have gluten_free == True
         "keto"        → product must have carbs <= KETO_CARB_LIMIT per 100g
+        "low_sugar"   → product must have carbs <= LOW_SUGAR_CARB_LIMIT per 100g
 
     Example: diet_rules=["vegan", "gluten_free"]
     """
@@ -99,6 +110,10 @@ def apply_diet_filter(df: pd.DataFrame, diet_rules: list[str]) -> pd.DataFrame:
         if rule_lower == "keto":
             # Keto = very low carb (not a boolean flag in our data)
             df = df[df["carbs"] <= KETO_CARB_LIMIT].copy()
+
+        elif rule_lower == "low_sugar":
+            # Low-sugar = total carbs used as a sugar proxy
+            df = df[df["carbs"] <= LOW_SUGAR_CARB_LIMIT].copy()
 
         elif rule_lower in DIET_MAP:
             col = DIET_MAP[rule_lower]

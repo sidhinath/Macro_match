@@ -19,9 +19,12 @@ class PriorityEnum(str, Enum):
 
 
 class DietRuleEnum(str, Enum):
+    vegetarian  = "vegetarian"
     vegan       = "vegan"
+    dairy_free  = "dairy_free"
     gluten_free = "gluten_free"
     keto        = "keto"
+    low_sugar   = "low_sugar"
 
 
 class AllergenEnum(str, Enum):
@@ -50,7 +53,7 @@ class AlternativeRequest(BaseModel):
     )
     diet_rules: list[DietRuleEnum] = Field(
         default=[],
-        description="Diet constraints. Allowed: 'vegan', 'gluten_free', 'keto'.",
+        description="Diet constraints. Allowed: 'vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'keto', 'low_sugar'.",
         examples=[["vegan"]],
     )
     allergens: list[AllergenEnum] = Field(
