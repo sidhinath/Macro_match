@@ -125,148 +125,188 @@ if (
 
 
 # ─────────────────────────────────────────────
-# AUTHENTICATION UI — strict centered card, green buttons, 16px text
-# Only rendered when logged out. All Supabase backend logic is unchanged.
+# AUTHENTICATION UI — ONE unified centered card
+# Rendered only while logged out. All Supabase backend logic is unchanged.
 # ─────────────────────────────────────────────
 
-# auth_view switches the Sign in tab between three views:
-#   "signin" -> normal login form
-#   "forgot" -> email + Send Reset Link
-#   "reset"  -> email + current/new password + Update Password
-# Normalise stale values from earlier deployments ("sign_in"/"reset_password")
-# so the forms can never silently disappear.
+# Normalise stale values from earlier deployments so forms never disappear.
 if st.session_state.get("auth_view") not in ("signin", "forgot", "reset"):
     st.session_state.auth_view = "signin"
 
 
 if st.session_state["supabase_user"] is None:
 
-    # ── Auth-only CSS — injected BEFORE st.stop() so it actually applies ──
+    # ── Auth CSS — MUST be injected before st.stop() below ──────────────
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    /* 5. Hide Streamlit toolbar / menu / footer */
-    header[data-testid="stHeader"], #MainMenu, footer, .stDeployButton {
+    /* Hide Streamlit chrome for a standalone-app feel */
+    header[data-testid="stHeader"], #MainMenu, footer,
+    .stDeployButton, [data-testid="stStatusWidget"] {
         display: none !important;
         visibility: hidden !important;
     }
 
-    /* 3. Force Inter + minimum 16px readable text */
-    html, body, [class*="css"], .stApp { font-family: 'Inter', sans-serif !important; }
-    .stTextInput label p,
-    .stTextInput input,
-    .stTextInput input::placeholder,
-    button[data-baseweb="tab"],
-    [data-baseweb="tab"] p,
-    [data-baseweb="tab"] div,
-    .stAlert,
-    .stAlert p {
-        font-size: 16px !important;
-        color: #E6EDF3 !important;
+    html, body, [class*="css"], .stApp {
+        font-family: 'Inter', sans-serif !important;
     }
 
-    /* 1. The middle column IS the card */
+    /* Balanced columns: the middle column IS the single card */
     div[data-testid="column"]:nth-of-type(2) {
-        background-color: #161B22;
-        padding: 2.2rem 2rem;
-        border-radius: 16px;
-        border: 1px solid #30363D;
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-        margin-top: 2.5rem;
+        background-color: #161B22 !important;
+        border: 1px solid #30363D !important;
+        border-radius: 18px !important;
+        padding: 2.5rem 2.2rem !important;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55) !important;
+        width: 100% !important;
+        max-width: 440px !important;
+        margin: clamp(2rem, 8vh, 6rem) auto 2rem !important;
     }
-    /* The rule above is global; stop it from styling nested columns
-       (the Forgot / Reset link columns) as additional cards. */
+    /* Neutralise this global selector on nested link columns */
     div[data-testid="column"] div[data-testid="column"]:nth-of-type(2) {
         background-color: transparent !important;
-        padding: 0 !important;
+        border: none !important;
         border-radius: 0 !important;
-        border: none !important;
+        padding: 0 !important;
         box-shadow: none !important;
-        margin-top: 0 !important;
+        max-width: none !important;
+        margin: 0 !important;
     }
 
-    /* Card header + subtitle centered */
-    div[data-testid="column"]:nth-of-type(2) h1,
-    div[data-testid="column"]:nth-of-type(2) p.auth-sub {
+    /* Centered header inside the card */
+    .auth-icon {
         text-align: center !important;
-        color: #E6EDF3 !important;
+        font-size: 34px !important;
+        line-height: 1 !important;
+        margin-bottom: 0.75rem !important;
     }
-    div[data-testid="column"]:nth-of-type(2) h1 { font-size: 26px !important; }
-    p.auth-sub { font-size: 16px !important; color: #8B949E !important; margin-bottom: 1.5rem !important; }
+    .auth-title {
+        text-align: center !important;
+        font-size: 26px !important;
+        font-weight: 700 !important;
+        color: #F0F6FC !important;
+        margin: 0 0 0.35rem !important;
+        letter-spacing: -0.02em !important;
+    }
+    .auth-subtitle {
+        text-align: center !important;
+        font-size: 16px !important;
+        color: #9BA1A6 !important;
+        margin: 0 0 1.5rem !important;
+    }
+    .auth-view-title {
+        text-align: center !important;
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        color: #F0F6FC !important;
+        margin: 0 0 1rem !important;
+    }
 
-    /* 2. GREEN primary buttons — override Streamlit's default red */
-    div.stButton > button[kind="primary"] {
-        background-color: #2EA043 !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 8px !important;
+    /* Clean tab bar with emerald active underline */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+        border-bottom: 1px solid #30363D !important;
+    }
+    .stTabs button[data-baseweb="tab"] {
         font-size: 16px !important;
         font-weight: 600 !important;
-        padding: 0.65rem 1rem !important;
+        color: #8B949E !important;
+        padding: 0.55rem 0.75rem !important;
     }
-    /* Higher-specificity fallback for form submit buttons / theme overrides */
+    .stTabs button[data-baseweb="tab"][aria-selected="true"] {
+        color: #F0F6FC !important;
+        box-shadow: inset 0 -2px 0 #2EA043 !important;
+    }
+    .stTabs [data-baseweb="tab-highlight"] {
+        background-color: #2EA043 !important;
+    }
+
+    /* Remove the double border around st.form */
+    div[data-testid="stForm"] {
+        border: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Readable labels and inputs */
+    .stTextInput label p {
+        font-size: 16px !important;
+        font-weight: 500 !important;
+        color: #E6EDF3 !important;
+    }
+    .stTextInput input {
+        font-size: 16px !important;
+        padding: 12px 14px !important;
+        border-radius: 10px !important;
+        background-color: #0D1117 !important;
+        border: 1px solid #30363D !important;
+        color: #E6EDF3 !important;
+    }
+    .stTextInput input::placeholder { color: #6E7681 !important; }
+    .stTextInput input:focus {
+        border-color: #2EA043 !important;
+        box-shadow: 0 0 0 3px rgba(46, 160, 67, 0.18) !important;
+    }
+    .stAlert, .stAlert p { font-size: 16px !important; }
+
+    /* Vibrant full-width emerald primary button */
+    div.stButton > button[kind="primary"],
     html body button[kind="primary"],
     html body .stFormSubmitButton button {
         background-color: #2EA043 !important;
         background-image: none !important;
         color: white !important;
         border: none !important;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
         font-size: 16px !important;
-        font-weight: 600 !important;
-        padding: 0.65rem 1rem !important;
+        font-weight: 700 !important;
+        padding: 0.7rem 1rem !important;
+        width: 100% !important;
+        box-shadow: none !important;
     }
     div.stButton > button[kind="primary"]:hover,
-    button[kind="primary"]:hover {
+    html body button[kind="primary"]:hover,
+    html body .stFormSubmitButton button:hover {
         background-color: #3FB950 !important;
     }
 
-    /* 4. Secondary buttons styled as clean blue text links */
-    div.stButton > button[kind="secondary"] {
+    /* Subtle blue text links — no default Streamlit button chrome */
+    div.stButton > button[kind="secondary"],
+    div.stButton > button:not([kind="primary"]) {
         color: #58A6FF !important;
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
         font-size: 15px !important;
+        font-weight: 500 !important;
         padding: 0.25rem 0 !important;
     }
-    div.stButton > button[kind="secondary"]:hover {
+    div.stButton > button[kind="secondary"]:hover,
+    div.stButton > button:not([kind="primary"]):hover {
         color: #79C0FF !important;
         text-decoration: underline !important;
-    }
-    /* Some Streamlit versions omit the kind attribute on default buttons */
-    div[data-testid="column"]:nth-of-type(2) div.stButton > button:not([kind="primary"]) {
-        color: #58A6FF !important;
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        font-size: 16px !important;
-        padding: 0.25rem 0 !important;
-    }
-
-    /* Rounded inputs inside the card */
-    div[data-testid="column"]:nth-of-type(2) input {
-        background-color: #0D1117 !important;
-        border: 1px solid #30363D !important;
-        border-radius: 8px !important;
-        padding: 0.65rem 0.85rem !important;
-        color: #E6EDF3 !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # 1. STRICT centered card — everything lives inside card_col
-    _, card_col, _ = st.columns([1.3, 1.4, 1.3])
+    # One card: every element below is inside card_col.
+    _, card_col, _ = st.columns([1.4, 1.3, 1.4])
 
     with card_col:
-        st.markdown("<h1>🥗 Welcome to MacroMatch</h1>", unsafe_allow_html=True)
+        st.markdown('<div class="auth-icon">🥗</div>', unsafe_allow_html=True)
         st.markdown(
-            '<p class="auth-sub">Sign in to continue or create an account</p>',
+            '<div class="auth-title">Welcome to MacroMatch</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="auth-subtitle">Sign in to continue or create an account</div>',
             unsafe_allow_html=True,
         )
 
-        tab_signin, tab_signup = st.tabs(["🔐 Sign in", "📝 Sign up"])
+        tab_signin, tab_signup = st.tabs(["Sign in", "Sign up"])
 
         # ════════════════════════════════════════════════════════════
         # SIGN IN TAB — hosts signin / forgot / reset views
@@ -317,7 +357,7 @@ if st.session_state["supabase_user"] is None:
                             except Exception as exc:
                                 st.error(f"❌ Sign in error: {exc}")
 
-                # Two text-link buttons right below the password box
+                # Both links live INSIDE the card, directly below the form.
                 col1, col2 = st.columns(2)
                 with col1:
                     if st.button("Forgot password?", key="forgot_link"):
@@ -330,7 +370,10 @@ if st.session_state["supabase_user"] is None:
 
             # ─────────────── VIEW: forgot ───────────────
             elif st.session_state.auth_view == "forgot":
-                st.markdown("### Forgot password?")
+                st.markdown(
+                    '<div class="auth-view-title">Forgot password?</div>',
+                    unsafe_allow_html=True,
+                )
                 with st.form("forgot_form"):
                     forgot_email = st.text_input(
                         "Email", placeholder="you@example.com", key="forgot_email"
@@ -360,18 +403,25 @@ if st.session_state["supabase_user"] is None:
 
             # ─────────────── VIEW: reset ───────────────
             elif st.session_state.auth_view == "reset":
-                st.markdown("### Reset password")
+                st.markdown(
+                    '<div class="auth-view-title">Reset password</div>',
+                    unsafe_allow_html=True,
+                )
                 with st.form("reset_form"):
                     reset_email = st.text_input(
                         "Email", placeholder="you@example.com", key="reset_email"
                     )
                     current_pw = st.text_input(
-                        "Current Password", type="password",
-                        placeholder="••••••••", key="current_pw",
+                        "Current Password",
+                        type="password",
+                        placeholder="••••••••",
+                        key="current_pw",
                     )
                     new_pw = st.text_input(
-                        "New Password", type="password",
-                        placeholder="••••••••", key="new_pw",
+                        "New Password",
+                        type="password",
+                        placeholder="••••••••",
+                        key="new_pw",
                     )
                     update_btn = st.form_submit_button(
                         "Update Password", type="primary", use_container_width=True
@@ -401,7 +451,9 @@ if st.session_state["supabase_user"] is None:
                 new_name = st.text_input("Full name", placeholder="Jane Doe")
                 new_email = st.text_input("Email", placeholder="you@example.com")
                 new_password = st.text_input(
-                    "Password", type="password", placeholder="••••••••",
+                    "Password",
+                    type="password",
+                    placeholder="••••••••",
                     help="At least 6 characters",
                 )
                 confirm_password = st.text_input(
