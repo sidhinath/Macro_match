@@ -1724,8 +1724,10 @@ if "food_box_ver" not in st.session_state:
     st.session_state["food_box_ver"] = 0
 if "city_box_ver" not in st.session_state:
     st.session_state["city_box_ver"] = 0
-# Browse-cities expander starts closed and auto-collapses after a city pick.
-st.session_state.setdefault("browse_cities_open", False)
+# Changing these label suffixes remounts the browse expanders, defeating the
+# browser's cached open state so every pick reliably closes the list.
+st.session_state.setdefault("food_browse_ver", 0)
+st.session_state.setdefault("city_browse_ver", 0)
 # Home shows the regular-food spotlight; Find Alternatives switches to the
 # ranked swaps view. This flag is the single source of truth for that switch.
 if "show_swaps_results" not in st.session_state:
@@ -1869,18 +1871,22 @@ def select_food_callback(widget_key: str) -> None:
     picked = st.session_state.get(widget_key)
     if not picked:
         return
+    # A fresh expander label remounts the list, so even re-picking the same food
+    # collapses it instead of reusing Streamlit's cached browser open state.
+    st.session_state.food_browse_ver += 1
     display_label = str(picked)
     canonical = _canonical_value(display_label, PRODUCT_DISPLAY_ALIASES)
-    if canonical == st.session_state.get("selected_product"):
-        return
+    selection_changed = canonical != st.session_state.get("selected_product")
     was_showing_results = st.session_state.get("show_swaps_results", False)
-    _sync_food_selection(canonical, display_label)
-    _reset_swaps_view()
-    # Only remount the searchbox when its visible text must change.
+    # The canonical catalogue name drives the selected badge and the visible
+    # search text, so they can never disagree after a pill tap.
+    _sync_food_selection(canonical)
     st.session_state["food_box_ver"] = st.session_state.get("food_box_ver", 0) + 1
-    # The outer results view needs a full pass; home-view taps stay fragment-only.
-    if was_showing_results:
-        st.rerun()
+    if selection_changed:
+        _reset_swaps_view()
+        # The outer results view needs a full pass; home taps stay fragment-only.
+        if was_showing_results:
+            st.rerun()
 
 
 def select_food_value_callback(product: str) -> None:
@@ -1900,14 +1906,11 @@ def select_city_callback(widget_key: str) -> None:
     picked = st.session_state.get(widget_key)
     if not picked:
         return
-    # Any city pill tap (including one inside Browse all) collapses the list.
-    st.session_state["browse_cities_open"] = False
-    st.session_state["browse_cities_expander"] = False
+    # A fresh expander label remounts the list, so every city pick closes it.
+    st.session_state.city_browse_ver += 1
     display_label = str(picked)
     canonical = _canonical_value(display_label, CITY_DISPLAY_ALIASES)
-    if canonical == st.session_state.get("selected_city"):
-        return
-    _sync_city_selection(canonical, display_label)
+    _sync_city_selection(canonical)
     st.session_state["city_box_ver"] = st.session_state.get("city_box_ver", 0) + 1
 
 
@@ -4366,6 +4369,9 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         )
         if _current_product_display not in product_display_options:
             _current_product_display = None
+        # Keep both pill groups on the current choice even when it came from
+        # the searchbox, sidebar guide, or a restored saved match.
+        st.session_state["quick_food_pills"] = _current_product_display
         st.pills(
             "Quick food picks",
             options=product_display_options,
@@ -4378,9 +4384,10 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         )
 
     with st.expander(
-        f"📋 Browse all available foods ({len(all_foods)} items)", expanded=False
+        f"📋 Browse all available foods ({len(all_foods)} items)" + ("\u200b" * st.session_state.food_browse_ver), expanded=False
     ):
         _all_food_default = selected_product if selected_product in all_foods else None
+        st.session_state["all_food_pills"] = _all_food_default
         st.pills(
             "All foods",
             options=all_foods,
@@ -4452,6 +4459,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         )
         if _current_city_display not in city_display_options:
             _current_city_display = None
+        st.session_state["quick_city_pills"] = _current_city_display
         st.pills(
             "Quick city picks",
             options=city_display_options,
@@ -4464,11 +4472,10 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         )
 
     with st.expander(
-        f"📍 Browse all available cities ({len(all_cities)} cities)",
-        expanded=st.session_state.browse_cities_open,
-        key="browse_cities_expander",
+        f"📍 Browse all available cities ({len(all_cities)} cities)" + ("\u200b" * st.session_state.city_browse_ver), expanded=False
     ):
         _all_city_default = selected_city if selected_city in all_cities else None
+        st.session_state["all_city_pills"] = _all_city_default
         st.pills(
             "All cities",
             options=all_cities,
