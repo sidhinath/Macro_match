@@ -685,20 +685,91 @@ def get_saved_matches(user_id):
         return []
 
 
+# Shared diet label map (defined here so the sidebar can restore saved pills
+# before the main-body widgets are created).
+DIET_LABELS = {
+    "vegetarian": "🌿 Vegetarian",
+    "vegan":      "🌱 Vegan",
+    "dairy_free": "🥛 Dairy-Free",
+    "gluten_free":"🌾 Gluten-Free",
+    "keto":       "⚡ Keto",
+    "low_sugar":  "🍬 Low-Sugar",
+}
+
+
+def delete_saved_match(match_id):
+    """Delete one saved row for the current user; report any failure clearly."""
+    _attach_session()
+    try:
+        supabase.table("saved_matches").delete().eq("id", match_id).eq(
+            "user_id", str(CURRENT_USER_ID)
+        ).execute()
+        return True
+    except Exception as e:
+        st.error(f"Delete failed: {e}")
+        return False
+
+
+def load_saved_match(match):
+    """Restore a saved comparison into the widgets and cached results."""
+    product = match.get("product", "")
+    city = match.get("city", "")
+    diets = list(match.get("diet_rules") or [])
+    allergens = list(match.get("allergens") or [])
+    priority = match.get("priority") or "balanced"
+
+    st.session_state["product_select"] = product
+    st.session_state["city_select"] = city
+    st.session_state["diet_pills"] = [DIET_LABELS[d] for d in diets if d in DIET_LABELS]
+    st.session_state["allergen_select"] = [
+        a for a in allergens if a in ALLERGEN_OPTIONS
+    ]
+    if priority in PRIORITY_KEYS:
+        st.session_state["priority_radio"] = priority
+
+    # Replay the saved ranked swaps — no backend call needed.
+    st.session_state["match_result_data"] = {
+        "product": product,
+        "city": city,
+        "diet_rules": diets,
+        "allergens": allergens,
+        "priority": priority,
+        "alternatives": match.get("alternatives") or [],
+    }
+    st.session_state["show_match_results"] = True
+    st.rerun()
+
+
 def render_saved_matches(container):
-    """Paint the sidebar saved-match list; can be re-called right after a save."""
+    """Paint clickable saved-match rows with an optional delete button."""
     matches = get_saved_matches(CURRENT_USER_ID)
     if not matches:
         container.caption("No saved matches yet — save a result below.")
         return
-    lines = []
-    for m in matches:
-        created = str(m.get("created_at", ""))[:10]
-        lines.append(
-            f"**{m.get('product', 'Saved match')}** → {m.get('city', '—')}  \n"
-            f"  Priority: {m.get('priority', '—')} · {created}"
+
+    for match in matches:
+        created = str(match.get("created_at", ""))[:10]
+        label = (
+            f"{match.get('product', 'Saved match')} → {match.get('city', '—')}\n"
+            f"Priority: {match.get('priority', '—')} · {created}"
         )
-    container.markdown("\n\n".join(lines))
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            if st.button(
+                label,
+                key=f"load_match_{match['id']}",
+                use_container_width=True,
+            ):
+                load_saved_match(match)
+        with col2:
+            if st.button(
+                "🗑️",
+                key=f"delete_match_{match['id']}",
+                use_container_width=True,
+                help="Delete this saved match",
+            ):
+                if delete_saved_match(match["id"]):
+                    st.rerun()
 
 
 # ─────────────────────────────────────────────
@@ -1483,6 +1554,22 @@ h1, h2, h3, .stHeading {
 }
 [data-testid="stSidebar"] hr.section-divider {
     margin: 0.9rem 0 !important;
+}
+/* Clickable saved-match rows inside "My saved matches" */
+[data-testid="stSidebar"] div[data-testid="stExpander"] button {
+    text-align: left !important;
+    font-size: 15px !important;
+    line-height: 1.35 !important;
+    white-space: pre-line !important;
+    padding: 0.55rem 0.7rem !important;
+    border: 1px solid #30363D !important;
+    border-radius: 10px !important;
+    background-color: rgba(22, 27, 34, 0.9) !important;
+    color: var(--text-body) !important;
+}
+[data-testid="stSidebar"] div[data-testid="stExpander"] button:hover {
+    background-color: #21262D !important;
+    border-color: #2EA043 !important;
 }
 
 /* ── Hero header ── */
@@ -2397,17 +2484,26 @@ with st.sidebar:
         st.error("The backend returned an empty product list. Please try again.")
         st.stop()
 
+    product_options = list(products)
+    _saved_product = st.session_state.get("product_select")
+    if _saved_product and _saved_product not in product_options:
+        product_options.insert(0, _saved_product)
     selected_product = st.selectbox(
         "What do you normally eat?",
-        options=products,
+        options=product_options,
         help="Select the product you use at home.",
+        key="product_select",
     )
 
     st.markdown("## 📍 Destination")
     city_options = load_city_list() or CITIES_FALLBACK
+    _saved_city = st.session_state.get("city_select")
+    if _saved_city and _saved_city not in city_options:
+        city_options.insert(0, _saved_city)
     selected_city = st.selectbox(
         "Which city are you travelling to?",
         options=city_options,
+        key="city_select",
     )
 
     st.markdown("## 🥦 Diet Rules")
@@ -2425,6 +2521,7 @@ with st.sidebar:
         options=list(_DIET_LABELS.values()),
         selection_mode="multi",
         label_visibility="collapsed",
+        key="diet_pills",
     )
     # Map selected display labels back to API keys
     _LABEL_TO_KEY = {v: k for k, v in _DIET_LABELS.items()}
@@ -2435,6 +2532,7 @@ with st.sidebar:
         "Select allergens",
         options=ALLERGEN_OPTIONS,
         format_func=lambda x: {"soy": "🫘 Soy", "nuts": "🥜 Nuts", "dairy": "🥛 Dairy"}[x],
+        key="allergen_select",
     )
 
     st.markdown("## 🎯 Priority")
@@ -2445,6 +2543,7 @@ with st.sidebar:
         options=PRIORITY_KEYS,
         format_func=lambda k: PRIORITY_LABELS[k].replace(" ", "\u00a0", 1),
         index=2,   # default: balanced
+        key="priority_radio",
     )
 
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)

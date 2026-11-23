@@ -149,6 +149,8 @@ Swagger docs are at `https://<your-service>.onrender.com/docs`.
      for select using (auth.uid() = user_id);
    create policy "users can insert own saved matches" on saved_matches
      for insert with check (auth.uid() = user_id);
+   create policy "users can delete own saved matches" on saved_matches
+     for delete using (auth.uid() = user_id);
    ```
 
 5. In **Authentication → URL Configuration**, add your Streamlit app URL
