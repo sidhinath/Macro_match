@@ -3746,25 +3746,74 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
     .steps { grid-template-columns: 1fr !important; }
 }
 
-/* ── Sidebar headings, toggle, and summary contrast ─────────────────── */
+/* ── Sidebar headings, saved expander, toggle, and summary highlight ── */
+.saved-matches-marker {
+    display: none !important;
+}
+[data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) [data-testid="stExpanderHeader"] p,
+[data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) summary p,
+[data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) .streamlit-expanderHeader p {
+    font-weight: 700 !important;
+    font-size: 16px !important;
+    color: #FFFFFF !important;
+}
+
 .sidebar-section-title {
     font-size: 18px !important;
-    font-weight: 700 !important;
-    color: #FFFFFF !important;
+    font-weight: 800 !important;
+    color: #4ADE80 !important;
+    background-color: rgba(46, 160, 67, 0.14);
+    border-left: 3px solid #2EA043;
+    padding: 4px 10px;
+    border-radius: 6px;
+    display: inline-block;
     margin: 0.4rem 0 0.3rem !important;
 }
-section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label,
-section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p,
+
+section[data-testid="stSidebar"] div[data-testid="stToggle"],
+section[data-testid="stSidebar"] div[data-testid="stCheckbox"] {
+    background-color: rgba(46, 160, 67, 0.12) !important;
+    border: 1px solid rgba(46, 160, 67, 0.45) !important;
+    border-radius: 10px !important;
+    padding: 8px 12px !important;
+}
 section[data-testid="stSidebar"] div[data-testid="stToggle"] label,
-section[data-testid="stSidebar"] div[data-testid="stToggle"] label p {
+section[data-testid="stSidebar"] div[data-testid="stToggle"] label p,
+section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label,
+section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
     font-weight: 700 !important;
     font-size: 16px !important;
-    color: #E6EDF3 !important;
+    color: #6EE798 !important;
+}
+
+.sidebar-stats {
+    background: linear-gradient(135deg, rgba(46, 160, 67, 0.16), rgba(22, 27, 34, 0.95)) !important;
+    border: 1px solid rgba(46, 160, 67, 0.55) !important;
+    border-radius: 12px !important;
+    padding: 12px 14px !important;
+    box-shadow: 0 4px 14px rgba(46, 160, 67, 0.12) !important;
+}
+.sidebar-stats .stats-row {
+    align-items: center !important;
 }
 .sidebar-stats .stats-label {
-    font-weight: 700 !important;
+    font-weight: 800 !important;
     color: #FFFFFF !important;
     font-size: 16px !important;
+}
+.sidebar-stats .stats-value {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 28px !important;
+    padding: 2px 9px !important;
+    border-radius: 999px !important;
+    background-color: rgba(46, 160, 67, 0.22) !important;
+    border: 1px solid rgba(46, 160, 67, 0.6) !important;
+    color: #6EE798 !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    font-variant-numeric: tabular-nums !important;
 }
 .sidebar-stats .stats-tip {
     color: #FBBF24 !important;
@@ -4344,6 +4393,10 @@ with st.sidebar:
         "🕘 My saved matches",
         expanded=bool(st.session_state.get("saved_match_flash")),
     ):
+        st.markdown(
+            '<div class="saved-matches-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
         saved_matches_slot = st.empty()
         render_saved_matches(saved_matches_slot)
 
