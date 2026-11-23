@@ -174,6 +174,28 @@ if st.session_state["supabase_user"] is None:
         visibility: visible !important;
         opacity: 1 !important;
         pointer-events: auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+        height: auto !important;
+    }
+    /* Streamlit may render a fixed-size icon button: let it grow for the label. */
+    button[data-testid="stSidebarCollapsedControl"],
+    button[data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"] button,
+    [data-testid="collapsedControl"] button {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: auto !important;
+        height: auto !important;
+        min-width: 0 !important;
+    }
+    /* Only a nested button loses its own box; the outer control keeps the pill. */
+    [data-testid="stSidebarCollapsedControl"] button,
+    [data-testid="collapsedControl"] button {
+        padding: 2px 4px !important;
+        background: transparent !important;
+        border: none !important;
     }
     [data-testid="stSidebarCollapsedControl"],
     [data-testid="collapsedControl"] {
@@ -195,13 +217,20 @@ if st.session_state["supabase_user"] is None:
         border-color: #2EA043 !important;
     }
 
-    [data-testid="stSidebarCollapsedControl"] button svg,
-    [data-testid="collapsedControl"] button svg {
+    /* Hide the native chevron in BOTH DOM shapes. */
+    [data-testid="stSidebarCollapsedControl"] svg,
+    [data-testid="collapsedControl"] svg {
         display: none !important;
     }
 
-    [data-testid="stSidebarCollapsedControl"] button::after,
-    [data-testid="collapsedControl"] button::after {
+    /* Label works whether the testid is on the button itself or on a
+       wrapper around it. Tag-qualified selectors avoid a duplicate label. */
+    button[data-testid="stSidebarCollapsedControl"]::after,
+    button[data-testid="collapsedControl"]::after,
+    div[data-testid="stSidebarCollapsedControl"] button::after,
+    div[data-testid="collapsedControl"] button::after,
+    span[data-testid="stSidebarCollapsedControl"] button::after,
+    span[data-testid="collapsedControl"] button::after {
         content: "☰  Menu";
         color: #E6EDF3 !important;
         font-family: 'Inter', sans-serif !important;
@@ -1206,6 +1235,28 @@ st.markdown("""
     visibility: visible !important;
     opacity: 1 !important;
     pointer-events: auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: auto !important;
+}
+/* Streamlit may render a fixed-size icon button: let it grow for the label. */
+button[data-testid="stSidebarCollapsedControl"],
+button[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapsedControl"] button,
+[data-testid="collapsedControl"] button {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0 !important;
+}
+/* Only a nested button loses its own box; the outer control keeps the pill. */
+[data-testid="stSidebarCollapsedControl"] button,
+[data-testid="collapsedControl"] button {
+    padding: 2px 4px !important;
+    background: transparent !important;
+    border: none !important;
 }
 [data-testid="stSidebarCollapsedControl"],
 [data-testid="collapsedControl"] {
@@ -1227,13 +1278,20 @@ st.markdown("""
     border-color: #2EA043 !important;
 }
 
-[data-testid="stSidebarCollapsedControl"] button svg,
-[data-testid="collapsedControl"] button svg {
+/* Hide the native chevron in BOTH DOM shapes. */
+[data-testid="stSidebarCollapsedControl"] svg,
+[data-testid="collapsedControl"] svg {
     display: none !important;
 }
 
-[data-testid="stSidebarCollapsedControl"] button::after,
-[data-testid="collapsedControl"] button::after {
+/* Label works whether the testid is on the button itself or on a
+   wrapper around it. Tag-qualified selectors avoid a duplicate label. */
+button[data-testid="stSidebarCollapsedControl"]::after,
+button[data-testid="collapsedControl"]::after,
+div[data-testid="stSidebarCollapsedControl"] button::after,
+div[data-testid="collapsedControl"] button::after,
+span[data-testid="stSidebarCollapsedControl"] button::after,
+span[data-testid="collapsedControl"] button::after {
     content: "☰  Menu";
     color: #E6EDF3 !important;
     font-family: 'Inter', sans-serif !important;
