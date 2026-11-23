@@ -1,0 +1,8 @@
+# Theme-level green primary color: even if CSS is slow/blocked, Streamlit's
+# own primary buttons render green instead of its default red.
+[theme]
+primaryColor = "#2EA043"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#161B22"
+textColor = "#E6EDF3"
+font = "sans serif"

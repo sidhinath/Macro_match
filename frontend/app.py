@@ -118,7 +118,9 @@ if (
 #   "signin" -> normal login form
 #   "forgot" -> email + Send Reset Link
 #   "reset"  -> email + current/new password + Update Password
-if "auth_view" not in st.session_state:
+# Normalise stale values from earlier deployments ("sign_in"/"reset_password")
+# so the forms can never silently disappear.
+if st.session_state.get("auth_view") not in ("signin", "forgot", "reset"):
     st.session_state.auth_view = "signin"
 
 
@@ -158,6 +160,16 @@ if st.session_state["supabase_user"] is None:
         box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
         margin-top: 2.5rem;
     }
+    /* The rule above is global; stop it from styling nested columns
+       (the Forgot / Reset link columns) as additional cards. */
+    div[data-testid="column"] div[data-testid="column"]:nth-of-type(2) {
+        background-color: transparent !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        margin-top: 0 !important;
+    }
 
     /* Card header + subtitle centered */
     div[data-testid="column"]:nth-of-type(2) h1,
@@ -178,14 +190,17 @@ if st.session_state["supabase_user"] is None:
         font-weight: 600 !important;
         padding: 0.65rem 1rem !important;
     }
-    /* Fallback for form submit buttons in other Streamlit versions */
-    button[kind="primary"], .stFormSubmitButton button {
+    /* Higher-specificity fallback for form submit buttons / theme overrides */
+    html body button[kind="primary"],
+    html body .stFormSubmitButton button {
         background-color: #2EA043 !important;
+        background-image: none !important;
         color: white !important;
         border: none !important;
         border-radius: 8px !important;
         font-size: 16px !important;
         font-weight: 600 !important;
+        padding: 0.65rem 1rem !important;
     }
     div.stButton > button[kind="primary"]:hover,
     button[kind="primary"]:hover {
@@ -204,6 +219,15 @@ if st.session_state["supabase_user"] is None:
     div.stButton > button[kind="secondary"]:hover {
         color: #79C0FF !important;
         text-decoration: underline !important;
+    }
+    /* Some Streamlit versions omit the kind attribute on default buttons */
+    div[data-testid="column"]:nth-of-type(2) div.stButton > button:not([kind="primary"]) {
+        color: #58A6FF !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        font-size: 16px !important;
+        padding: 0.25rem 0 !important;
     }
 
     /* Rounded inputs inside the card */
