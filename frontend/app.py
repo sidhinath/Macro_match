@@ -478,31 +478,43 @@ CURRENT_USER_EMAIL = st.session_state["supabase_user"].email or ""
 
 
 def save_match(user_id, product, city, diet_rules, allergens, priority, alternatives):
-    """Insert one saved match for the given Supabase user id."""
-    supabase.table("saved_matches").insert(
-        {
-            "user_id": user_id,
-            "product": product,
-            "city": city,
-            "diet_rules": diet_rules,
-            "allergens": allergens,
-            "priority": priority,
-            "alternatives": alternatives,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-    ).execute()
+    """Insert one saved match; report failure without crashing the app."""
+    try:
+        supabase.table("saved_matches").insert(
+            {
+                "user_id": user_id,
+                "product": product,
+                "city": city,
+                "diet_rules": diet_rules,
+                "allergens": allergens,
+                "priority": priority,
+                "alternatives": alternatives,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ).execute()
+        return True
+    except Exception as exc:
+        st.warning(f"⚠️ Could not save this match: {exc}")
+        return False
 
 
 def get_saved_matches(user_id):
-    """Return saved matches for ONE user only — other users' rows are hidden by RLS."""
-    result = (
-        supabase.table("saved_matches")
-        .select("*")
-        .eq("user_id", user_id)
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return result.data or []
+    """Return saved matches for ONE user — RLS hides other users' rows.
+
+    If the table has not been created yet (or PostgREST returns any other
+    error), return an empty list so the rest of the app keeps working.
+    """
+    try:
+        result = (
+            supabase.table("saved_matches")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return result.data or []
+    except Exception:
+        return []
 
 # ─────────────────────────────────────────────
 # Constants
@@ -2251,7 +2263,7 @@ st.markdown(summary_html, unsafe_allow_html=True)
 
 # ─── NEW: save the current match to the logged-in user's history (Supabase) ─
 if st.button("💾 Save this match to my history", key="save_match_to_history"):
-    save_match(
+    if save_match(
         CURRENT_USER_ID,
         selected_product,
         selected_city,
@@ -2259,8 +2271,8 @@ if st.button("💾 Save this match to my history", key="save_match_to_history"):
         selected_allergens,
         priority_label,
         alternatives,
-    )
-    st.success("Saved to your history — only your own account can see it.")
+    ):
+        st.success("Saved to your history — only your own account can see it.")
 
 # ── Result cards ──────────────────────────────
 
