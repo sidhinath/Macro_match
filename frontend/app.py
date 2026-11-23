@@ -295,7 +295,8 @@ def fetch_profile_name(user_id: str, fallback: str) -> str:
     """Look up a profile name, tolerating a missing `profiles` table (PGRST205)."""
     try:
         profile = (
-            supabase.table("profiles")
+            get_authenticated_supabase()
+            .table("profiles")
             .select("name")
             .eq("id", user_id)
             .single()
@@ -421,6 +422,63 @@ def _ensure_supabase_session() -> None:
             )
     except Exception as exc:
         st.error(f"Could not verify Supabase session: {exc}")
+
+
+def get_authenticated_supabase() -> Client:
+    """Return a fresh Supabase client with this user's JWT attached.
+
+    RLS policies on `saved_matches` compare `auth.uid()` with `user_id`. A
+    client created without a session talks to PostgREST as `anon`, which is
+    why inserts from other signed-in users fail with 42501. Building the
+    client per call and explicitly attaching the stored access token keeps
+    every query authenticated, even after reruns or on another device.
+    """
+    client = get_supabase_client()
+    access = st.session_state.get("supabase_access_token")
+    refresh = st.session_state.get("supabase_refresh_token")
+
+    # Recover a usable access token when only the refresh token survived.
+    if not access and refresh:
+        try:
+            refreshed = client.auth.refresh_session(refresh)
+            session = getattr(refreshed, "session", None)
+            if session and session.access_token:
+                access = session.access_token
+                refresh = session.refresh_token or refresh
+                st.session_state["supabase_access_token"] = access
+                st.session_state["supabase_refresh_token"] = refresh
+        except Exception:
+            access = None
+
+    if access:
+        try:
+            client.auth.set_session(access, refresh or "")
+        except Exception:
+            # Older/newer supabase-py versions vary in set_session semantics;
+            # setting the PostgREST header directly is the reliable fallback.
+            pass
+        try:
+            client.postgrest.auth(access)
+        except Exception:
+            pass
+
+    return client
+
+
+def _authenticated_user(client: Client):
+    """Resolve the user tied to the attached JWT, preferring cached state."""
+    user = st.session_state.get("supabase_user")
+    if user is not None and getattr(user, "id", None):
+        return user
+    try:
+        response = client.auth.get_user()
+        user = getattr(response, "user", None) if response is not None else None
+        if user is not None and getattr(user, "id", None):
+            st.session_state["supabase_user"] = user
+            return user
+    except Exception:
+        pass
+    return None
 
 
 # Supabase OAuth and password-recovery links return auth data in the query
@@ -1425,11 +1483,6 @@ CURRENT_USER_ID = st.session_state["supabase_user"].id
 CURRENT_USER_EMAIL = st.session_state["supabase_user"].email or ""
 
 
-def _attach_session() -> None:
-    """Re-attach stored tokens before any DB call (client is new each rerun)."""
-    _ensure_supabase_session()
-
-
 def save_match(user_id, product, city, diet_rules, allergens, priority, alternatives):
     """Insert one row into public.saved_matches.
 
@@ -1443,11 +1496,18 @@ def save_match(user_id, product, city, diet_rules, allergens, priority, alternat
         alternatives  jsonb       = list[dict]
         created_at    timestamptz
     """
-    _attach_session()  # RLS requires an authenticated PostgREST session
+    client = get_authenticated_supabase()
+    current_user = _authenticated_user(client)
+    if current_user is None:
+        st.error("Cannot save: your Supabase session is not active. Please sign in again.")
+        return False
+    # RLS checks auth.uid() = user_id, so derive the id from the JWT-backed user
+    # rather than trusting a value passed in by the caller.
+    auth_user_id = str(current_user.id)
     try:
-        supabase.table("saved_matches").insert(
+        client.table("saved_matches").insert(
             {
-                "user_id": str(user_id),
+                "user_id": auth_user_id,
                 "product": str(product),
                 "city": str(city),
                 "diet_rules": list(diet_rules or []),
@@ -1472,10 +1532,10 @@ def get_saved_matches(user_id):
 
     Cached for 60s; the cache is cleared only on save/delete.
     """
-    _attach_session()  # RLS requires an authenticated PostgREST session
+    client = get_authenticated_supabase()
     try:
         result = (
-            supabase.table("saved_matches")
+            client.table("saved_matches")
             .select("*")
             .eq("user_id", str(user_id))
             .order("created_at", desc=True)
@@ -1501,10 +1561,14 @@ DIET_LABELS = {
 
 def delete_saved_match(match_id):
     """Delete one saved row for the current user; report any failure clearly."""
-    _attach_session()
+    client = get_authenticated_supabase()
+    current_user = _authenticated_user(client)
+    if current_user is None:
+        st.error("Cannot delete: your Supabase session is not active. Please sign in again.")
+        return False
     try:
-        supabase.table("saved_matches").delete().eq("id", match_id).eq(
-            "user_id", str(CURRENT_USER_ID)
+        client.table("saved_matches").delete().eq("id", match_id).eq(
+            "user_id", str(current_user.id)
         ).execute()
         get_saved_matches.clear()
         return True
@@ -1751,12 +1815,12 @@ def _apply_default_allergens() -> None:
 
 def _save_user_metadata(updates: dict, success_message: str) -> None:
     """Merge selected keys into the user's Supabase Auth user_metadata."""
-    _attach_session()
+    client = get_authenticated_supabase()
     current = getattr(st.session_state.get("supabase_user"), "user_metadata", None) or {}
     metadata = dict(current)
     metadata.update(updates)
     try:
-        response = supabase.auth.update_user({"data": metadata})
+        response = client.auth.update_user({"data": metadata})
         user = getattr(response, "user", None)
         if user is not None:
             st.session_state["supabase_user"] = user
