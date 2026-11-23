@@ -167,24 +167,48 @@ if st.session_state["supabase_user"] is None:
     [data-testid="stToolbarActions"], #MainMenu, footer {
         display: none !important;
     }
-    /* Keep the collapsed-sidebar reopen button visible and high-contrast. */
+    /* Keep the control interactive, then apply the custom "☰ Menu" styling. */
     [data-testid="stSidebarCollapsedControl"],
     [data-testid="collapsedControl"] {
         display: flex !important;
         visibility: visible !important;
         opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"] {
         position: fixed !important;
-        top: 14px !important;
-        left: 14px !important;
+        top: 16px !important;
+        left: 16px !important;
         z-index: 999999 !important;
         background-color: #161B22 !important;
         border: 1px solid #30363D !important;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
+        padding: 4px 12px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+        transition: all 0.2s ease !important;
     }
-    [data-testid="stSidebarCollapsedControl"] svg,
-    [data-testid="collapsedControl"] svg {
-        fill: #FFFFFF !important;
-        color: #FFFFFF !important;
+
+    [data-testid="stSidebarCollapsedControl"]:hover,
+    [data-testid="collapsedControl"]:hover {
+        background-color: #21262D !important;
+        border-color: #2EA043 !important;
+    }
+
+    [data-testid="stSidebarCollapsedControl"] button svg,
+    [data-testid="collapsedControl"] button svg {
+        display: none !important;
+    }
+
+    [data-testid="stSidebarCollapsedControl"] button::after,
+    [data-testid="collapsedControl"] button::after {
+        content: "☰  Menu";
+        color: #E6EDF3 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        white-space: nowrap !important;
+        padding: 2px 4px !important;
     }
 
     html, body, [class*="css"], .stApp {
@@ -1175,24 +1199,48 @@ st.markdown("""
 [data-testid="stToolbarActions"], #MainMenu, footer {
     display: none !important;
 }
-/* Force the collapsed-sidebar reopen button to be visible and high-contrast. */
+/* Keep the control interactive, then apply the custom "☰ Menu" styling. */
 [data-testid="stSidebarCollapsedControl"],
 [data-testid="collapsedControl"] {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
+    pointer-events: auto !important;
+}
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"] {
     position: fixed !important;
-    top: 14px !important;
-    left: 14px !important;
+    top: 16px !important;
+    left: 16px !important;
     z-index: 999999 !important;
     background-color: #161B22 !important;
     border: 1px solid #30363D !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
+    padding: 4px 12px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    transition: all 0.2s ease !important;
 }
-[data-testid="stSidebarCollapsedControl"] svg,
-[data-testid="collapsedControl"] svg {
-    fill: #FFFFFF !important;
-    color: #FFFFFF !important;
+
+[data-testid="stSidebarCollapsedControl"]:hover,
+[data-testid="collapsedControl"]:hover {
+    background-color: #21262D !important;
+    border-color: #2EA043 !important;
+}
+
+[data-testid="stSidebarCollapsedControl"] button svg,
+[data-testid="collapsedControl"] button svg {
+    display: none !important;
+}
+
+[data-testid="stSidebarCollapsedControl"] button::after,
+[data-testid="collapsedControl"] button::after {
+    content: "☰  Menu";
+    color: #E6EDF3 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+    padding: 2px 4px !important;
 }
 /* Content sits cleanly at the top of the page with breathing room */
 section.main > div[data-testid="stMainBlockContainer"],
