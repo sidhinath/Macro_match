@@ -1530,6 +1530,10 @@ def load_saved_match(match):
     st.session_state["selected_city"] = city
     st.session_state["food_search_input"] = product
     st.session_state["city_search_input"] = city
+    # A restored match is a programmatic selection, so remount both searchbox
+    # widgets with the restored text instead of reusing any half-typed state.
+    st.session_state["food_box_ver"] = st.session_state.get("food_box_ver", 0) + 1
+    st.session_state["city_box_ver"] = st.session_state.get("city_box_ver", 0) + 1
     # Legacy aliases kept so older saved-state keys stay in sync.
     st.session_state["product_select"] = product
     st.session_state["city_select"] = city
@@ -1643,6 +1647,19 @@ if "selected_product" not in st.session_state:
     st.session_state["selected_product"] = "Almond Butter"
 if "selected_city" not in st.session_state:
     st.session_state["selected_city"] = "Delhi"
+# Searchbox text is independent from the active selection. Keeping it empty by
+# default lets the placeholder show and lets the user backspace freely; the
+# "Selected food/city" badges below each box always show the active choice.
+if "food_search_input" not in st.session_state:
+    st.session_state["food_search_input"] = ""
+if "city_search_input" not in st.session_state:
+    st.session_state["city_search_input"] = ""
+# Bumped only by explicit selections (pills, guide, saved match) to remount a
+# searchbox. Typing never changes these, so the input cannot snap back.
+if "food_box_ver" not in st.session_state:
+    st.session_state["food_box_ver"] = 0
+if "city_box_ver" not in st.session_state:
+    st.session_state["city_box_ver"] = 0
 if "daily_protein_goal" not in st.session_state:
     st.session_state["daily_protein_goal"] = 120
 if "daily_calorie_goal" not in st.session_state:
@@ -3501,6 +3518,16 @@ def cached_all_cities() -> list[str]:
     return sorted(set(load_city_list() or CITIES_FALLBACK))
 
 
+def _reset_food_search_input() -> None:
+    """Clear-box handler: keep the input empty without changing the selection."""
+    st.session_state["food_search_input"] = ""
+
+
+def _reset_city_search_input() -> None:
+    """Clear-box handler: keep the input empty without changing the selection."""
+    st.session_state["city_search_input"] = ""
+
+
 def search_foods(searchterm: str) -> list[str]:
     """Instant food matches for st_searchbox, prefix matches before keywords."""
     term = searchterm or ""
@@ -3827,6 +3854,7 @@ def render_product_guide(details: dict[str, dict]) -> None:
                 # On mobile, the injected parent-document listener collapses
                 # the sidebar immediately after this widget is clicked.
                 _sync_food_selection(item_name)
+                st.session_state["food_box_ver"] += 1
                 st.rerun()
 
     st.caption(
@@ -4109,8 +4137,6 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         st.session_state["selected_product"], PRODUCT_DISPLAY_ALIASES
     )
     st.session_state["selected_product"] = selected_product
-    if "food_search_input" not in st.session_state:
-        st.session_state["food_search_input"] = selected_product
 
     food_defaults = [
         _canonical_value(label, PRODUCT_DISPLAY_ALIASES)
@@ -4119,24 +4145,26 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
     ]
     food_pick = st_searchbox(
         search_foods,
-        placeholder="🔍 Type to search foods (e.g. Cashews, Chia Seeds)...",
+        placeholder="🔍 Type food name (e.g., Cashews, Oats)...",
         default=None,
-        default_searchterm=st.session_state["food_search_input"] or selected_product,
+        default_searchterm=st.session_state["food_search_input"],
         default_options=food_defaults,
         edit_after_submit="option",
         clear_on_submit=False,
         style_overrides=_SEARCHBOX_STYLE_OVERRIDES,
         rerun_scope="fragment",
         debounce=80,
-        key=f"food_searchbox_{selected_product}",
+        reset_function=_reset_food_search_input,
+        key=f"food_search_{st.session_state['food_box_ver']}",
     )
     if food_pick:
-        picked_food = str(food_pick)
-        canonical_food = _canonical_value(picked_food, PRODUCT_DISPLAY_ALIASES)
-        if canonical_food != selected_product:
-            _sync_food_selection(canonical_food, picked_food)
-            st.rerun(scope="fragment")
-        st.session_state["food_search_input"] = picked_food
+        selected_food = str(food_pick).strip()
+        if selected_food:
+            canonical_food = _canonical_value(selected_food, PRODUCT_DISPLAY_ALIASES)
+            st.session_state["selected_product"] = canonical_food
+            if canonical_food != selected_product:
+                _sync_food_selection(canonical_food, selected_food)
+                st.rerun(scope="fragment")
 
     selected_product = st.session_state["selected_product"]
     st.session_state["product_select"] = selected_product
@@ -4174,6 +4202,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
             if picked_product != selected_product:
                 selected_product = picked_product
                 _sync_food_selection(selected_product, product_pick)
+                st.session_state["food_box_ver"] += 1
                 st.rerun(scope="fragment")
 
     with st.expander(
@@ -4190,6 +4219,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         if all_food_pick and all_food_pick != selected_product:
             selected_product = all_food_pick
             _sync_food_selection(selected_product)
+            st.session_state["food_box_ver"] += 1
             st.rerun(scope="fragment")
 
     # ── City ────────────────────────────────────────────────────────────
@@ -4201,8 +4231,6 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         st.session_state["selected_city"], CITY_DISPLAY_ALIASES
     )
     st.session_state["selected_city"] = selected_city
-    if "city_search_input" not in st.session_state:
-        st.session_state["city_search_input"] = selected_city
 
     city_defaults = []
     for label in POPULAR_CITIES:
@@ -4212,24 +4240,26 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
 
     city_pick = st_searchbox(
         search_cities,
-        placeholder="🔍 Type to search cities (e.g. Delhi, Mumbai)...",
+        placeholder="🔍 Type city name (e.g., Delhi, Mumbai)...",
         default=None,
-        default_searchterm=st.session_state["city_search_input"] or selected_city,
+        default_searchterm=st.session_state["city_search_input"],
         default_options=city_defaults,
         edit_after_submit="option",
         clear_on_submit=False,
         style_overrides=_SEARCHBOX_STYLE_OVERRIDES,
         rerun_scope="fragment",
         debounce=80,
-        key=f"city_searchbox_{selected_city}",
+        reset_function=_reset_city_search_input,
+        key=f"city_search_{st.session_state['city_box_ver']}",
     )
     if city_pick:
-        picked_city = str(city_pick)
-        canonical_city = _canonical_value(picked_city, CITY_DISPLAY_ALIASES)
-        if canonical_city != selected_city:
-            _sync_city_selection(canonical_city, picked_city)
-            st.rerun(scope="fragment")
-        st.session_state["city_search_input"] = picked_city
+        selected_city_value = str(city_pick).strip()
+        if selected_city_value:
+            canonical_city = _canonical_value(selected_city_value, CITY_DISPLAY_ALIASES)
+            st.session_state["selected_city"] = canonical_city
+            if canonical_city != selected_city:
+                _sync_city_selection(canonical_city, selected_city_value)
+                st.rerun(scope="fragment")
 
     selected_city = st.session_state["selected_city"]
     st.session_state["city_select"] = selected_city
@@ -4266,6 +4296,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
             if picked_city != selected_city:
                 selected_city = picked_city
                 _sync_city_selection(selected_city, city_pick)
+                st.session_state["city_box_ver"] += 1
                 st.rerun(scope="fragment")
 
     with st.expander(
@@ -4282,6 +4313,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         if all_city_pick and all_city_pick != selected_city:
             selected_city = all_city_pick
             _sync_city_selection(selected_city)
+            st.session_state["city_box_ver"] += 1
             st.rerun(scope="fragment")
 
 
