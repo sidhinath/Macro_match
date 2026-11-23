@@ -3733,6 +3733,32 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
     }
     .steps { grid-template-columns: 1fr !important; }
 }
+
+/* ── Sidebar headings, toggle, and summary contrast ─────────────────── */
+.sidebar-section-title {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+    margin: 0.4rem 0 0.3rem !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label,
+section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p,
+section[data-testid="stSidebar"] div[data-testid="stToggle"] label,
+section[data-testid="stSidebar"] div[data-testid="stToggle"] label p {
+    font-weight: 700 !important;
+    font-size: 16px !important;
+    color: #E6EDF3 !important;
+}
+.sidebar-stats .stats-label {
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+    font-size: 16px !important;
+}
+.sidebar-stats .stats-tip {
+    color: #FBBF24 !important;
+    font-weight: 500 !important;
+    font-size: 14.5px !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -4311,12 +4337,17 @@ with st.sidebar:
 
     # ─── Product guide (moved here from the bottom of the main page) ─────
     product_details = load_product_details()
-    st.markdown("### 📖 Product guide")
+    st.markdown(
+        '<div class="sidebar-section-title">📖 Product guide</div>',
+        unsafe_allow_html=True,
+    )
     st.caption(
         "New to a food? Browse the catalogue to see what it looks like, "
         "its macros per 100 g, diet rules and allergens."
     )
-    if st.toggle(f"Show all {len(product_details)} products", key="show_product_guide"):
+    if st.toggle(
+        f"**Show all {len(product_details)} products**", key="show_product_guide"
+    ):
         render_product_guide(product_details)
 
     # ─── Daily macro goal ──────────────────────────────────────────────
@@ -4400,7 +4431,7 @@ with st.sidebar:
                 <span class="stats-value">{_saved_count}</span>
             </div>
             <div class="stats-tip">
-                Tip: Click any product in the guide to load it instantly.
+                💡 Tip: Click any product in the guide to load it instantly.
             </div>
         </div>
         """,
