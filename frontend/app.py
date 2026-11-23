@@ -2715,6 +2715,38 @@ button[title="View fullscreen"], [data-testid="StyledFullScreenButton"] {
     .steps { grid-template-columns: 1fr; }
 }
 
+/* ── Top how-it-works expander — high-contrast one-line guide bar ── */
+.how-guide-anchor { display: none !important; }
+div[data-testid="stExpander"]:has(.landing) {
+    margin: 0.15rem 0 1.1rem !important;
+}
+div[data-testid="stExpander"]:has(.landing) summary,
+div[data-testid="stExpander"]:has(.landing) button[data-testid="stExpanderHeader"],
+div[data-testid="stExpander"]:has(.landing) [data-testid="stExpanderHeader"],
+div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] summary,
+div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"],
+div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
+    background-color: #161B22 !important;
+    border: 1px solid #30363D !important;
+    border-radius: 10px !important;
+    padding: 10px 14px !important;
+    color: #E6EDF3 !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+}
+div[data-testid="stExpander"]:has(.landing) [data-testid="stExpanderHeader"] p,
+div[data-testid="stExpander"]:has(.landing) summary p,
+div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] p {
+    color: #E6EDF3 !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+}
+div[data-testid="stExpander"]:has(.landing) [data-testid="stExpanderHeader"] svg,
+div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] svg {
+    color: #7EE2A8 !important;
+    fill: #7EE2A8 !important;
+}
+
 /* ── Sidebar header ── */
 .sidebar-header {
     display: flex;
@@ -3437,7 +3469,12 @@ def call_api(payload: dict) -> requests.Response | None:
 
 
 def render_how_it_works() -> None:
-    """Collapsible footer guide — the original 3-step card, unchanged inside."""
+    """Collapsible top guide — the original 3-step card, unchanged inside."""
+    # Marker lets CSS find this expander even while it is collapsed.
+    st.markdown(
+        '<div class="how-guide-anchor" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
     with st.expander("ℹ️ How MacroMatch Works — 3 simple steps", expanded=False):
         # Built as one unindented HTML string: Markdown ends an HTML block at
         # the first blank line and would turn any indented remainder into code.
@@ -3490,6 +3527,9 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 st.markdown('<hr class="section-divider hero-divider">', unsafe_allow_html=True)
+
+# Pinned directly under the header, before the search card.
+render_how_it_works()
 
 
 # ─────────────────────────────────────────────
@@ -3898,8 +3938,7 @@ with st.container(border=True):
 selected_detail = product_details.get(selected_product)
 
 if not find_btn:
-    # The 3-step guide now lives in a collapsed footer expander; nothing sits
-    # between the search card and the results/preview anymore.
+    # The 3-step guide is pinned above the search card; results follow immediately.
     if selected_detail:
         st.markdown("### 🥗 Your Regular Food")
         render_product_spotlight(
@@ -3909,7 +3948,6 @@ if not find_btn:
         )
         st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
-    render_how_it_works()
     st.stop()
 
 
@@ -4328,4 +4366,3 @@ with st.container(border=True):
                 st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
 st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
-render_how_it_works()
