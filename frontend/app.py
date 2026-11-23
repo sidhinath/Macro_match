@@ -133,6 +133,8 @@ if "supabase_refresh_token" not in st.session_state:
     st.session_state["supabase_refresh_token"] = None
 if "supabase_user_name" not in st.session_state:
     st.session_state["supabase_user_name"] = None
+if "supabase_recovery_mode" not in st.session_state:
+    st.session_state["supabase_recovery_mode"] = False
 
 
 def _ensure_supabase_session() -> None:
@@ -164,6 +166,7 @@ def _ensure_supabase_session() -> None:
             st.session_state["supabase_refresh_token"] = None
             st.session_state["supabase_user"] = None
             st.session_state["supabase_user_name"] = None
+            st.session_state["supabase_recovery_mode"] = False
             st.error(f"Supabase session expired — please sign in again: {exc}")
             return
 
@@ -183,28 +186,62 @@ def _ensure_supabase_session() -> None:
         st.error(f"Could not verify Supabase session: {exc}")
 
 
-# Supabase OAuth redirects can return tokens in the query string. Capture them
-# before session restoration so the Google button can complete sign-in.
-_oauth_params = st.query_params
-if (
-    st.session_state["supabase_user"] is None
-    and "access_token" in _oauth_params
-    and "refresh_token" in _oauth_params
-):
-    st.session_state["supabase_access_token"] = _oauth_params["access_token"]
-    st.session_state["supabase_refresh_token"] = _oauth_params["refresh_token"]
-    try:
-        del st.query_params["access_token"]
-        del st.query_params["refresh_token"]
-    except Exception:
-        pass
+# Supabase OAuth and password-recovery links return auth data in the query
+# string. Capture it before session restoration so Google sign-in and the
+# `type=recovery` password reset flow can both complete.
+_auth_params = st.query_params
+_is_recovery_link = str(_auth_params.get("type", "")) == "recovery"
+
+if st.session_state["supabase_user"] is None or _is_recovery_link:
+    _tokens_captured = False
+
+    # Implicit flow: access_token + refresh_token + type=recovery.
+    if "access_token" in _auth_params and "refresh_token" in _auth_params:
+        st.session_state["supabase_access_token"] = _auth_params["access_token"]
+        st.session_state["supabase_refresh_token"] = _auth_params["refresh_token"]
+        _tokens_captured = True
+
+    # PKCE flow: Supabase may send a one-time `code` instead of raw tokens.
+    elif "code" in _auth_params:
+        try:
+            _code_response = supabase.auth.exchange_code_for_session(
+                {"auth_code": _auth_params["code"]}
+            )
+            _code_session = getattr(_code_response, "session", None)
+            if _code_session and _code_session.access_token and _code_session.refresh_token:
+                st.session_state["supabase_access_token"] = _code_session.access_token
+                st.session_state["supabase_refresh_token"] = _code_session.refresh_token
+                _tokens_captured = True
+        except Exception as exc:
+            st.error(f"Error: could not start the recovery session: {exc}")
+
+    if _is_recovery_link:
+        st.session_state["supabase_recovery_mode"] = True
+        st.session_state.auth_view = "reset"
+        if (
+            not _tokens_captured
+            and not st.session_state["supabase_access_token"]
+            and not st.session_state["supabase_refresh_token"]
+        ):
+            st.warning(
+                "Recovery link opened without a session. Enter your email, "
+                "current password, and new password below."
+            )
+
+    # Remove one-time auth params so a refresh cannot replay them.
+    for _param in ("access_token", "refresh_token", "code", "type"):
+        try:
+            if _param in st.query_params:
+                del st.query_params[_param]
+        except Exception:
+            pass
 
 _ensure_supabase_session()
 
 
 # ─────────────────────────────────────────────
 # AUTHENTICATION UI — ONE unified centered card
-# Rendered only while logged out. All Supabase backend logic is unchanged.
+# Rendered while logged out, and while a password-recovery session is active.
 # ─────────────────────────────────────────────
 
 # Normalise stale values from earlier deployments so forms never disappear.
@@ -221,6 +258,21 @@ def _oauth_redirect_url() -> str:
         except Exception:
             configured = ""
     return configured
+
+
+def _app_url() -> str:
+    """Return this app's public URL for Supabase email redirects."""
+    for key in ("APP_URL", "STREAMLIT_APP_URL"):
+        configured = os.environ.get(key, "").strip()
+        if not configured:
+            try:
+                configured = str(st.secrets.get(key, "")).strip()
+            except Exception:
+                configured = ""
+        if configured:
+            return configured
+    # Reuse the redirect URL already configured for Google/OAuth if present.
+    return _oauth_redirect_url()
 
 
 def _begin_google_sign_in() -> None:
@@ -253,7 +305,14 @@ def _begin_google_sign_in() -> None:
         st.error(f"Google sign-in could not start: {exc}")
 
 
-if st.session_state["supabase_user"] is None:
+# A recovery session is authenticated, but must stay on the reset form until
+# the user has actually changed their password.
+show_auth_ui = (
+    st.session_state["supabase_user"] is None
+    or st.session_state.get("supabase_recovery_mode", False)
+)
+
+if show_auth_ui:
 
     # ── Auth CSS — MUST be injected before st.stop() below ──────────────
     st.markdown("""
@@ -839,6 +898,7 @@ if st.session_state["supabase_user"] is None:
                                             response.user.email or "",
                                         )
                                     )
+                                    st.session_state["supabase_recovery_mode"] = False
                                     st.success("✅ Signed in successfully!")
                                     st.rerun()
                                 else:
@@ -883,14 +943,27 @@ if st.session_state["supabase_user"] is None:
                     elif not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", forgot_email or ""):
                         st.error("Please enter a valid email address.")
                     else:
-                        with st.spinner("Sending reset link…"):
-                            # ── TODO: connect your backend password-reset function ──
-                            # supabase.auth.reset_password_for_email(forgot_email)  # v2
-                            # supabase.auth.reset_password_email(forgot_email)      # older
-                            st.success(
-                                "If an account exists for this email, a reset "
-                                "link has been sent."
+                        app_url = _app_url()
+                        if not app_url:
+                            st.error(
+                                "Error: APP_URL is not configured. Set APP_URL "
+                                "(or SUPABASE_REDIRECT_URL) in Streamlit secrets "
+                                "or environment variables."
                             )
+                        else:
+                            with st.spinner("Sending reset link…"):
+                                try:
+                                    result = supabase.auth.reset_password_for_email(
+                                        forgot_email, {"redirect_to": app_url}
+                                    )
+                                    if getattr(result, "error", None):
+                                        raise RuntimeError(str(result.error))
+                                    st.success(
+                                        "If an account exists for this email, a reset "
+                                        "link has been sent."
+                                    )
+                                except Exception as e:
+                                    st.error(f"Error: {e}")
 
                 if st.button("← Back to Sign in", key="back_from_forgot"):
                     st.session_state.auth_view = "signin"
@@ -902,6 +975,11 @@ if st.session_state["supabase_user"] is None:
                     '<div class="auth-view-title">Reset Password</div>',
                     unsafe_allow_html=True,
                 )
+                if st.session_state.get("supabase_recovery_mode", False):
+                    st.info(
+                        "Recovery session detected. Confirm your identity with "
+                        "your current password, then choose a new one."
+                    )
                 with st.form("reset_form"):
                     reset_email = st.text_input(
                         "Email", placeholder="you@example.com", key="reset_email"
@@ -929,10 +1007,50 @@ if st.session_state["supabase_user"] is None:
                         st.error("New password must be at least 6 characters.")
                     else:
                         with st.spinner("Updating password…"):
-                            # ── TODO: connect your backend update-password function ──
-                            # supabase.auth.update_user({"password": new_pw})
-                            # (requires a recovery session from the emailed link)
-                            st.success("Password updated successfully.")
+                            try:
+                                # Verify identity first, then attach the fresh
+                                # session so update_user() writes to Supabase.
+                                sign_in_response = supabase.auth.sign_in_with_password(
+                                    {
+                                        "email": reset_email,
+                                        "password": current_pw,
+                                    }
+                                )
+                                signed_in_user = getattr(sign_in_response, "user", None)
+                                if not signed_in_user:
+                                    raise RuntimeError(
+                                        "Sign-in verification did not return a user."
+                                    )
+
+                                session = getattr(sign_in_response, "session", None)
+                                if (
+                                    session
+                                    and session.access_token
+                                    and session.refresh_token
+                                ):
+                                    st.session_state["supabase_access_token"] = (
+                                        session.access_token
+                                    )
+                                    st.session_state["supabase_refresh_token"] = (
+                                        session.refresh_token
+                                    )
+                                    supabase.auth.set_session(
+                                        session.access_token, session.refresh_token
+                                    )
+
+                                update_response = supabase.auth.update_user(
+                                    {"password": new_pw}
+                                )
+                                if getattr(update_response, "error", None):
+                                    raise RuntimeError(str(update_response.error))
+
+                                st.session_state["supabase_user"] = signed_in_user
+                                st.session_state["supabase_recovery_mode"] = False
+                                st.session_state.auth_view = "signin"
+                                st.success("Password updated successfully.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error: {e}")
 
                 if st.button("← Back to Sign in", key="back_from_reset"):
                     st.session_state.auth_view = "signin"
@@ -997,6 +1115,7 @@ if st.session_state["supabase_user"] is None:
                                     )
                                 st.session_state["supabase_user"] = response.user
                                 st.session_state["supabase_user_name"] = new_name
+                                st.session_state["supabase_recovery_mode"] = False
                                 if response.session:
                                     st.session_state["supabase_access_token"] = (
                                         response.session.access_token
@@ -1030,8 +1149,9 @@ if st.session_state["supabase_user"] is None:
         </div>
         """, unsafe_allow_html=True)
 
-# Protect the rest of the app: nothing below runs for logged-out users.
-if st.session_state["supabase_user"] is None:
+# Protect the rest of the app: a recovery session must finish the reset form
+# before the dashboard is allowed to render.
+if show_auth_ui:
     st.stop()
 
 
@@ -2846,6 +2966,7 @@ with st.sidebar:
         st.session_state["supabase_access_token"] = None
         st.session_state["supabase_refresh_token"] = None
         st.session_state["supabase_user_name"] = None
+        st.session_state["supabase_recovery_mode"] = False
         st.rerun()
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
