@@ -68,6 +68,23 @@ def get_supabase_client() -> Client:
 supabase: Client = get_supabase_client()
 
 
+def fetch_profile_name(user_id: str, fallback: str) -> str:
+    """Look up a profile name, tolerating a missing `profiles` table (PGRST205)."""
+    try:
+        profile = (
+            supabase.table("profiles")
+            .select("name")
+            .eq("id", user_id)
+            .single()
+            .execute()
+        )
+        if profile.data and profile.data.get("name"):
+            return profile.data["name"]
+    except Exception:
+        pass
+    return fallback
+
+
 # Session-state keys for Supabase Auth persistence
 if "supabase_user" not in st.session_state:
     st.session_state["supabase_user"] = None
@@ -94,15 +111,9 @@ if (
         user_response = supabase.auth.get_user()
         if user_response and user_response.user:
             st.session_state["supabase_user"] = user_response.user
-            profile = (
-                supabase.table("profiles")
-                .select("name")
-                .eq("id", user_response.user.id)
-                .single()
-                .execute()
+            st.session_state["supabase_user_name"] = fetch_profile_name(
+                user_response.user.id, user_response.user.email or ""
             )
-            if profile.data:
-                st.session_state["supabase_user_name"] = profile.data["name"]
     except Exception:
         # Tokens expired or invalid — clear them so the user can sign in again.
         st.session_state["supabase_access_token"] = None
@@ -287,17 +298,11 @@ if st.session_state["supabase_user"] is None:
                                     st.session_state["supabase_refresh_token"] = (
                                         session.refresh_token if session else None
                                     )
-                                    profile = (
-                                        supabase.table("profiles")
-                                        .select("name")
-                                        .eq("id", response.user.id)
-                                        .single()
-                                        .execute()
-                                    )
                                     st.session_state["supabase_user_name"] = (
-                                        profile.data["name"]
-                                        if profile.data
-                                        else response.user.email
+                                        fetch_profile_name(
+                                            response.user.id,
+                                            response.user.email or "",
+                                        )
                                     )
                                     st.success("✅ Signed in successfully!")
                                     st.rerun()
@@ -423,13 +428,22 @@ if st.session_state["supabase_user"] is None:
                                 {"email": new_email, "password": new_password}
                             )
                             if response.user:
-                                supabase.table("profiles").insert(
-                                    {
-                                        "id": response.user.id,
-                                        "email": new_email,
-                                        "name": new_name,
-                                    }
-                                ).execute()
+                                try:
+                                    supabase.table("profiles").insert(
+                                        {
+                                            "id": response.user.id,
+                                            "email": new_email,
+                                            "name": new_name,
+                                        }
+                                    ).execute()
+                                except Exception as exc:
+                                    # Auth account was created successfully; a missing
+                                    # profiles table must not block sign-in.
+                                    st.warning(
+                                        "Account created, but the profile row could not "
+                                        "be saved. Have you run the Supabase setup SQL "
+                                        f"from DEPLOYMENT.md? ({exc})"
+                                    )
                                 st.session_state["supabase_user"] = response.user
                                 st.session_state["supabase_user_name"] = new_name
                                 if response.session:
