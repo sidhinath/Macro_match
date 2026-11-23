@@ -2457,10 +2457,14 @@ button[data-testid="collapsedControl"],
     }
 }
 
-/* Highlight the sidebar collapse (<<) button */
+/* Highlight BOTH the collapse (<<) and expand (>>) sidebar buttons identically */
 [data-testid="stSidebarCollapseButton"] button,
 [data-testid="stSidebarHeader"] button,
-section[data-testid="stSidebar"] button[kind="header"] {
+section[data-testid="stSidebar"] button[kind="header"],
+[data-testid="stExpandSidebarButton"],
+[data-testid="stSidebarCollapsedControl"] button,
+[data-testid="collapsedControl"] button,
+header[data-testid="stHeader"] button[kind="header"] {
     background-color: rgba(46, 160, 67, 0.16) !important;
     border: 1px solid rgba(46, 160, 67, 0.65) !important;
     border-radius: 8px !important;
@@ -2473,7 +2477,11 @@ section[data-testid="stSidebar"] button[kind="header"] {
 
 [data-testid="stSidebarCollapseButton"] button svg,
 [data-testid="stSidebarHeader"] button svg,
-section[data-testid="stSidebar"] button[kind="header"] svg {
+section[data-testid="stSidebar"] button[kind="header"] svg,
+[data-testid="stExpandSidebarButton"] svg,
+[data-testid="stSidebarCollapsedControl"] button svg,
+[data-testid="collapsedControl"] button svg,
+header[data-testid="stHeader"] button[kind="header"] svg {
     fill: #6EE798 !important;
     color: #6EE798 !important;
     width: 18px !important;
@@ -2483,7 +2491,11 @@ section[data-testid="stSidebar"] button[kind="header"] svg {
 @media (hover: hover) {
     [data-testid="stSidebarCollapseButton"] button:hover,
     [data-testid="stSidebarHeader"] button:hover,
-    section[data-testid="stSidebar"] button[kind="header"]:hover {
+    section[data-testid="stSidebar"] button[kind="header"]:hover,
+    [data-testid="stExpandSidebarButton"]:hover,
+    [data-testid="stSidebarCollapsedControl"] button:hover,
+    [data-testid="collapsedControl"] button:hover,
+    header[data-testid="stHeader"] button[kind="header"]:hover {
         background-color: rgba(46, 160, 67, 0.3) !important;
         border-color: #3FB950 !important;
     }
