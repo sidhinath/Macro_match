@@ -2276,6 +2276,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) {
     border-radius: 16px !important;
     padding: 1.25rem !important;
     height: 100% !important;
+    min-height: 360px !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card--top) {
     border-color: #2EA043 !important;
@@ -2293,7 +2294,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) div[data-testid=
     margin-top: auto !important;
 }
 .swap-card {
-    min-height: 100%;
+    min-height: 360px !important;
     display: flex;
     flex-direction: column;
 }
@@ -2329,7 +2330,8 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) div[data-testid=
 }
 .swap-thumb {
     width: 100%;
-    height: 140px;
+    height: 150px;
+    max-height: 150px;
     object-fit: cover;
     border-radius: 10px;
     display: block;
@@ -2427,7 +2429,25 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) .stButton > butt
     }
 }
 
-/* ── Product images — fixed aspect ratio ── */
+/* ── Product images — fixed heights, no fullscreen chrome ── */
+button[title="View fullscreen"], [data-testid="StyledFullScreenButton"] {
+    display: none !important;
+}
+.spotlight-thumb {
+    width: 100%;
+    height: 210px;
+    max-height: 210px;
+    object-fit: cover;
+    border-radius: 12px;
+    display: block;
+    background: #0B0F19;
+}
+.spotlight-thumb-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4.2rem;
+}
 .product-emoji {
     display: flex;
     align-items: center;
@@ -3136,14 +3156,21 @@ def render_product_spotlight(name: str, detail: dict, keto: bool = False) -> Non
     )
 
     with st.container(border=True):
-        col_img, col_info = st.columns([1, 2.2], gap="medium")
+        col_img, col_info = st.columns([1, 2.2], vertical_alignment="center")
         with col_img:
-            image = product_image(name)
-            if image:
-                st.image(str(image), use_container_width=True)
+            image_src = product_image_src(name)
+            if image_src:
+                # Inline <img> keeps the exact fixed height and avoids
+                # Streamlit's fullscreen button entirely.
+                st.markdown(
+                    f'<img class="spotlight-thumb" src="{image_src}" '
+                    f'alt="{html.escape(name, quote=True)}">',
+                    unsafe_allow_html=True,
+                )
             else:
                 st.markdown(
-                    f'<div class="product-emoji">{PRODUCT_EMOJI.get(name, "🥗")}</div>',
+                    '<div class="spotlight-thumb spotlight-thumb-fallback">'
+                    f'{PRODUCT_EMOJI.get(name, "🥗")}</div>',
                     unsafe_allow_html=True,
                 )
         with col_info:
