@@ -3469,13 +3469,15 @@ div[data-testid="stExpander"]:has(.filters-expander-marker) .stRadio div[role="r
 }
 
 .selected-value {
-    font-size: 0.8rem !important;
-    color: var(--text-muted) !important;
-    margin: 0.35rem 0 0.55rem !important;
-}
-.selected-value strong {
-    color: #7EE2A8 !important;
+    font-size: 16px !important;
     font-weight: 700 !important;
+    color: #E6EDF3 !important;
+    margin: 6px 0 10px 0 !important;
+}
+.selected-value strong,
+.selected-value span {
+    font-weight: 700 !important;
+    color: #4ADE80 !important;
 }
 
 /* Quick-tap pills: active choice is emerald green. */
@@ -4455,8 +4457,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
     selected_product = st.session_state["selected_product"]
     st.session_state["product_select"] = selected_product
     st.markdown(
-        '<div class="selected-value">Selected food: '
-        f"<strong>{html.escape(selected_product)}</strong></div>",
+        f'<div class="selected-value" style="font-size: 16px; font-weight: 700; color: #E6EDF3; margin: 6px 0 10px 0;">Selected food: <span style="color: #4ADE80;">{html.escape(selected_product)}</span></div>',
         unsafe_allow_html=True,
     )
 
@@ -4546,8 +4547,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
     selected_city = st.session_state["selected_city"]
     st.session_state["city_select"] = selected_city
     st.markdown(
-        '<div class="selected-value">Selected city: '
-        f"<strong>{html.escape(selected_city)}</strong></div>",
+        f'<div class="selected-value" style="font-size: 16px; font-weight: 700; color: #E6EDF3; margin: 6px 0 10px 0;">Selected city: <span style="color: #4ADE80;">{html.escape(selected_city)}</span></div>',
         unsafe_allow_html=True,
     )
 
