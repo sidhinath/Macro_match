@@ -1812,8 +1812,8 @@ PRIORITY_LABELS = {
 }
 PRIORITY_KEYS = list(PRIORITY_LABELS.keys())
 
-RANK_COLORS = ["#4ade80", "#60a5fa", "#f472b6"]   # green, blue, pink
-RANK_LABELS = ["🥇 Best Match", "🥈 Second Match", "🥉 Third Match"]
+RANK_COLORS = ["#2EA043", "#60A5FA", "#94A3B8"]   # emerald, blue, slate
+RANK_LABELS = ["#1 Best Match", "#2 Runner Up", "#3 Option"]
 
 # ── Canonical serving sizes in grams (used for Per-Serving toggle) ──────────
 PRODUCT_SERVING_G: dict[str, int] = {
@@ -2236,20 +2236,161 @@ button[kind="primary"] p {
     margin: 0.7rem 0;
 }
 
-/* ── Result card ── */
-.result-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1rem 1.25rem;
-    margin-bottom: 1rem;
-    transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+/* ── Ranked swaps — high-contrast SaaS comparison cards ── */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) {
+    background-color: #161B22 !important;
+    border: 1px solid #30363D !important;
+    border-radius: 16px !important;
+    padding: 1.25rem !important;
+    height: 100% !important;
 }
-@media (hover: hover) {
-    .result-card:hover {
-        transform: translateY(-3px);
-        border-color: var(--border-hover);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card--top) {
+    border-color: #2EA043 !important;
+    box-shadow: 0 0 0 1px rgba(46, 160, 67, 0.25), 0 14px 34px rgba(0, 0, 0, 0.32) !important;
+}
+div[data-testid="stColumn"]:has(.swap-card) > div[data-testid="stVerticalBlock"] {
+    height: 100% !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) > div[data-testid="stVerticalBlock"] {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) div[data-testid="stButton"] {
+    margin-top: auto !important;
+}
+.swap-card {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.swap-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.85rem;
+}
+.swap-rank-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+.swap-score-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 11px;
+    border-radius: 999px;
+    background: #0B0F19 !important;
+    border: 1px solid #2EA043 !important;
+    color: #7EE2A8 !important;
+    font-size: 0.82rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.swap-thumb {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 10px;
+    display: block;
+    margin-bottom: 0.85rem;
+    background: #0B0F19;
+}
+.swap-thumb-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3.2rem;
+}
+.swap-name {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+    line-height: 1.25 !important;
+    margin: 0 0 0.25rem !important;
+}
+.swap-meta {
+    font-size: 0.8rem;
+    color: #94A3B8;
+    margin-bottom: 0.7rem !important;
+    overflow-wrap: anywhere;
+}
+.swap-macros {
+    margin: 0.2rem 0 0.6rem;
+}
+.swap-macro-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 9px;
+    margin: 0.15rem 0.3rem 0.15rem 0;
+    border-radius: 999px;
+    border: 1px solid;
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.swap-macro-pill.protein  { background: rgba(52,211,153,0.12); color: #34D399; border-color: rgba(52,211,153,0.35); }
+.swap-macro-pill.carbs    { background: rgba(96,165,250,0.12); color: #60A5FA; border-color: rgba(96,165,250,0.35); }
+.swap-macro-pill.fat      { background: rgba(244,114,182,0.12); color: #F472B6; border-color: rgba(244,114,182,0.35); }
+.swap-macro-pill.calories { background: rgba(251,191,36,0.12); color: #FBBF24; border-color: rgba(251,191,36,0.35); }
+.swap-deltas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-bottom: 0.75rem;
+}
+.swap-delta {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    background: rgba(148, 163, 184, 0.10);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    color: #CBD5E1;
+}
+.swap-delta--good {
+    background: rgba(46, 160, 67, 0.14);
+    border-color: rgba(46, 160, 67, 0.40);
+    color: #7EE2A8;
+}
+.swap-delta--warn {
+    background: rgba(251, 191, 36, 0.12);
+    border-color: rgba(251, 191, 36, 0.35);
+    color: #FBBF24;
+}
+.swap-explanation {
+    background: #0B0F19;
+    border-left: 3px solid #2EA043;
+    border-radius: 0 10px 10px 0;
+    padding: 0.8rem 0.9rem;
+    font-size: 15px;
+    color: #C9D1D9;
+    line-height: 1.5;
+    margin: 0 0 0.9rem;
+    flex: 1;
+}
+.swap-explanation strong {
+    color: #F1F5F9;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) .stButton > button {
+    min-height: 42px !important;
+    font-size: 0.9rem !important;
+    border-radius: 10px !important;
+}
+@media (max-width: 768px) {
+    div[data-testid="stColumn"]:has(.swap-card) {
+        flex: 0 0 100% !important;
+        width: 100% !important;
     }
 }
 
@@ -2264,38 +2405,6 @@ button[kind="primary"] p {
     border: 1px solid var(--border);
     border-radius: 12px;
 }
-.result-thumb {
-    width: 88px;
-    height: 88px;
-    min-width: 88px;
-    min-height: 88px;
-    object-fit: cover;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    padding: 4px;
-    background: #FFFFFF;
-    box-sizing: border-box;
-    flex-shrink: 0;
-    aspect-ratio: 1;
-}
-.result-thumb-fallback {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 88px;
-    height: 88px;
-    min-width: 88px;
-    min-height: 88px;
-    font-size: 2rem;
-    background: #FFFFFF;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 4px;
-    box-sizing: border-box;
-    flex-shrink: 0;
-    aspect-ratio: 1;
-}
-
 /* ── Tag / pill badges ── */
 .tag {
     display: inline-block;
@@ -2324,61 +2433,6 @@ button[kind="primary"] p {
 .macro-pill.fat     { background: rgba(244, 114, 182, 0.12); color: #F472B6; border-color: rgba(244, 114, 182, 0.35); }
 .macro-pill.fiber   { background: rgba(168, 85, 247, 0.12); color: #A855F7; border-color: rgba(168, 85, 247, 0.35); }
 .macro-pill.calories{ background: rgba(251, 191, 36, 0.12); color: #FBBF24; border-color: rgba(251, 191, 36, 0.35); }
-
-/* ── Rank badge ── */
-.rank-badge {
-    display: inline-block;
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    padding: 3px 10px;
-    border-radius: 999px;
-    margin-bottom: 0.35rem;
-    color: var(--text-heading);
-}
-
-/* ── Product name in card ── */
-.card-product-name {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: var(--text-heading);
-    margin: 0 0 0.15rem;
-}
-.card-category {
-    font-size: 0.95rem;
-    color: var(--text-body);
-    margin-bottom: 0.35rem;
-    overflow-wrap: anywhere;
-}
-
-/* ── Explanation box ── */
-.explanation-box {
-    background: #0B0F19;
-    border-left: 3px solid var(--accent-mint);
-    border-radius: 0 8px 8px 0;
-    padding: 0.7rem 1rem;
-    font-size: 14.5px;
-    color: #F1F5F9;
-    line-height: 1.5;
-    margin-top: 0.6rem;
-    font-style: normal;
-}
-
-/* ── Match score pill ── */
-.score-pill {
-    display: inline-block;
-    background: #0B0F19;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 2px 10px;
-    font-size: 0.875rem;
-    color: var(--text-body);
-    margin-left: 0.5rem;
-    font-family: 'Inter', sans-serif;
-    font-variant-numeric: tabular-nums;
-}
 
 /* ── Landing (empty state) — compact ── */
 .landing {
@@ -3589,28 +3643,11 @@ summary_html = (
 )
 st.markdown(summary_html, unsafe_allow_html=True)
 
-# ─── Save the current match to the logged-in user's history (Supabase) ───
+# ─── Saved-match confirmation (surfaced after per-card saves) ─────────
 if st.session_state.pop("saved_match_flash", None):
     st.success("Saved to your history — only your own account can see it.")
 
-if st.button("💾 Save this match to my history", key="save_match_to_history"):
-    if save_match(
-        CURRENT_USER_ID,
-        selected_product,
-        selected_city,
-        selected_diets,
-        selected_allergens,
-        priority_label,
-        alternatives,
-    ):
-        # Rerun re-renders the sidebar from fresh DB data. The results view
-        # and the success message are restored from session state.
-        st.session_state["saved_match_flash"] = True
-        st.rerun()
-
-# ── Result cards ──────────────────────────────
-
-# ── Per-serving toggle (one shared toggle above all cards) ────────────────
+# ── Per-serving toggle (shared by all comparison cards) ────────────────
 _srv_col, _lbl_col = st.columns([2, 5], gap="small")
 with _srv_col:
     per_serving_on = st.toggle(
@@ -3621,6 +3658,7 @@ with _srv_col:
     )
 _unit_label = "per serving" if per_serving_on else "per 100 g"
 keto_on     = "keto" in selected_diets   # used for net-carbs highlight
+
 
 def _scale(macros: dict, product_name: str) -> dict:
     """Return a copy of macros dict scaled to serving size (if toggle is on)."""
@@ -3636,132 +3674,233 @@ def _scale(macros: dict, product_name: str) -> dict:
         "calories": round(macros["calories"] * factor),
     }
 
-for alt in alternatives:
-    rank     = alt["rank"] - 1          # 0-indexed for color/label arrays
-    color    = RANK_COLORS[rank]
-    label    = RANK_LABELS[rank]
-    nutr     = alt["nutrition"]
 
-    # Scale both original and alternative macros based on toggle
-    orig_scaled = _scale(orig_macros, selected_product) if orig_macros else None
-    nutr_scaled = _scale(nutr, alt["name"])
+def _delta_html(label: str, alt_val: float, orig_val: float | None,
+                unit: str = "g", higher_is_better: bool = False) -> str:
+    """Compact trade-off badge comparing an alternative with the regular food."""
+    if orig_val is None:
+        return ""
+    diff = round(float(alt_val) - float(orig_val), 1)
+    if abs(diff) < 0.05:
+        return f'<span class="swap-delta">±0{unit} {label}</span>'
+    sign = "+" if diff > 0 else "−"
+    good = diff > 0 if higher_is_better else diff < 0
+    cls = "swap-delta swap-delta--good" if good else "swap-delta swap-delta--warn"
+    return f'<span class="{cls}">{sign}{abs(diff):g}{unit} {label}</span>'
 
-    with st.container():
-        # ── Card header ──
+
+orig_scaled = _scale(orig_macros, selected_product) if orig_macros else None
+
+# ── Ranked swaps — 3 equal columns on desktop, stacked on mobile ───────
+st.markdown("### 🔁 Ranked Swaps")
+cols = st.columns(3)
+
+for col, alt in zip(cols, alternatives[:3]):
+    with col:
+        rank_i = max(0, min(int(alt.get("rank", 1)) - 1, 2))
+        color  = RANK_COLORS[rank_i]
+        label  = RANK_LABELS[rank_i]
+        score_pct = max(0, min(100, round((1 - float(alt["match_score"])) * 100)))
+        match_pct_str = f"{score_pct}% match"
+
+        nutr        = alt["nutrition"]
+        nutr_scaled = _scale(nutr, alt["name"])
+
         thumb = product_image_src(alt["name"])
         if thumb:
             thumb_html = (
-                f'<div style="width:88px;height:88px;min-width:88px;min-height:88px;'
-                f'flex-shrink:0;border-radius:12px;background:#FFFFFF;padding:4px;'
-                f'box-sizing:border-box;overflow:hidden;display:flex;align-items:center;justify-content:center;">'
-                f'<img src="{thumb}" alt="{alt["name"]}" style="width:100%;height:100%;'
-                f'object-fit:cover;border-radius:8px;display:block;">'
-                f'</div>'
+                f'<img class="swap-thumb" src="{thumb}" '
+                f'alt="{html.escape(alt["name"], quote=True)}">'
             )
         else:
             thumb_html = (
-                f'<div class="result-thumb result-thumb-fallback">'
+                '<div class="swap-thumb swap-thumb-fallback">'
                 f'{PRODUCT_EMOJI.get(alt["name"], "🥗")}</div>'
             )
-        # Local name + net carbs for the alt product
-        alt_local   = PRODUCT_LOCAL_NAMES.get(alt["name"], "")
-        alt_local_tag = (
-            f'<span class="local-name-tag" style="margin-left:0;">🗺️ {alt_local}</span>'
+
+        alt_local = PRODUCT_LOCAL_NAMES.get(alt["name"], "")
+        local_tag = (
+            f'<span class="local-name-tag" style="margin-left:0;">🗺️ {html.escape(alt_local)}</span>'
             if alt_local else ""
         )
-        # Net carbs: use scaled value when Per Serving toggle is active
-        alt_nc      = max(0.0, nutr_scaled["carbs"] - nutr_scaled["fiber"])
-        alt_nc_cls  = "net-carbs-keto" if keto_on else "net-carbs-normal"
-        nc_unit_note = f" ({_unit_label})" if per_serving_on else ""
-        alt_nc_tag  = f'<span class="{alt_nc_cls}">⚡ Net Carbs {alt_nc:g} g{nc_unit_note}</span>'
-        st.markdown(f"""
-        <div class="result-card">
-            <div class="result-card-head">
-                {thumb_html}
-                <div class="result-card-body">
-                    <span class="rank-badge" style="background:{color}22;color:{color};">{label}</span>
-                    <p class="card-product-name">{alt['name']}
-                        <span class="score-pill">{round((1 - alt['match_score']) * 100)}% Match</span>
-                        {alt_nc_tag}
-                    </p>
-                    {f'<p style="margin:0 0 0.2rem;">{alt_local_tag}</p>' if alt_local_tag else ''}
-                    <p class="card-category">{alt['category']} &nbsp;·&nbsp; Available in: {alt['cities'].replace(',', ', ')}</p>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        meta_text = html.escape(
+            f"{alt['category']} · Available in: {alt['cities'].replace(',', ', ')}"
+        )
 
-        # ── Two columns: table | chart ──
-        col_table, col_chart = st.columns([1, 1], gap="medium")
+        macro_html = (
+            f'<span class="swap-macro-pill protein">P {nutr_scaled["protein"]:g}g</span>'
+            f'<span class="swap-macro-pill carbs">C {nutr_scaled["carbs"]:g}g</span>'
+            f'<span class="swap-macro-pill fat">F {nutr_scaled["fat"]:g}g</span>'
+            f'<span class="swap-macro-pill calories">{nutr_scaled["calories"]:g} kcal</span>'
+        )
 
-        with col_table:
-            st.markdown(f"**Nutrition Breakdown** *({_unit_label})*")
-            if orig_scaled:
-                # Net carbs rows (scaled same way as other macros)
-                orig_nc_val = max(0.0, round(orig_scaled["carbs"] - orig_scaled["fiber"], 1))
-                nutr_nc_val = max(0.0, round(nutr_scaled["carbs"] - nutr_scaled["fiber"], 1))
-                col_a = f"🏠 {selected_product}"
-                col_b = f"📍 {alt['name']}"
-                comparison_df = pd.DataFrame({
-                    "Nutrient": [
-                        "Protein (g)", "Carbs (g)", "Fat (g)",
-                        "Fiber (g)", "⚡ Net Carbs (g)", "Calories (kcal)",
-                    ],
-                    col_a: [
-                        orig_scaled["protein"],
-                        orig_scaled["carbs"],
-                        orig_scaled["fat"],
-                        orig_scaled["fiber"],
-                        orig_nc_val,
-                        orig_scaled["calories"],
-                    ],
-                    col_b: [
-                        nutr_scaled["protein"],
-                        nutr_scaled["carbs"],
-                        nutr_scaled["fat"],
-                        nutr_scaled["fiber"],
-                        nutr_nc_val,
-                        nutr_scaled["calories"],
-                    ],
-                })
+        delta_html = ""
+        if orig_scaled:
+            delta_html = (
+                '<div class="swap-deltas">'
+                + _delta_html("Protein", nutr_scaled["protein"], orig_scaled["protein"],
+                              higher_is_better=True)
+                + _delta_html("Carbs", nutr_scaled["carbs"], orig_scaled["carbs"])
+                + _delta_html("Fat", nutr_scaled["fat"], orig_scaled["fat"])
+                + _delta_html("kcal", nutr_scaled["calories"], orig_scaled["calories"],
+                              unit="")
+                + "</div>"
+            )
+
+        explanation = str(alt.get("explanation", "")).strip()
+        if explanation:
+            # Strip raw-score artifacts leaked by older backend prompts.
+            explanation = re.sub(
+                r"\(?\s*match\s+score\s*[:\-]?\s*\d+\.\d+\s*\)?",
+                f"({match_pct_str})",
+                explanation,
+                flags=re.IGNORECASE,
+            )
+            explanation = re.sub(r"\b0\.\d{3,6}\b", "", explanation).strip()
+        if not explanation:
+            explanation = (
+                f"A strong local swap for {selected_product} in {selected_city}, "
+                f"chosen for your {PRIORITY_LABELS[priority_label].split('—')[0].strip().lower()} priority."
+            )
+
+        top_cls = " swap-card--top" if rank_i == 0 else ""
+        with st.container(border=True):
+            st.markdown(
+                f'<div class="swap-card{top_cls}">'
+                '<div class="swap-card-header">'
+                f'<span class="swap-rank-pill" style="background:{color}22;color:{color};">{label}</span>'
+                f'<span class="swap-score-pill">{score_pct}% Match</span>'
+                '</div>'
+                f'{thumb_html}'
+                f'<p class="swap-name">{PRODUCT_EMOJI.get(alt["name"], "🥗")} '
+                f'{html.escape(alt["name"])}</p>'
+                f'{f"<p>{local_tag}</p>" if local_tag else ""}'
+                f'<p class="swap-meta">{meta_text}</p>'
+                f'<div class="swap-macros">{macro_html}</div>'
+                f'{delta_html}'
+                '<div class="swap-explanation">'
+                f'<strong>Why this swap:</strong> {html.escape(explanation)}'
+                '<div style="margin-top:0.6rem;padding-top:0.5rem;'
+                'border-top:1px solid rgba(126,226,168,0.22);'
+                'font-size:0.82rem;color:#94A3B8;">'
+                f'📊 {_unit_label} · <strong style="color:#7EE2A8;">{match_pct_str}</strong>'
+                '</div>'
+                '</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+            if st.button(
+                "💾 Save Match",
+                key=f"save_swap_{rank_i + 1}",
+                use_container_width=True,
+                type="primary",
+            ):
+                if save_match(
+                    CURRENT_USER_ID,
+                    selected_product,
+                    selected_city,
+                    selected_diets,
+                    selected_allergens,
+                    priority_label,
+                    [alt],
+                ):
+                    st.session_state["saved_match_flash"] = True
+                    st.rerun()
+
+# ── Detailed comparison (kept available without cluttering the cards) ───
+with st.expander("📊 Detailed nutrition comparison", expanded=False):
+    if not orig_scaled:
+        st.info("Original product macros not available for comparison.")
+    else:
+        for swap in alternatives[:3]:
+            swap_nutr = _scale(swap["nutrition"], swap["name"])
+            orig_nc = max(
+                0.0, round(orig_scaled["carbs"] - orig_scaled["fiber"], 1)
+            )
+            swap_nc = max(
+                0.0, round(swap_nutr["carbs"] - swap_nutr["fiber"], 1)
+            )
+
+            st.markdown(
+                f"#### {PRODUCT_EMOJI.get(swap['name'], '🥗')} "
+                f"{html.escape(swap['name'])}"
+            )
+            st.caption(
+                f"{html.escape(swap.get('category', ''))} · {_unit_label}"
+            )
+
+            col_table, col_chart = st.columns([1, 1], gap="medium")
+            with col_table:
+                st.markdown(f"**Nutrition Breakdown** *({_unit_label})*")
+                orig_label = f"🥗 {selected_product}"
+                swap_label = f"✨ {swap['name']}"
+                comparison_df = pd.DataFrame(
+                    {
+                        "Nutrient": [
+                            "Protein (g)",
+                            "Carbs (g)",
+                            "Fat (g)",
+                            "Fiber (g)",
+                            "⚡ Net Carbs (g)",
+                            "Calories (kcal)",
+                        ],
+                        orig_label: [
+                            orig_scaled["protein"],
+                            orig_scaled["carbs"],
+                            orig_scaled["fat"],
+                            orig_scaled["fiber"],
+                            orig_nc,
+                            orig_scaled["calories"],
+                        ],
+                        swap_label: [
+                            swap_nutr["protein"],
+                            swap_nutr["carbs"],
+                            swap_nutr["fat"],
+                            swap_nutr["fiber"],
+                            swap_nc,
+                            swap_nutr["calories"],
+                        ],
+                    }
+                )
                 st.dataframe(
                     comparison_df.set_index("Nutrient"),
                     use_container_width=True,
                     column_config={
-                        col_a: st.column_config.NumberColumn(col_a, format="%.1f"),
-                        col_b: st.column_config.NumberColumn(col_b, format="%.1f"),
+                        orig_label: st.column_config.NumberColumn(
+                            orig_label, format="%.1f"
+                        ),
+                        swap_label: st.column_config.NumberColumn(
+                            swap_label, format="%.1f"
+                        ),
                     },
                 )
-            else:
-                st.info("Original product macros not available for comparison.")
 
-        with col_chart:
-            st.markdown(f"**Nutrient Chart** *(excl. calories · {_unit_label})*")
-            if orig_scaled:
-                chart_df = pd.DataFrame({
-                    f"🏠 {selected_product}": [
-                        orig_scaled["protein"],
-                        orig_scaled["carbs"],
-                        orig_scaled["fat"],
-                        orig_scaled["fiber"],
-                    ],
-                    f"📍 {alt['name']}": [
-                        nutr_scaled["protein"],
-                        nutr_scaled["carbs"],
-                        nutr_scaled["fat"],
-                        nutr_scaled["fiber"],
-                    ],
-                }, index=["Protein", "Carbs", "Fat", "Fiber"])
-
-                # Melt to long format for Altair
+            with col_chart:
+                st.markdown(f"**Nutrient Chart** *(excl. calories · {_unit_label})*")
                 import altair as alt_chart
-                chart_long = chart_df.reset_index().melt(
-                    id_vars="index",
-                    var_name="Product",
-                    value_name="Value (g)",
-                )
-                chart_long = chart_long.rename(columns={"index": "Nutrient"})
 
+                chart_df = pd.DataFrame(
+                    {
+                        orig_label: [
+                            orig_scaled["protein"],
+                            orig_scaled["carbs"],
+                            orig_scaled["fat"],
+                            orig_scaled["fiber"],
+                        ],
+                        swap_label: [
+                            swap_nutr["protein"],
+                            swap_nutr["carbs"],
+                            swap_nutr["fat"],
+                            swap_nutr["fiber"],
+                        ],
+                    },
+                    index=["Protein", "Carbs", "Fat", "Fiber"],
+                )
+                chart_long = (
+                    chart_df.reset_index()
+                    .melt(id_vars="index", var_name="Product", value_name="Value (g)")
+                    .rename(columns={"index": "Nutrient"})
+                )
                 bars = (
                     alt_chart.Chart(chart_long)
                     .mark_bar()
@@ -3779,8 +3918,7 @@ for alt in alternatives:
                         ),
                         xOffset=alt_chart.XOffset("Product:N"),
                         y=alt_chart.Y(
-                            "Value (g):Q",
-                            axis=alt_chart.Axis(labelFontSize=11),
+                            "Value (g):Q", axis=alt_chart.Axis(labelFontSize=11)
                         ),
                         color=alt_chart.Color(
                             "Product:N",
@@ -3799,61 +3937,12 @@ for alt in alternatives:
                 )
                 st.altair_chart(bars, use_container_width=True)
 
-        # ── Explanation ──
-        explanation = alt.get("explanation", "").strip()
-        if explanation:
-            # ── Sanitise any leaked raw score patterns from the backend ──────
-            # Handles: "match score: 0.0873", "(match score: 0.0873)", etc.
-            import re as _re
-            match_pct_str = f"{round((1 - alt['match_score']) * 100)}% match"
-            explanation = _re.sub(
-                r"\(?\s*match\s+score\s*[:\-]?\s*[\d]+\.[\d]+\s*\)?",
-                f"({match_pct_str})",
-                explanation,
-                flags=_re.IGNORECASE,
+            nc_class = "net-carbs-keto" if keto_on else "net-carbs-normal"
+            st.markdown(
+                f'<span class="{nc_class}">⚡ Net Carbs {swap_nc:g} g '
+                f"({_unit_label})</span>",
+                unsafe_allow_html=True,
             )
-            # Remove stray standalone raw decimal score artifacts e.g. "0.0873"
-            explanation = _re.sub(
-                r"\b0\.\d{3,6}\b",
-                "",
-                explanation,
-            ).strip()
+            st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
-            # ── Build the live data footer (always in sync with toggle) ──────
-            srv_g   = PRODUCT_SERVING_G.get(alt["name"], 100) if per_serving_on else None
-            if srv_g:
-                factor      = srv_g / 100.0
-                p_val       = round(nutr_scaled["protein"],  1)
-                c_val       = round(nutr_scaled["carbs"],    1)
-                f_val       = round(nutr_scaled["fat"],      1)
-                kcal_val    = round(nutr_scaled["calories"])
-                unit_detail = f"per {srv_g} g serving"
-            else:
-                p_val       = nutr["protein"]
-                c_val       = nutr["carbs"]
-                f_val       = nutr["fat"]
-                kcal_val    = nutr["calories"]
-                unit_detail = "per 100 g"
-
-            data_footer = (
-                f'<span style="color:#F1F5F9;font-style:normal;font-size:14.5px;">'
-                f'📊 {p_val:g}g protein · {c_val:g}g carbs · {f_val:g}g fat · '
-                f'{kcal_val:g} kcal'
-                f'<span style="margin-left:0.4rem;font-size:0.8em;opacity:0.75;">'
-                f'({unit_detail})</span>'
-                f' · <strong style="color:#4ade80;">{match_pct_str}</strong>'
-                f'</span>'
-            )
-
-            st.markdown(f"""
-            <div class="explanation-box">
-                💬 {explanation}
-                <div style="margin-top:0.5rem;padding-top:0.45rem;
-                            border-top:1px solid rgba(74,222,128,0.2);
-                            font-size:0.83rem;">
-                    {data_footer}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
