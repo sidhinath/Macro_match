@@ -3571,6 +3571,14 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) {
 .results-tabs-marker {
     display: none !important;
 }
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) div[data-testid="stToggle"] label,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) div[data-testid="stToggle"] label p,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) div[data-testid="stCheckbox"] label,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) div[data-testid="stCheckbox"] label p {
+    font-weight: 700 !important;
+    font-size: 16px !important;
+    color: #E6EDF3 !important;
+}
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs [data-baseweb="tab-list"] {
     gap: 0.4rem !important;
     background: #0B0F19 !important;
@@ -3583,8 +3591,12 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTab
     background: transparent !important;
     border-radius: 999px !important;
     padding: 0.45rem 0.9rem !important;
-    font-size: 0.88rem !important;
+    font-size: 16px !important;
     font-weight: 700 !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs button[data-baseweb="tab"] p {
+    font-weight: 700 !important;
+    font-size: 16px !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs button[data-baseweb="tab"][aria-selected="true"] {
     color: #FFFFFF !important;
@@ -4827,15 +4839,19 @@ with st.container(border=True):
         else ""
     )
     summary_html = (
-        '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;'
-        'padding:0.75rem 1.25rem;margin-bottom:1.25rem;display:flex;'
-        'align-items:center;gap:1rem;">'
-        '<span style="font-size:1.5rem">✅</span>'
+        '<div style="background: linear-gradient(135deg, rgba(46, 160, 67, 0.16), rgba(22, 27, 34, 0.95)); '
+        'border: 1px solid rgba(46, 160, 67, 0.55); border-radius: 12px; '
+        'padding: 14px 18px; margin-bottom: 1.25rem; display: flex; '
+        'align-items: center; gap: 1rem;">'
+        '<span style="font-size: 1.5rem">✅</span>'
         '<div>'
-        '<span style="color:#f1f5f9;font-weight:600;">'
-        f"Top {len(alternatives)} Swap{'s' if len(alternatives) != 1 else ''} for <em>{selected_product}</em> in {selected_city}"
+        '<span style="font-size: 20px; font-weight: 800; color: #FFFFFF;">'
+        f"Top {len(alternatives)} Swap{'s' if len(alternatives) != 1 else ''} for "
+        f'<span style="color: #4ADE80; font-style: normal; font-weight: 800;">{html.escape(selected_product)}</span>'
+        ' in '
+        f'<span style="color: #4ADE80; font-style: normal; font-weight: 800;">{html.escape(selected_city)}</span>'
         '</span><br>'
-        '<span style="color:var(--text-muted);font-size:0.85rem;">'
+        '<span style="color: #E6EDF3; font-weight: 700; font-size: 15px;">'
         f"Priority: {PRIORITY_LABELS[priority_label].split('—')[0].strip()}"
         f"{diet_text}{allergen_text}"
         '</span>'
@@ -4851,7 +4867,7 @@ with st.container(border=True):
     _srv_col, _lbl_col = st.columns([2, 5], gap="small")
     with _srv_col:
         per_serving_on = st.toggle(
-            "Per Serving",
+            "**Per Serving**",
             value=False,
             key="per_serving_toggle",
             help="Switch between Per 100 g (default) and the product's defined serving size",
