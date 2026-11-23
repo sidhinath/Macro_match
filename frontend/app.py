@@ -10,10 +10,14 @@ Requires the FastAPI backend to be running at http://127.0.0.1:8000
 
 import os
 import re
+import io
+import html
 import base64
 import json
 from datetime import datetime, timezone
 
+import numpy as np
+from PIL import Image
 import streamlit as st
 import requests
 import pandas as pd
@@ -522,13 +526,39 @@ def get_saved_matches(user_id):
 
 DEFAULT_API_BASE = "http://127.0.0.1:8000"
 
-# ── Hero logo (base64-embedded so it loads in Streamlit's served context) ──
+# ── Hero logo ──────────────────────────────────────────────────────────────
+# The source PNG has a baked-in white background. Convert it to true alpha so
+# it blends into the dark UI instead of showing a harsh white rectangle.
 _LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "macromatch_logo.png"
-if _LOGO_PATH.exists():
-    _LOGO_B64 = base64.b64encode(_LOGO_PATH.read_bytes()).decode("ascii")
-    LOGO_SRC = f"data:image/png;base64,{_LOGO_B64}"
-else:
-    LOGO_SRC = ""
+
+
+def _transparent_logo_data_url(path: Path) -> str:
+    if not path.exists():
+        return ""
+    try:
+        rgb = np.asarray(Image.open(path).convert("RGB"), dtype=np.float32)
+        alpha = np.clip((255.0 - rgb.min(axis=2)) / 255.0, 0.0, 1.0)
+        foreground = np.zeros_like(rgb)
+        solid = alpha > 0.01
+        foreground[solid] = (
+            rgb[solid] - (1.0 - alpha[solid, None]) * 255.0
+        ) / alpha[solid, None]
+        rgba = np.dstack(
+            [np.clip(foreground, 0, 255), alpha * 255.0]
+        ).astype(np.uint8)
+        buffer = io.BytesIO()
+        Image.fromarray(rgba, "RGBA").save(buffer, format="PNG")
+        return "data:image/png;base64," + base64.b64encode(
+            buffer.getvalue()
+        ).decode("ascii")
+    except Exception:
+        # Fall back to the original image if Pillow/NumPy are unavailable.
+        return "data:image/png;base64," + base64.b64encode(
+            path.read_bytes()
+        ).decode("ascii")
+
+
+LOGO_SRC = _transparent_logo_data_url(_LOGO_PATH)
 
 
 def _resolve_api_base() -> str:
@@ -1020,6 +1050,13 @@ header button:not([kind="header"]):not([data-testid="baseButton-header"]) {
 }
 /* Default Streamlit footer ("Made with Streamlit") */
 footer { display: none !important; }
+/* Bottom-right "Manage app" / deploy badge — polished standalone look */
+.stDeployButton, [data-testid="stDeployButton"],
+[data-testid="stStatusWidget"], #stStatusWidget,
+[data-testid="stAppDeployButton"] {
+    display: none !important;
+    visibility: hidden !important;
+}
 /* Remove empty dark bar left by the hidden Streamlit header */
 header[data-testid="stHeader"] { height: 0px; background: transparent !important; }
 /* Keep the sidebar expand/collapse arrow visible and functional */
@@ -1031,7 +1068,7 @@ button[data-testid="baseButton-header"] {
 }
 /* Content sits cleanly at the top of the page with breathing room */
 section.main > div[data-testid="stMainBlockContainer"],
-div.block-container { padding-top: 2.5rem !important; }
+div.block-container { padding-top: 1rem !important; }
 
 /* ── Base typography ── */
 html, body, [class*="css"] {
@@ -1136,9 +1173,9 @@ h1, h2, h3, .stHeading {
     width: auto;
     flex-shrink: 0;
     border-radius: 10px;
-    background: #0B0F19;
-    padding: 0.12rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    background: transparent !important;
+    padding: 0;
+    box-shadow: none;
 }
 .sidebar-header .sidebar-text {
     display: flex;
@@ -1162,6 +1199,48 @@ h1, h2, h3, .stHeading {
     line-height: 1.1;
 }
 
+/* ── Sidebar welcome card ── */
+.sidebar-welcome {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(5, 150, 105, 0.08));
+    border: 1px solid rgba(52, 211, 153, 0.32);
+    border-radius: 12px;
+    padding: 0.75rem 0.9rem;
+    margin: 0.25rem 0 0.85rem;
+}
+.sidebar-welcome .welcome-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-heading);
+    line-height: 1.25;
+}
+.sidebar-welcome .welcome-email {
+    font-size: 0.75rem;
+    color: #9BA1A6;
+    margin-top: 0.15rem;
+    line-height: 1.25;
+    text-decoration: none !important;
+    word-break: break-all;
+}
+.sidebar-welcome a,
+.sidebar-welcome a:hover {
+    color: inherit !important;
+    text-decoration: none !important;
+}
+/* Consistent spacing / clean borders for sidebar sections */
+[data-testid="stSidebar"] .stMarkdown h2 {
+    margin: 0.9rem 0 0.5rem !important;
+}
+[data-testid="stSidebar"] .streamlit-expanderHeader {
+    background: rgba(15, 23, 42, 0.4) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    font-size: 0.9rem !important;
+    color: var(--text-heading) !important;
+}
+[data-testid="stSidebar"] hr.section-divider {
+    margin: 0.9rem 0 !important;
+}
+
 /* ── Hero header ── */
 .hero-block {
     text-align: center;
@@ -1177,9 +1256,9 @@ h1, h2, h3, .stHeading {
     width: auto;
     display: block;
     border-radius: 10px;
-    background: #0B0F19;
-    padding: 0.12rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    background: transparent !important;
+    padding: 0;
+    box-shadow: none;
 }
 .hero-title {
     font-family: 'Plus Jakarta Sans', sans-serif;
@@ -1518,9 +1597,9 @@ button[kind="primary"] p:hover {
     width: auto;
     flex-shrink: 0;
     border-radius: 10px;
-    background: #0B0F19;
-    padding: 0.12rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    background: transparent !important;
+    padding: 0;
+    box-shadow: none;
 }
 .sidebar-header .sidebar-text {
     display: flex;
@@ -2014,9 +2093,19 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # ─── NEW: signed-in welcome + sign out (Supabase Auth) ─────────
-    _user_name = st.session_state.get("supabase_user_name", CURRENT_USER_EMAIL)
-    st.success(f"Welcome, {_user_name} ({CURRENT_USER_EMAIL})")
+    # ─── Signed-in welcome + sign out (Supabase Auth) ───────────────
+    _auth_user = st.session_state.get("supabase_user")
+    _metadata = getattr(_auth_user, "user_metadata", None) or {}
+    _email_local = CURRENT_USER_EMAIL.split("@")[0] if CURRENT_USER_EMAIL else "there"
+    _raw_name = _metadata.get("full_name") or _email_local
+    _display_name = html.escape(str(_raw_name).strip() or _email_local)
+    _display_email = html.escape(CURRENT_USER_EMAIL)
+    st.markdown(f"""
+    <div class="sidebar-welcome">
+        <div class="welcome-name">Welcome, {_display_name}</div>
+        <div class="welcome-email">{_display_email}</div>
+    </div>
+    """, unsafe_allow_html=True)
     if st.button("🚪 Sign out", key="supabase_sign_out"):
         try:
             supabase.auth.sign_out()
