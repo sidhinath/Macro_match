@@ -2015,7 +2015,7 @@ with st.sidebar:
         st.session_state["supabase_refresh_token"] = None
         st.session_state["supabase_user_name"] = None
         st.rerun()
-    st.mark('<hr class="section-divider">', unsafe_allow_html=True)
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
     # ─── NEW: per-user saved matches history (Supabase, user_id-keyed) ──
     with st.expander("🕘 My saved matches", expanded=False):
