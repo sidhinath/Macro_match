@@ -1229,6 +1229,16 @@ h1, h2, h3, .stHeading {
     padding: 0;
     box-shadow: none;
 }
+/* Light pill behind the dark logo so it stays crisp on the dark UI */
+.logo-pill {
+    background-color: #F0F6FC;
+    padding: 6px 10px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+.logo-pill img { display: block; }
 .sidebar-header .sidebar-text {
     display: flex;
     flex-direction: column;
@@ -2122,7 +2132,9 @@ def call_api(payload: dict) -> requests.Response | None:
 st.markdown(f"""
 <div class="hero-block">
     <div class="hero-brand">
-        <img src="{LOGO_SRC}" alt="MacroMatch logo" class="hero-logo">
+        <span class="logo-pill">
+            <img src="{LOGO_SRC}" alt="MacroMatch logo" class="hero-logo">
+        </span>
         <div class="hero-title">MacroMatch</div>
     </div>
     <div class="hero-tagline">Your macros, anywhere.</div>
@@ -2137,7 +2149,9 @@ st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 with st.sidebar:
     st.markdown(f"""
     <div class="sidebar-header">
-        <img src="{LOGO_SRC}" alt="MacroMatch logo" class="sidebar-logo">
+        <span class="logo-pill">
+            <img src="{LOGO_SRC}" alt="MacroMatch logo" class="sidebar-logo">
+        </span>
         <div class="sidebar-text">
             <div class="sidebar-title">MacroMatch</div>
             <div class="sidebar-tagline">Your macros, anywhere.</div>
