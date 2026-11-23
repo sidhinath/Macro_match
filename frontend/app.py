@@ -2427,6 +2427,38 @@ button[data-testid="collapsedControl"],
     }
 }
 
+/* Highlight the sidebar collapse (<<) button */
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="stSidebarHeader"] button,
+section[data-testid="stSidebar"] button[kind="header"] {
+    background-color: rgba(46, 160, 67, 0.16) !important;
+    border: 1px solid rgba(46, 160, 67, 0.65) !important;
+    border-radius: 8px !important;
+    padding: 4px 8px !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+    transition: all 0.15s ease !important;
+}
+
+[data-testid="stSidebarCollapseButton"] button svg,
+[data-testid="stSidebarHeader"] button svg,
+section[data-testid="stSidebar"] button[kind="header"] svg {
+    fill: #6EE798 !important;
+    color: #6EE798 !important;
+    width: 18px !important;
+    height: 18px !important;
+}
+
+@media (hover: hover) {
+    [data-testid="stSidebarCollapseButton"] button:hover,
+    [data-testid="stSidebarHeader"] button:hover,
+    section[data-testid="stSidebar"] button[kind="header"]:hover {
+        background-color: rgba(46, 160, 67, 0.3) !important;
+        border-color: #3FB950 !important;
+    }
+}
+
 /* Hide the native chevron in BOTH DOM shapes. */
 [data-testid="stSidebarCollapsedControl"] svg,
 [data-testid="collapsedControl"] svg {
