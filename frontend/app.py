@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 import numpy as np
 from PIL import Image
 import streamlit as st
+import streamlit.components.v1 as components
 import requests
 import pandas as pd
 from pathlib import Path
@@ -28,6 +29,140 @@ from supabase import create_client, Client  # >>> NEW: Supabase client for Auth 
 
 # Load .env (local dev). On Streamlit Community Cloud, use the app's Secrets instead.
 load_dotenv()
+
+# Zero-height component that installs mobile sidebar gestures once per session.
+# It listens on window.parent.document so a swipe from anywhere closes the
+# sidebar, and it also closes the sidebar after a Product guide "Select" tap.
+_MOBILE_SIDEBAR_TOGGLE_JS = """
+<script>
+(function () {
+    var MOBILE_MAX_WIDTH = 768;
+
+    function parentWindow() {
+        try {
+            return (window.parent && window.parent.document) ? window.parent : window;
+        } catch (e) {
+            return window;
+        }
+    }
+
+    function first(doc, selectors) {
+        for (var i = 0; i < selectors.length; i++) {
+            var el = doc.querySelector(selectors[i]);
+            if (el) { return el; }
+        }
+        return null;
+    }
+
+    var COLLAPSE_SELECTORS = [
+        '[data-testid="stSidebarCollapseButton"] button',
+        'button[data-testid="stSidebarCollapseButton"]',
+        '[data-testid="stSidebar"] button[kind="header"]',
+        '[data-testid="stSidebarHeader"] button[kind="header"]'
+    ];
+    var EXPAND_SELECTORS = [
+        '[data-testid="stSidebarCollapsedControl"] button',
+        'button[data-testid="stSidebarCollapsedControl"]',
+        '[data-testid="collapsedControl"] button',
+        'button[data-testid="collapsedControl"]'
+    ];
+
+    function sidebarIsOpen(doc) {
+        var sidebar = doc.querySelector('[data-testid="stSidebar"]');
+        if (!sidebar) { return false; }
+        var view = doc.defaultView || window;
+        var style = view.getComputedStyle(sidebar);
+        var rect = sidebar.getBoundingClientRect();
+        return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0;
+    }
+
+    function collapseSidebar() {
+        var win = parentWindow();
+        if (!win || win.innerWidth > MOBILE_MAX_WIDTH) { return false; }
+        var doc = win.document;
+        if (!doc) { return false; }
+        var collapseButton = first(doc, COLLAPSE_SELECTORS);
+        if (collapseButton) {
+            collapseButton.click();
+            win.__mmLastCollapseAt = Date.now();
+            return true;
+        }
+        if (!sidebarIsOpen(doc)) { return false; }
+        var control = first(doc, EXPAND_SELECTORS);
+        if (control) {
+            control.click();
+            win.__mmLastCollapseAt = Date.now();
+            return true;
+        }
+        return false;
+    }
+
+    var host = parentWindow();
+    // The iframe is recreated on each app rerun, so refresh the shared helper
+    // while keeping the parent-document listeners bound only once.
+    host.__macroMatchCollapseSidebar = collapseSidebar;
+    var doc = host.document;
+
+    if (!host.__mmSwipeBound) {
+        host.__mmSwipeBound = true;
+        var startX = null;
+        var startY = null;
+        host.__mmTouchStart = function (event) {
+            if (host.innerWidth > MOBILE_MAX_WIDTH ||
+                    !event.touches || event.touches.length !== 1) {
+                startX = null;
+                startY = null;
+                return;
+            }
+            startX = event.touches[0].clientX;
+            startY = event.touches[0].clientY;
+        };
+        host.__mmTouchEnd = function (event) {
+            if (startX === null || host.innerWidth > MOBILE_MAX_WIDTH) {
+                startX = null;
+                startY = null;
+                return;
+            }
+            var touch = event.changedTouches && event.changedTouches[0];
+            if (touch) {
+                var deltaX = startX - touch.clientX;
+                var deltaY = Math.abs(startY - touch.clientY);
+                if (deltaX > 60 && deltaX > deltaY) {
+                    collapseSidebar();
+                }
+            }
+            startX = null;
+            startY = null;
+        };
+        doc.addEventListener('touchstart', host.__mmTouchStart,
+                             { passive: true, capture: true });
+        doc.addEventListener('touchend', host.__mmTouchEnd,
+                             { passive: true, capture: true });
+    }
+
+    // Product-guide Select buttons are Streamlit widgets that trigger a full
+    // rerun; a delegated parent-document listener is the reliable place to
+    // collapse the mobile sidebar right after the selection is registered.
+    if (!host.__mmGuideSelectBound) {
+        host.__mmGuideSelectBound = true;
+        host.__mmGuideSelectHandler = function (event) {
+            if (host.innerWidth > MOBILE_MAX_WIDTH) { return; }
+            var target = event.target && event.target.closest
+                ? event.target.closest('button') : null;
+            if (!target || (target.textContent || '').trim() !== 'Select') { return; }
+            var sidebar = doc.querySelector('[data-testid="stSidebar"]');
+            if (!sidebar || !sidebar.contains(target)) { return; }
+            // Retry once only if Streamlit has not swapped in the collapse
+            // control yet; a successful click must never be repeated.
+            if (!collapseSidebar()) {
+                host.setTimeout(collapseSidebar, 80);
+            }
+        };
+        doc.addEventListener('click', host.__mmGuideSelectHandler, false);
+    }
+})();
+</script>
+"""
 
 # ─────────────────────────────────────────────
 # Page config — must be the FIRST st call
@@ -1226,6 +1361,9 @@ if show_auth_ui:
 # before the dashboard is allowed to render.
 if show_auth_ui:
     st.stop()
+
+# Install the mobile swipe/guide-select sidebar helpers for the dashboard only.
+components.html(_MOBILE_SIDEBAR_TOGGLE_JS, height=0, scrolling=False)
 
 
 # ─────────────────────────────────────────────
@@ -3527,6 +3665,8 @@ def render_product_guide(details: dict[str, dict]) -> None:
             ):
                 # Updating both keys before the rerun makes the chosen food
                 # appear in the main search box and the active-selection badge.
+                # On mobile, the injected parent-document listener collapses
+                # the sidebar immediately after this widget is clicked.
                 _sync_food_selection(item_name)
                 st.rerun()
 
