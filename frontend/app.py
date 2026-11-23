@@ -628,6 +628,21 @@ if show_auth_ui:
     .stDeployButton, [data-testid="stAppDeployButton"], [data-testid="manage-app-button"] {
         display: none !important;
     }
+
+    /* Hide the bottom-right Streamlit viewer badge and creator profile avatar for all visitors */
+    [data-testid="stStatusWidget"],
+    [data-testid="manage-app-button"],
+    .stDeployButton,
+    [class*="viewerBadge"],
+    [class*="StatusWidget"],
+    div[class*="_container_"][class*="_viewerBadge_"],
+    a[href*="streamlit.io/cloud"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
     header[data-testid="stHeader"] { background: transparent !important; }
 
     /* Keep the control interactive, then apply the custom "☰ Menu" styling. */
@@ -2374,6 +2389,21 @@ st.markdown("""
 .stDeployButton, [data-testid="stAppDeployButton"], [data-testid="manage-app-button"] {
     display: none !important;
 }
+
+/* Hide the bottom-right Streamlit viewer badge and creator profile avatar for all visitors */
+[data-testid="stStatusWidget"],
+[data-testid="manage-app-button"],
+.stDeployButton,
+[class*="viewerBadge"],
+[class*="StatusWidget"],
+div[class*="_container_"][class*="_viewerBadge_"],
+a[href*="streamlit.io/cloud"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
 header[data-testid="stHeader"] { background: transparent !important; }
 /* Keep the control interactive, then apply the custom "☰ Menu" styling. */
 [data-testid="stSidebarCollapsedControl"],
