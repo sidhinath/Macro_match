@@ -1724,6 +1724,8 @@ if "food_box_ver" not in st.session_state:
     st.session_state["food_box_ver"] = 0
 if "city_box_ver" not in st.session_state:
     st.session_state["city_box_ver"] = 0
+# Browse-cities expander starts closed and auto-collapses after a city pick.
+st.session_state.setdefault("browse_cities_open", False)
 # Home shows the regular-food spotlight; Find Alternatives switches to the
 # ranked swaps view. This flag is the single source of truth for that switch.
 if "show_swaps_results" not in st.session_state:
@@ -1898,6 +1900,9 @@ def select_city_callback(widget_key: str) -> None:
     picked = st.session_state.get(widget_key)
     if not picked:
         return
+    # Any city pill tap (including one inside Browse all) collapses the list.
+    st.session_state["browse_cities_open"] = False
+    st.session_state["browse_cities_expander"] = False
     display_label = str(picked)
     canonical = _canonical_value(display_label, CITY_DISPLAY_ALIASES)
     if canonical == st.session_state.get("selected_city"):
@@ -4459,7 +4464,9 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         )
 
     with st.expander(
-        f"📍 Browse all available cities ({len(all_cities)} cities)", expanded=False
+        f"📍 Browse all available cities ({len(all_cities)} cities)",
+        expanded=st.session_state.browse_cities_open,
+        key="browse_cities_expander",
     ):
         _all_city_default = selected_city if selected_city in all_cities else None
         st.pills(
