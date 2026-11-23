@@ -3387,10 +3387,39 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
 .search-card-title--spaced {
     margin-top: 1.1rem !important;
 }
+.search-step-badge {
+    flex-shrink: 0 !important;
+}
 
 /* ── Filter questions — bold, crisp labels; choices stay regular weight ── */
 .filters-expander-marker {
     display: none !important;
+}
+/* Step 3 badge lives inside the Filters expander header. */
+div[data-testid="stExpander"]:has(.filters-expander-marker) [data-testid="stExpanderHeader"] p,
+div[data-testid="stExpander"]:has(.filters-expander-marker) summary.streamlit-expanderHeader p {
+    font-size: 17px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.04em !important;
+    color: #4ADE80 !important;
+}
+div[data-testid="stExpander"]:has(.filters-expander-marker) [data-testid="stExpanderHeader"] p::before,
+div[data-testid="stExpander"]:has(.filters-expander-marker) summary.streamlit-expanderHeader p::before {
+    content: "3";
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 26px;
+    height: 26px;
+    margin-right: 10px;
+    flex: 0 0 26px;
+    vertical-align: middle;
+    border-radius: 50%;
+    background-color: #2EA043;
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 14px;
+    line-height: 1;
 }
 div[data-testid="stExpander"]:has(.filters-expander-marker) label[data-testid="stWidgetLabel"] p {
     font-weight: 700 !important;
@@ -4604,7 +4633,10 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
 
     # ── City ────────────────────────────────────────────────────────────
     st.markdown(
-        '<div class="search-card-title search-card-title--spaced">DESTINATION</div>',
+        '<div class="search-card-title" style="display: flex; align-items: center; gap: 10px; margin: 14px 0 8px 0;">'
+        '<span class="step-badge search-step-badge" style="background-color: #2EA043; color: #FFFFFF; font-weight: 800; font-size: 14px; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">2</span>'
+        '<span class="search-step-label" style="color: #4ADE80; font-weight: 700; font-size: 17px; letter-spacing: 0.04em;">DESTINATION</span>'
+        '</div>',
         unsafe_allow_html=True,
     )
     selected_city = _canonical_value(
@@ -4696,7 +4728,10 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
 
 with st.container(border=True):
     st.markdown(
-        '<div class="search-card-title">YOUR PRODUCT — What do you normally eat?</div>',
+        '<div class="search-card-title" style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">'
+        '<span class="step-badge search-step-badge" style="background-color: #2EA043; color: #FFFFFF; font-weight: 800; font-size: 14px; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">1</span>'
+        '<span class="search-step-label" style="color: #4ADE80; font-weight: 700; font-size: 17px; letter-spacing: 0.04em;">YOUR PRODUCT — What do you normally eat?</span>'
+        '</div>',
         unsafe_allow_html=True,
     )
     try:
