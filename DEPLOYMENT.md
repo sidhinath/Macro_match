@@ -124,12 +124,18 @@ Swagger docs are at `https://<your-service>.onrender.com/docs`.
 
    ```toml
    MACROMATCH_API_URL = "https://<your-service>.onrender.com"
+
+   [auth]
+   # Cookie signing secret for streamlit-authenticator's remember-me cookie.
+   # Generate one with:  python -c "import secrets; print(secrets.token_hex(32))"
+   cookie_key = "<long-random-secret>"
    ```
 
-   This is the only configuration the frontend needs. It reads the value via
-   `st.secrets` (the code also accepts the same name as an environment variable
-   for local/container use) and falls back to `http://127.0.0.1:8000` when
-   neither is set.
+   The frontend reads both values via `st.secrets`. The cookie key must be set
+   here — it is intentionally never stored in the repository (see
+   `.streamlit/secrets.toml.example`). `MACROMATCH_API_URL` also accepts the
+   same name as an environment variable for local/container use and falls back
+   to `http://127.0.0.1:8000` when neither is set.
 
 5. **Deploy**. The first build installs `requirements.txt` (1–3 minutes).
 
@@ -237,3 +243,28 @@ App settings → Secrets). Streamlit restarts the app when secrets change.
 
 The current split (Streamlit Cloud + Render) keeps the API independently
 testable and documented, which is why it is the recommended setup.
+
+---
+
+## 8. Limitation: ephemeral filesystem (accounts & saved matches can reset)
+
+Streamlit Community Cloud does **not** give you a persistent disk. Every time
+the app redeploys or reboots, the local filesystem is reset, so:
+
+- `config.yaml` (user accounts with hashed passwords) is lost — users must
+  sign up again.
+- `data/user_data.db` (SQLite saved matches) is lost — saved history is gone.
+
+This is by design in this mini project: everything stays file-based and simple
+so the code is easy to explain in a viva. If you need real persistence, the
+simple upgrade path is to replace the file-based storage with a hosted store
+still keyed by username, e.g.:
+
+- **Supabase** (free PostgreSQL tier) — `users` and `saved_matches` tables,
+  Row Level Security so each user sees only their own rows.
+- **Google Sheets** — one sheet for users, one for saved matches, appended via
+  the Sheets API.
+
+The login / logout / session-check flow in `frontend/app.py` stays exactly the
+same; only the `load_config` / `save_config` / `save_match` / `get_saved_matches`
+functions would swap files for API calls.

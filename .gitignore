@@ -14,6 +14,12 @@ env/
 .env
 .streamlit/secrets.toml
 
+# App runtime data — created at runtime, contains user data (hashed passwords
+# in config.yaml, saved matches in user_data.db). NEVER commit these.
+config.yaml
+data/user_data.db
+*.db
+
 # Pytest cache
 .pytest_cache/
 *.pytest_cache

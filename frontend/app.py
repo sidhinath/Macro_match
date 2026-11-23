@@ -11,12 +11,19 @@ Requires the FastAPI backend to be running at http://127.0.0.1:8000
 import os
 import re
 import base64
+import json
+import sqlite3
+from datetime import datetime, timezone
 
 import streamlit as st
 import requests
 import pandas as pd
+import yaml
+from yaml.loader import SafeLoader
 from pathlib import Path
 from dotenv import load_dotenv
+
+import streamlit_authenticator as stauth  # >>> NEW: username/password auth (0.3.x API)
 
 # Load .env (local dev). On Streamlit Community Cloud, use the app's Secrets instead.
 load_dotenv()
@@ -32,6 +39,225 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+
+# ─────────────────────────────────────────────
+# NEW: Authentication — streamlit-authenticator (0.3.x API)
+# ─────────────────────────────────────────────
+# Users are stored in config.yaml (name, username, email, bcrypt-hashed
+# password). Passwords are NEVER stored as plain text. The cookie signing
+# secret comes from st.secrets, never from this file.
+# streamlit-authenticator handles the remember-me cookie and the login form;
+# this code only calls its public methods.
+
+CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.yaml"
+
+DEFAULT_CONFIG = {
+    "credentials": {"usernames": {}},
+    "cookie": {"name": "macro_match_session", "expiry_days": 7},
+}
+
+
+def load_config():
+    """Read users + cookie settings from config.yaml."""
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        return yaml.load(f, Loader=SafeLoader)
+
+
+def save_config(config):
+    """Persist config back to config.yaml. Passwords are already hashed."""
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        yaml.dump(config, f, default_flow_style=False)
+
+
+def get_cookie_key():
+    """Cookie signing secret from st.secrets (local fallback for dev only)."""
+    try:
+        return st.secrets["auth"]["cookie_key"]
+    except Exception:
+        # Local development only. Deployments MUST set [auth] cookie_key in secrets.
+        return "dev-only-cookie-key-please-set-in-secrets"
+
+
+# Create config.yaml on first run (it is git-ignored; real user data is never
+# committed to the repository).
+if not CONFIG_PATH.exists():
+    save_config(dict(DEFAULT_CONFIG))
+
+config = load_config()
+
+authenticator = stauth.Authenticate(
+    config["credentials"],
+    config.get("cookie", {}).get("name", "macro_match_session"),
+    get_cookie_key(),
+    int(config.get("cookie", {}).get("expiry_days", 7)),
+    config.get("preauthorized") or {},
+)
+
+# Make sure the session-state key exists before anything reads it.
+if "authentication_status" not in st.session_state:
+    st.session_state["authentication_status"] = None
+
+
+# ─────────────────────────────────────────────
+# NEW: Landing screen — "Sign in" / "Sign up" tabs
+# Shown ONLY when the user is not logged in; everything below this point runs
+# for logged-in users only.
+# ─────────────────────────────────────────────
+if st.session_state["authentication_status"] is not True:
+    st.markdown("## 🔐 Welcome to MacroMatch")
+    st.caption("Sign in to continue, or create a new account below.")
+    tab_sign_in, tab_sign_up = st.tabs(["🔐 Sign in", "📝 Sign up"])
+
+    # ─── Sign in tab ───
+    with tab_sign_in:
+        st.subheader("Sign in")
+        # streamlit-authenticator 0.3.x: login(location='main', ...)
+        # Returns (name, authentication_status, username). A valid remember-me
+        # cookie (7-day expiry, set in the constructor above) signs the user
+        # in silently. Mirror the result into st.session_state, which the
+        # guard above checks before showing any app content.
+        _name, _auth_status, _username = authenticator.login("main")
+        if _auth_status is not None:
+            st.session_state["authentication_status"] = _auth_status
+            st.session_state["name"] = _name
+            st.session_state["username"] = _username
+        if st.session_state["authentication_status"] is False:
+            st.error("❌ Wrong username or password. Please try again.")
+
+    # ─── Sign up tab ───
+    with tab_sign_up:
+        st.subheader("Create a new account")
+        with st.form("sign_up_form"):  # keep filled fields if validation fails
+            new_name = st.text_input("Full name")
+            new_email = st.text_input("Email address")
+            new_user = st.text_input("Username")
+            new_pw = st.text_input(
+                "Password", type="password", help="At least 6 characters"
+            )
+            new_pw2 = st.text_input("Confirm password", type="password")
+            create_btn = st.form_submit_button("Create account", type="primary")
+
+        if create_btn:
+            # Basic validation before anything is saved.
+            problems = []
+            if not new_name or not new_email or not new_user or not new_pw or not new_pw2:
+                problems.append("Please fill in every field.")
+            elif not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", new_email or ""):
+                problems.append("Please enter a valid email address.")
+            elif len(new_pw or "") < 6:
+                problems.append("Password must be at least 6 characters long.")
+            elif new_pw != new_pw2:
+                problems.append("Passwords do not match.")
+            elif new_user in config["credentials"]["usernames"]:
+                problems.append("Username already exists — choose another one.")
+
+            if problems:
+                for p in problems:
+                    st.error(p)
+            else:
+                # Hash the password with bcrypt (via streamlit-authenticator).
+                # Never store or log the plain-text password.
+                hashed_pw = stauth.Hasher([new_pw]).generate()[0]
+                config["credentials"]["usernames"][new_user] = {
+                    "name": new_name,
+                    "email": new_email,
+                    "password": hashed_pw,
+                }
+                save_config(config)  # persist the new user to config.yaml
+                st.success("✅ Account created! Go to the 'Sign in' tab to log in.")
+                st.rerun()  # restart so the new user can sign in immediately
+
+# A valid remember-me cookie may have just authenticated the user.
+if st.session_state["authentication_status"] is not True:
+    st.stop()
+
+
+# ─────────────────────────────────────────────
+# NEW: Per-user SQLite storage (saved matches)
+# Requirement 7: data is keyed by username; each user sees only their own rows.
+# ─────────────────────────────────────────────
+DB_PATH = Path(__file__).resolve().parent.parent / "data" / "user_data.db"
+
+
+def init_db():
+    """Create the saved_matches table if it does not exist yet."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS saved_matches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                product TEXT NOT NULL,
+                city TEXT NOT NULL,
+                diet_rules TEXT NOT NULL,
+                allergens TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                alternatives TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_saved_matches_username "
+            "ON saved_matches(username)"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def save_match(username, product, city, diet_rules, allergens, priority, alternatives):
+    """Insert one saved match for the given username."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute(
+            "INSERT INTO saved_matches "
+            "(username, product, city, diet_rules, allergens, priority, alternatives, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                username,
+                product,
+                city,
+                json.dumps(diet_rules),
+                json.dumps(allergens),
+                priority,
+                json.dumps(alternatives),
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_saved_matches(username):
+    """Return saved matches for ONE username only — other users' rows are hidden."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM saved_matches WHERE username = ? ORDER BY created_at DESC",
+            (username,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+# Create the table on first run.
+init_db()
+
+
+# ⚠️ LIMITATION (requirement 10): Streamlit Community Cloud has an ephemeral
+# filesystem. config.yaml (users) and data/user_data.db (saved matches) are
+# local files, so they reset whenever the app redeploys or reboots — accounts
+# and saved matches can disappear. Optional production fix: replace this
+# file-based storage with Supabase (PostgreSQL) or Google Sheets, still keyed
+# by username. The login / logout / session-check flow stays the same; only the
+# storage layer changes. Kept simple here because this is a mini project.
+# ─────────────────────────────────────────────
 
 # ─────────────────────────────────────────────
 # Constants
@@ -1525,6 +1751,21 @@ with st.sidebar:
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+    # ─── NEW: signed-in welcome + sign out (authentication) ─────────
+    st.success(f"Welcome, {st.session_state['name']}")
+    authenticator.logout("Sign out", "main")
+    st.mark('<hr class="section-divider">', unsafe_allow_html=True)
+
+    # ─── NEW: per-user saved matches history (SQLite, username-keyed) ──
+    with st.expander("🕘 My saved matches", expanded=False):
+        _matches = get_saved_matches(st.session_state["username"])
+        if not _matches:
+            st.caption("No saved matches yet — save a result below.")
+        else:
+            for _m in _matches:
+                st.caption(f"{_m['product']} → {_m['city']} · {_m['priority']}")
+
     st.markdown("## 🛒 Your Product")
     try:
         with st.spinner(
@@ -1747,6 +1988,19 @@ summary_html = (
     '</div></div>'
 )
 st.markdown(summary_html, unsafe_allow_html=True)
+
+# ─── NEW: save the current match to the logged-in user's history ────────
+if st.button("💾 Save this match to my history", key="save_match_to_history"):
+    save_match(
+        st.session_state["username"],
+        selected_product,
+        selected_city,
+        selected_diets,
+        selected_allergens,
+        priority_label,
+        alternatives,
+    )
+    st.success("Saved to your history — only your own account can see it.")
 
 # ── Result cards ──────────────────────────────
 
