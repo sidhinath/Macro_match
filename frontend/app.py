@@ -2648,6 +2648,73 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
 .search-card-title--spaced {
     margin-top: 1.1rem !important;
 }
+
+/* ── Sidebar product guide — compact single-column cards ── */
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.guide-card) {
+    background-color: #161B22 !important;
+    border: 1px solid #30363D !important;
+    border-radius: 12px !important;
+    padding: 10px !important;
+    margin-bottom: 10px !important;
+}
+.guide-thumb {
+    display: block;
+    width: 100%;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 8px !important;
+    margin-bottom: 0.5rem;
+}
+.guide-emoji {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100px;
+    border-radius: 8px;
+    background: rgba(148, 163, 184, 0.10);
+    font-size: 2.2rem;
+    margin-bottom: 0.5rem;
+}
+.guide-title {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+    line-height: 1.25 !important;
+}
+.guide-category {
+    font-size: 0.72rem !important;
+    color: var(--text-muted) !important;
+    margin: 0.15rem 0 0.4rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.guide-macros .macro-pill {
+    font-size: 0.7rem !important;
+    padding: 2px 6px !important;
+}
+.guide-macros .macro-unit {
+    font-size: 0.7rem !important;
+    color: var(--text-muted) !important;
+    margin-left: 0.25rem !important;
+}
+.guide-tags .tag {
+    font-size: 0.68rem !important;
+    padding: 2px 6px !important;
+}
+.guide-cities {
+    font-size: 0.72rem !important;
+    color: var(--text-muted) !important;
+    margin-top: 0.35rem !important;
+}
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.guide-card) .stButton > button {
+    min-height: 32px !important;
+    padding: 0.3rem 0.6rem !important;
+    font-size: 0.78rem !important;
+    border-radius: 8px !important;
+    margin-top: 0.55rem !important;
+}
+
 .selected-value {
     font-size: 0.8rem !important;
     color: var(--text-muted) !important;
@@ -2991,55 +3058,54 @@ def render_product_spotlight(name: str, detail: dict, keto: bool = False) -> Non
 
 
 def render_product_guide(details: dict[str, dict]) -> None:
-    """Searchable grid of every product with a photo and its key details."""
-    col_search, col_category = st.columns([2, 1], gap="medium")
-    with col_search:
-        query = st.text_input(
-            "Search products",
-            placeholder="Search by name or category…",
-            label_visibility="collapsed",
-            key="guide_search",
-        ).strip().lower()
-    with col_category:
-        categories = sorted({d["category"] for d in details.values()})
-        category = st.selectbox(
-            "Category",
-            ["All categories", *categories],
-            label_visibility="collapsed",
-            key="guide_category",
+    """Compact one-column visual catalogue tailored to the sidebar width."""
+    for item_name in sorted(details):
+        detail = details[item_name]
+        image_src = product_image_src(item_name)
+        if image_src:
+            image_html = (
+                f'<img class="guide-thumb" src="{image_src}" '
+                f'alt="{html.escape(item_name, quote=True)}">'
+            )
+        else:
+            image_html = (
+                '<div class="guide-emoji">'
+                f'{PRODUCT_EMOJI.get(item_name, "🥗")}</div>'
+            )
+
+        macros_html = (
+            f'<span class="macro-pill protein">Protein {detail["protein"]:g}g</span>'
+            f'<span class="macro-pill carbs">Carbs {detail["carbs"]:g}g</span>'
+            f'<span class="macro-pill fat">Fat {detail["fat"]:g}g</span>'
+            f'<span class="macro-pill calories">{detail["calories"]:g} kcal</span>'
+            '<span class="macro-unit">per 100 g</span>'
         )
 
-    names = sorted(details)
-    if query:
-        names = [
-            n for n in names
-            if query in n.lower() or query in details[n]["category"].lower()
-        ]
-    if category != "All categories":
-        names = [n for n in names if details[n]["category"] == category]
-
-    if not names:
-        st.info("No products match that search.")
-        return
-
-    cols = st.columns(3, gap="medium")
-    for i, name in enumerate(names):
-        detail = details[name]
-        with cols[i % 3]:
-            with st.container(border=True):
-                image = product_image(name)
-                if image:
-                    st.image(str(image), use_container_width=True)
-                else:
-                    st.markdown(
-                        f'<div class="product-emoji">{PRODUCT_EMOJI.get(name, "🥗")}</div>',
-                        unsafe_allow_html=True,
-                    )
-                st.markdown(f"**{PRODUCT_EMOJI.get(name, '🥗')} {name}**")
-                st.caption(detail["category"])
-                st.markdown(_macro_line(detail), unsafe_allow_html=True)
-                st.markdown(_badges_html(detail), unsafe_allow_html=True)
-                st.caption(f"📍 {len(detail['cities'])} cities")
+        with st.container(border=True):
+            st.markdown(
+                '<div class="guide-card">'
+                f"{image_html}"
+                f'<div class="guide-title">{PRODUCT_EMOJI.get(item_name, "🥗")} '
+                f"{html.escape(item_name)}</div>"
+                f'<div class="guide-category">{html.escape(detail["category"])}</div>'
+                f'<div class="guide-macros">{macros_html}</div>'
+                f'<div class="guide-tags">{_badges_html(detail)}</div>'
+                f'<div class="guide-cities">📍 {len(detail["cities"])} cities</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            if st.button(
+                "Select",
+                key=f"guide_select_{item_name}",
+                use_container_width=True,
+                type="secondary",
+            ):
+                st.session_state["selected_product"] = item_name
+                st.session_state["product_select"] = item_name
+                # Clear any stale filter so the chosen food is visible in the
+                # main search card immediately after the rerun.
+                st.session_state["product_query"] = ""
+                st.rerun()
 
     st.caption(
         "Product photos: Wikipedia / Wikimedia Commons — "
@@ -3133,6 +3199,16 @@ with st.sidebar:
     ):
         saved_matches_slot = st.empty()
         render_saved_matches(saved_matches_slot)
+
+    # ─── Product guide (moved here from the bottom of the main page) ─────
+    product_details = load_product_details()
+    st.markdown("### 📖 Product guide")
+    st.caption(
+        "New to a food? Browse the catalogue to see what it looks like, "
+        "its macros per 100 g, diet rules and allergens."
+    )
+    if st.toggle(f"Show all {len(product_details)} products", key="show_product_guide"):
+        render_product_guide(product_details)
 
 
 # ─────────────────────────────────────────────
@@ -3373,7 +3449,6 @@ with st.container(border=True):
 # Main area — results
 # ─────────────────────────────────────────────
 
-product_details = load_product_details()
 selected_detail = product_details.get(selected_product)
 
 if not find_btn:
@@ -3422,14 +3497,6 @@ if not find_btn:
             keto="keto" in selected_diets,
         )
         st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
-
-    st.markdown("### 📖 Product guide")
-    st.caption(
-        "New to a food? Browse the catalogue to see what it looks like, "
-        "its macros per 100 g, diet rules and allergens."
-    )
-    if st.toggle(f"Show all {len(product_details)} products", key="show_product_guide"):
-        render_product_guide(product_details)
 
     st.stop()
 
