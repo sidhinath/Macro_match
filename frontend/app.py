@@ -141,12 +141,14 @@ if st.session_state["supabase_user"] is None:
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    /* Hide Streamlit chrome for a standalone-app feel */
-    header[data-testid="stHeader"], #MainMenu, footer,
+    /* Hide Streamlit chrome, but NEVER the header itself: it hosts the
+       sidebar expand button needed to reopen a collapsed sidebar. */
+    #MainMenu, [data-testid="stToolbar"], footer,
     .stDeployButton, [data-testid="stStatusWidget"] {
         display: none !important;
         visibility: hidden !important;
     }
+    header[data-testid="stHeader"] { background: transparent !important; }
 
     html, body, [class*="css"], .stApp {
         font-family: 'Inter', sans-serif !important;
@@ -1107,29 +1109,38 @@ st.markdown("""
 /* ── Google Fonts ── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
 
-/* ── Hide default Streamlit chrome ── */
-/* Top-right action bar (Share / GitHub / star / edit / hamburger menu) — fully removed */
-#MainMenu, [data-testid="stToolbar"], .stAppToolbar,
-header button:not([kind="header"]):not([data-testid="baseButton-header"]) {
-    display: none !important;
-}
-/* Default Streamlit footer ("Made with Streamlit") */
-footer { display: none !important; }
-/* Bottom-right "Manage app" / deploy badge — polished standalone look */
+/* ── Hide default Streamlit chrome ──
+   Do NOT hide the header itself — it carries the sidebar expand button. */
+#MainMenu, [data-testid="stToolbar"], footer,
 .stDeployButton, [data-testid="stDeployButton"],
 [data-testid="stStatusWidget"], #stStatusWidget,
 [data-testid="stAppDeployButton"] {
     display: none !important;
     visibility: hidden !important;
 }
-/* Remove empty dark bar left by the hidden Streamlit header */
-header[data-testid="stHeader"] { height: 0px; background: transparent !important; }
-/* Keep the sidebar expand/collapse arrow visible and functional */
+/* Keep the header present but invisible so ">>" can reopen the sidebar */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+/* Explicitly keep the sidebar expand/collapse controls visible */
 button[kind="header"],
-button[data-testid="baseButton-header"] {
+button[data-testid="baseButton-header"],
+button[data-testid="stExpandSidebarButton"],
+div[data-testid="collapsedControl"] {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
+    color: #F0F6FC !important;
+    background: rgba(11, 15, 25, 0.85) !important;
+    border-radius: 10px !important;
+}
+div[data-testid="collapsedControl"] {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 1000;
 }
 /* Content sits cleanly at the top of the page with breathing room */
 section.main > div[data-testid="stMainBlockContainer"],
