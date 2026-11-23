@@ -265,8 +265,8 @@ if st.session_state["supabase_user"] is None:
         --auth-green-bright: #3FB950;
         --auth-text: #F8FAFC;
         --auth-muted: #94A3B8;
-        --auth-border: rgba(148, 163, 184, 0.16);
-        --auth-radius: 22px;
+        --auth-glass: rgba(255, 255, 255, 0.10);
+        --auth-radius: 24px;
     }
 
     /* Hide Streamlit chrome and flatten the header — never touch the sidebar toggle. */
@@ -345,13 +345,12 @@ if st.session_state["supabase_user"] is None:
         font-family: 'Inter', sans-serif !important;
     }
 
-    /* Premium dark gradient canvas with a subtle green glow. */
+    /* Dark navy + black canvas with restrained green ambience. */
     .stApp {
         background:
-            radial-gradient(900px 520px at 12% 6%, rgba(46, 160, 67, 0.16), transparent 62%),
-            radial-gradient(760px 520px at 88% 18%, rgba(16, 185, 129, 0.10), transparent 60%),
-            radial-gradient(620px 480px at 50% 105%, rgba(46, 160, 67, 0.08), transparent 65%),
-            linear-gradient(180deg, #05070C 0%, #0A1020 48%, #04060A 100%) !important;
+            radial-gradient(900px 520px at 10% 4%, rgba(46, 160, 67, 0.14), transparent 62%),
+            radial-gradient(760px 520px at 90% 16%, rgba(16, 185, 129, 0.09), transparent 60%),
+            linear-gradient(180deg, #04060B 0%, #0A1020 50%, #03050A 100%) !important;
     }
     .stApp::before {
         content: "";
@@ -363,30 +362,44 @@ if st.session_state["supabase_user"] is None:
             linear-gradient(rgba(148, 163, 184, 0.035) 1px, transparent 1px),
             linear-gradient(90deg, rgba(148, 163, 184, 0.035) 1px, transparent 1px);
         background-size: 44px 44px;
-        -webkit-mask-image: radial-gradient(circle at 50% 22%, black, transparent 76%);
-        mask-image: radial-gradient(circle at 50% 22%, black, transparent 76%);
+        -webkit-mask-image: radial-gradient(circle at 50% 26%, black, transparent 76%);
+        mask-image: radial-gradient(circle at 50% 26%, black, transparent 76%);
+    }
+    .stApp::after {
+        content: "";
+        position: fixed;
+        top: 44%;
+        left: 50%;
+        width: min(760px, 92vw);
+        height: min(760px, 92vw);
+        transform: translate(-50%, -50%);
+        z-index: 0;
+        pointer-events: none;
+        background: radial-gradient(circle, rgba(46, 160, 67, 0.17) 0%, rgba(16, 185, 129, 0.07) 38%, transparent 70%);
     }
 
     /* The middle column from st.columns([1.4, 1.3, 1.4]) is the auth card. */
-    div[data-testid="column"]:nth-of-type(2) {
+    div[data-testid="column"]:has(.auth-brand) {
         position: relative;
+        z-index: 1;
         overflow: hidden;
-        width: 100% !important;
-        max-width: 480px !important;
-        margin: clamp(1.25rem, 5vh, 3.5rem) auto 2rem !important;
-        padding: 2.1rem 2.1rem 1.6rem !important;
-        background: linear-gradient(155deg, rgba(23, 32, 50, 0.86), rgba(9, 14, 24, 0.92)) !important;
-        border: 1px solid var(--auth-border) !important;
+        flex: 0 0 min(560px, calc(100% - 1rem)) !important;
+        width: min(560px, calc(100% - 1rem)) !important;
+        max-width: 560px !important;
+        margin: clamp(1.5rem, 4vh, 3.25rem) auto 2rem !important;
+        padding: 2.25rem 2.25rem 1.75rem !important;
+        background: linear-gradient(160deg, rgba(21, 31, 49, 0.74), rgba(7, 12, 22, 0.86)) !important;
+        border: 1px solid var(--auth-glass) !important;
         border-radius: var(--auth-radius) !important;
         box-shadow:
-            0 24px 70px rgba(0, 0, 0, 0.55),
-            0 0 0 1px rgba(46, 160, 67, 0.06),
-            inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
-        -webkit-backdrop-filter: blur(16px) saturate(130%) !important;
-        backdrop-filter: blur(16px) saturate(130%) !important;
+            0 28px 70px rgba(0, 0, 0, 0.55),
+            0 0 55px rgba(46, 160, 67, 0.18),
+            inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+        -webkit-backdrop-filter: blur(24px) saturate(140%) !important;
+        backdrop-filter: blur(24px) saturate(140%) !important;
         animation: authRise 0.45s ease both;
     }
-    div[data-testid="column"]:nth-of-type(2)::before {
+    div[data-testid="column"]:has(.auth-brand)::before {
         content: "";
         position: absolute;
         inset: 0 0 auto 0;
@@ -394,71 +407,54 @@ if st.session_state["supabase_user"] is None:
         background: linear-gradient(90deg, transparent, #2EA043, #60A5FA, transparent);
         opacity: 0.9;
     }
-    /* Neutralise this global selector on nested link columns. */
-    div[data-testid="column"] div[data-testid="column"]:nth-of-type(2) {
-        background: transparent !important;
-        border: none !important;
-        border-radius: 0 !important;
-        padding: 0 !important;
-        box-shadow: none !important;
-        -webkit-backdrop-filter: none !important;
-        backdrop-filter: none !important;
-        max-width: none !important;
-        margin: 0 !important;
-        overflow: visible !important;
-        animation: none !important;
-    }
-    div[data-testid="column"] div[data-testid="column"]:nth-of-type(2)::before {
-        display: none !important;
-    }
 
     /* Branded logo area + hierarchy. */
     .auth-brand {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 0.6rem;
-        margin-bottom: 1rem;
+        gap: 0.65rem;
+        margin-bottom: 1.1rem;
     }
     .auth-brand-mark {
-        width: 64px;
-        height: 64px;
-        border-radius: 18px;
+        width: 76px;
+        height: 76px;
+        border-radius: 22px;
         display: grid;
         place-items: center;
-        background: linear-gradient(145deg, #F0F6FC, #D8E6F5);
-        border: 1px solid rgba(255, 255, 255, 0.7);
-        box-shadow: 0 10px 30px rgba(46, 160, 67, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        background: linear-gradient(145deg, #EAFBF0 0%, #BFF0CE 100%);
+        border: 1px solid rgba(126, 226, 168, 0.55);
+        box-shadow: 0 14px 38px rgba(46, 160, 67, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.9);
     }
     .auth-brand-mark img {
-        width: 48px;
-        height: 48px;
+        width: 58px;
+        height: 58px;
         object-fit: contain;
         display: block;
     }
     .auth-brand-kicker {
         font-size: 0.68rem;
         font-weight: 700;
-        letter-spacing: 0.18em;
+        letter-spacing: 0.2em;
         text-transform: uppercase;
         color: #7EE2A8;
     }
     .auth-title {
         text-align: center !important;
         font-family: 'Plus Jakarta Sans', sans-serif !important;
-        font-size: 2rem !important;
-        line-height: 1.15 !important;
+        font-size: 2.15rem !important;
+        line-height: 1.12 !important;
         font-weight: 800 !important;
-        letter-spacing: -0.03em !important;
+        letter-spacing: -0.035em !important;
         color: var(--auth-text) !important;
-        margin: 0 0 0.45rem !important;
+        margin: 0 0 0.5rem !important;
     }
     .auth-subtitle {
         text-align: center !important;
-        font-size: 0.94rem !important;
-        line-height: 1.6 !important;
+        font-size: 0.95rem !important;
+        line-height: 1.55 !important;
         color: var(--auth-muted) !important;
-        margin: 0 0 1.5rem !important;
+        margin: 0 0 1.4rem !important;
     }
     .auth-view-title {
         text-align: center !important;
@@ -469,6 +465,52 @@ if st.session_state["supabase_user"] is None:
         margin: 0 0 1rem !important;
     }
 
+    /* Invisible markers let the CSS target the Google button and recovery row. */
+    .auth-google-slot, .auth-recovery-slot {
+        display: none !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.auth-google-slot) + div[data-testid="stVerticalBlockElement"] button {
+        width: 100% !important;
+        min-height: 52px !important;
+        color: #F8FAFC !important;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)) !important;
+        border: 1px solid rgba(255, 255, 255, 0.14) !important;
+        border-radius: 14px !important;
+        font-size: 0.95rem !important;
+        font-weight: 700 !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+        transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.auth-google-slot) + div[data-testid="stVerticalBlockElement"] button:hover {
+        transform: translateY(-1px) !important;
+        color: #FFFFFF !important;
+        background: rgba(46, 160, 67, 0.12) !important;
+        border-color: rgba(126, 226, 168, 0.5) !important;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3), 0 0 20px rgba(46, 160, 67, 0.16) !important;
+    }
+
+    .auth-divider {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 1.1rem 0;
+        color: #64748B;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+    }
+    .auth-divider span {
+        padding: 0 0.25rem;
+    }
+    .auth-divider::before,
+    .auth-divider::after {
+        content: "";
+        height: 1px;
+        flex: 1;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+    }
+
     /* Pill tabs. */
     .stTabs [data-baseweb="tab-list"] {
         width: 100% !important;
@@ -476,26 +518,28 @@ if st.session_state["supabase_user"] is None:
         gap: 0.3rem !important;
         padding: 0.3rem !important;
         background: rgba(8, 13, 23, 0.72) !important;
-        border: 1px solid var(--auth-border) !important;
+        border: 1px solid var(--auth-glass) !important;
         border-radius: 999px !important;
     }
     .stTabs button[data-baseweb="tab"] {
         flex: 1 1 50% !important;
         border-radius: 999px !important;
-        padding: 0.62rem 1rem !important;
+        padding: 0.65rem 1rem !important;
         font-size: 0.9rem !important;
         font-weight: 700 !important;
         color: var(--auth-muted) !important;
-        transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease !important;
+        background: rgba(148, 163, 184, 0.06) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+        transition: background-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease !important;
     }
     .stTabs button[data-baseweb="tab"]:hover {
         color: #E2E8F0 !important;
-        background: rgba(148, 163, 184, 0.08) !important;
+        background: rgba(148, 163, 184, 0.12) !important;
     }
     .stTabs button[data-baseweb="tab"][aria-selected="true"] {
         color: #FFFFFF !important;
         background: linear-gradient(135deg, #2EA043 0%, #10B981 100%) !important;
-        box-shadow: 0 8px 22px rgba(46, 160, 67, 0.28) !important;
+        box-shadow: 0 8px 22px rgba(46, 160, 67, 0.3) !important;
     }
     .stTabs [data-baseweb="tab-highlight"],
     .stTabs [data-baseweb="tab-border"] {
@@ -510,74 +554,46 @@ if st.session_state["supabase_user"] is None:
         padding: 0 !important;
         margin: 0 !important;
     }
-    div[data-testid="column"]:nth-of-type(2) .stTextInput {
+    div[data-testid="column"]:has(.auth-brand) .stTextInput {
         margin-bottom: 0.15rem !important;
     }
-    div[data-testid="column"]:nth-of-type(2) .stTextInput label p {
+    div[data-testid="column"]:has(.auth-brand) .stTextInput label p {
         font-size: 0.82rem !important;
         font-weight: 600 !important;
         color: #CBD5E1 !important;
         letter-spacing: 0.01em !important;
     }
-    div[data-testid="column"]:nth-of-type(2) .stTextInput input {
+    div[data-testid="column"]:has(.auth-brand) .stTextInput input {
         font-size: 0.95rem !important;
-        min-height: 48px !important;
-        padding: 0.82rem 1rem 0.82rem 2.75rem !important;
+        min-height: 50px !important;
+        padding: 0.85rem 1rem 0.85rem 2.8rem !important;
         border-radius: 14px !important;
-        background-color: rgba(4, 9, 18, 0.72) !important;
-        border: 1px solid rgba(148, 163, 184, 0.18) !important;
+        background-color: rgba(4, 9, 18, 0.68) !important;
+        border: 1px solid rgba(255, 255, 255, 0.10) !important;
         color: #F1F5F9 !important;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
         background-repeat: no-repeat !important;
         background-position: 14px center !important;
         background-size: 18px 18px !important;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease !important;
+        transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease !important;
     }
-    div[data-testid="column"]:nth-of-type(2) .stTextInput input::placeholder {
+    div[data-testid="column"]:has(.auth-brand) .stTextInput input::placeholder {
         color: #64748B !important;
     }
-    div[data-testid="column"]:nth-of-type(2) .stTextInput input[placeholder="you@example.com"] {
+    div[data-testid="column"]:has(.auth-brand) .stTextInput input[placeholder="you@example.com"] {
         background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="%2394A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 6l10 7 10-7"/></svg>') !important;
     }
-    div[data-testid="column"]:nth-of-type(2) .stTextInput input[placeholder="Jane Doe"] {
+    div[data-testid="column"]:has(.auth-brand) .stTextInput input[placeholder="Jane Doe"] {
         background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="%2394A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>') !important;
     }
-    div[data-testid="column"]:nth-of-type(2) .stTextInput input[placeholder="••••••••"] {
+    div[data-testid="column"]:has(.auth-brand) .stTextInput input[placeholder="••••••••"] {
         background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="%2394A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>') !important;
     }
-    div[data-testid="column"]:nth-of-type(2) .stTextInput input:focus {
+    div[data-testid="column"]:has(.auth-brand) .stTextInput input:focus {
         outline: none !important;
         border-color: var(--auth-green) !important;
-        background-color: rgba(4, 9, 18, 0.92) !important;
-        box-shadow: 0 0 0 4px rgba(46, 160, 67, 0.18), 0 0 24px rgba(46, 160, 67, 0.12) !important;
-    }
-
-    .auth-divider {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        margin: 1rem 0;
-        color: #64748B;
-        font-size: 0.7rem;
-        font-weight: 600;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-    }
-    .auth-divider::before,
-    .auth-divider::after {
-        content: "";
-        height: 1px;
-        flex: 1;
-        background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.24), transparent);
-    }
-    .auth-links-label {
-        text-align: center !important;
-        font-size: 0.7rem;
-        font-weight: 600;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: #64748B;
-        margin: 1rem 0 0.45rem !important;
+        background-color: rgba(4, 9, 18, 0.9) !important;
+        box-shadow: 0 0 0 4px rgba(46, 160, 67, 0.20), 0 0 26px rgba(46, 160, 67, 0.16) !important;
     }
 
     /* Primary action. */
@@ -592,15 +608,15 @@ if st.session_state["supabase_user"] is None:
         font-weight: 700 !important;
         padding: 0.85rem 1.1rem !important;
         width: 100% !important;
-        min-height: 50px !important;
-        box-shadow: 0 10px 24px rgba(46, 160, 67, 0.25) !important;
-        transition: transform 0.16s ease, box-shadow 0.16s ease !important;
+        min-height: 52px !important;
+        box-shadow: 0 12px 28px rgba(46, 160, 67, 0.28), 0 0 20px rgba(46, 160, 67, 0.16) !important;
+        transition: transform 0.18s ease, box-shadow 0.18s ease !important;
     }
     div.stButton > button[kind="primary"]:hover,
     html body button[kind="primary"]:hover,
     html body .stFormSubmitButton button:hover {
         transform: translateY(-2px) !important;
-        box-shadow: 0 14px 30px rgba(46, 160, 67, 0.34) !important;
+        box-shadow: 0 16px 34px rgba(46, 160, 67, 0.36), 0 0 26px rgba(46, 160, 67, 0.22) !important;
     }
     div.stButton > button[kind="primary"]:active,
     html body button[kind="primary"]:active,
@@ -608,25 +624,60 @@ if st.session_state["supabase_user"] is None:
         transform: translateY(0) !important;
     }
 
-    /* Secondary actions (Google + recovery links). */
-    div[data-testid="column"]:nth-of-type(2) button[kind="secondary"],
-    div[data-testid="column"]:nth-of-type(2) button:not([kind="primary"]) {
+    /* Secondary actions (Google fallback + recovery links). */
+    div[data-testid="column"]:has(.auth-brand) button[kind="secondary"],
+    div[data-testid="column"]:has(.auth-brand) button:not([kind="primary"]) {
         color: #A5B4C8 !important;
-        background: rgba(148, 163, 184, 0.05) !important;
-        border: 1px solid rgba(148, 163, 184, 0.14) !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        border: 1px solid rgba(255, 255, 255, 0.10) !important;
+        border-radius: 14px !important;
+        padding: 0.65rem 0.9rem !important;
+        min-height: 46px !important;
+        font-size: 0.86rem !important;
+        font-weight: 600 !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+        transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease !important;
+    }
+    div[data-testid="column"]:has(.auth-brand) button[kind="secondary"]:hover,
+    div[data-testid="column"]:has(.auth-brand) button:not([kind="primary"]):hover {
+        color: #F8FAFC !important;
+        background: rgba(46, 160, 67, 0.12) !important;
+        border-color: rgba(126, 226, 168, 0.42) !important;
+        text-decoration: none !important;
+    }
+
+    /* Forgot Password / Reset Password: modern link pills, left + right. */
+    div[data-testid="stVerticalBlockElement"]:has(.auth-recovery-slot) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] button {
+        display: inline-flex !important;
+        min-height: 0 !important;
+        color: #94A3B8 !important;
+        background: transparent !important;
+        border: none !important;
         border-radius: 999px !important;
-        padding: 0.48rem 0.85rem !important;
-        font-size: 0.8rem !important;
+        padding: 0.35rem 0.25rem !important;
+        font-size: 0.82rem !important;
         font-weight: 600 !important;
         box-shadow: none !important;
-        transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
     }
-    div[data-testid="column"]:nth-of-type(2) button[kind="secondary"]:hover,
-    div[data-testid="column"]:nth-of-type(2) button:not([kind="primary"]):hover {
-        color: #F8FAFC !important;
-        background: rgba(46, 160, 67, 0.10) !important;
-        border-color: rgba(46, 160, 67, 0.45) !important;
-        text-decoration: none !important;
+    div[data-testid="stVerticalBlockElement"]:has(.auth-recovery-slot) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] button:hover {
+        color: #7EE2A8 !important;
+        background: transparent !important;
+        border: none !important;
+        text-decoration: underline !important;
+        text-underline-offset: 4px !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.auth-recovery-slot) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-of-type(2) {
+        text-align: right !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.auth-recovery-slot) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-of-type(2) button {
+        margin-left: auto !important;
+    }
+    /* Fallback alignment if the marker adjacency changes across Streamlit versions. */
+    div[data-testid="column"]:has(.auth-brand) div[data-testid="column"]:nth-of-type(2) {
+        text-align: right !important;
+    }
+    div[data-testid="column"]:has(.auth-brand) div[data-testid="column"]:nth-of-type(2) button {
+        margin-left: auto !important;
     }
 
     .stAlert, .stAlert p {
@@ -634,49 +685,46 @@ if st.session_state["supabase_user"] is None:
         border-radius: 12px !important;
     }
 
-    /* Trust strip below the form. */
+    /* Three compact feature badges. */
     .auth-features {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 0.5rem;
-        margin-top: 1.4rem;
-        padding-top: 1.1rem;
-        border-top: 1px solid rgba(148, 163, 184, 0.12);
+        margin-top: 1.5rem;
+        padding-top: 1.15rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
     .auth-feature {
         display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.35rem;
-        padding: 0.65rem 0.55rem;
-        border-radius: 14px;
-        background: rgba(148, 163, 184, 0.05);
-        border: 1px solid rgba(148, 163, 184, 0.10);
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        padding: 0.55rem 0.45rem;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.07);
         animation: authFade 0.5s ease both;
     }
     .auth-feature:nth-child(2) { animation-delay: 0.06s; }
     .auth-feature:nth-child(3) { animation-delay: 0.12s; }
     .feature-icon {
-        width: 24px;
-        height: 24px;
-        border-radius: 8px;
+        width: 22px;
+        height: 22px;
+        flex: 0 0 22px;
+        border-radius: 7px;
         display: grid;
         place-items: center;
-        background: rgba(46, 160, 67, 0.14);
+        background: rgba(46, 160, 67, 0.16);
         color: #7EE2A8;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         font-weight: 700;
     }
     .feature-title {
-        font-size: 0.72rem;
+        font-size: 0.68rem;
         font-weight: 700;
-        line-height: 1.25;
+        line-height: 1.2;
         color: #E2E8F0;
-    }
-    .feature-copy {
-        font-size: 0.65rem;
-        line-height: 1.35;
-        color: #7C8A9F;
     }
 
     @keyframes authRise {
@@ -689,35 +737,35 @@ if st.session_state["supabase_user"] is None:
     }
 
     @media (max-width: 900px) {
-        div[data-testid="stHorizontalBlock"]:has(.auth-title) > div[data-testid="column"]:nth-of-type(1),
-        div[data-testid="stHorizontalBlock"]:has(.auth-title) > div[data-testid="column"]:nth-of-type(3) {
+        div[data-testid="stHorizontalBlock"]:has(.auth-brand) > div[data-testid="column"]:nth-of-type(1),
+        div[data-testid="stHorizontalBlock"]:has(.auth-brand) > div[data-testid="column"]:nth-of-type(3) {
             display: none !important;
         }
-        div[data-testid="stHorizontalBlock"]:has(.auth-title) > div[data-testid="column"]:nth-of-type(2) {
-            width: 100% !important;
-            max-width: 540px !important;
+        div[data-testid="column"]:has(.auth-brand) {
+            flex: 0 0 min(560px, calc(100% - 1rem)) !important;
+            width: min(560px, calc(100% - 1rem)) !important;
         }
     }
     @media (max-width: 600px) {
-        div[data-testid="column"]:nth-of-type(2) {
-            padding: 1.5rem 1.15rem 1.25rem !important;
+        div[data-testid="column"]:has(.auth-brand) {
+            padding: 1.65rem 1.15rem 1.3rem !important;
             border-radius: 20px !important;
             margin: 1rem auto !important;
         }
-        .auth-title { font-size: 1.7rem !important; }
+        .auth-title { font-size: 1.75rem !important; }
         .auth-subtitle { font-size: 0.86rem !important; }
-        .auth-brand-mark { width: 56px; height: 56px; border-radius: 16px; }
-        .auth-brand-mark img { width: 42px; height: 42px; }
+        .auth-brand-mark { width: 64px; height: 64px; border-radius: 18px; }
+        .auth-brand-mark img { width: 48px; height: 48px; }
         .stTabs button[data-baseweb="tab"] { font-size: 0.82rem !important; padding: 0.55rem 0.6rem !important; }
         .auth-features { grid-template-columns: 1fr !important; }
-        .auth-feature { flex-direction: row; align-items: center; }
+        .auth-feature { justify-content: flex-start; }
     }
     @media (prefers-reduced-motion: reduce) {
-        div[data-testid="column"]:nth-of-type(2),
+        div[data-testid="column"]:has(.auth-brand),
         .auth-feature {
             animation: none !important;
         }
-        div[data-testid="column"]:nth-of-type(2) * {
+        div[data-testid="column"]:has(.auth-brand) * {
             transition-duration: 0.01ms !important;
         }
     }
@@ -734,10 +782,20 @@ if st.session_state["supabase_user"] is None:
             <span class="auth-brand-kicker">Smart nutrition, everywhere</span>
         </div>
         <div class="auth-title">Welcome to MacroMatch</div>
-        <div class="auth-subtitle">Know what you eat. Find better swaps anywhere.</div>
+        <div class="auth-subtitle">AI-powered local macro swaps &amp; nutrition tracking</div>
         """, unsafe_allow_html=True)
 
-        tab_signin, tab_signup = st.tabs(["Sign in", "Sign up"])
+        st.markdown('<div class="auth-google-slot"></div>', unsafe_allow_html=True)
+        if st.button(
+            "Continue with Google", key="google_signin", use_container_width=True
+        ):
+            _begin_google_sign_in()
+        st.markdown(
+            '<div class="auth-divider"><span>OR</span></div>',
+            unsafe_allow_html=True,
+        )
+
+        tab_signin, tab_signup = st.tabs(["Sign In", "Sign Up"])
 
         # ════════════════════════════════════════════════════════════
         # SIGN IN TAB — hosts signin / forgot / reset views
@@ -746,21 +804,13 @@ if st.session_state["supabase_user"] is None:
 
             # ─────────────── VIEW: signin ───────────────
             if st.session_state.auth_view == "signin":
-                if st.button(
-                    "Continue with Google", key="google_signin", use_container_width=True
-                ):
-                    _begin_google_sign_in()
-                st.markdown(
-                    '<div class="auth-divider"><span>or continue with email</span></div>',
-                    unsafe_allow_html=True,
-                )
                 with st.form("signin_form", clear_on_submit=True):
                     email = st.text_input("Email", placeholder="you@example.com")
                     password = st.text_input(
                         "Password", type="password", placeholder="••••••••"
                     )
                     signin_btn = st.form_submit_button(
-                        "Sign in", type="primary", use_container_width=True
+                        "Sign In", type="primary", use_container_width=True
                     )
 
                 if signin_btn:
@@ -798,23 +848,23 @@ if st.session_state["supabase_user"] is None:
 
                 # Both links live INSIDE the card, directly below the form.
                 st.markdown(
-                    '<div class="auth-links-label">Account recovery</div>',
+                    '<div class="auth-recovery-slot"></div>',
                     unsafe_allow_html=True,
                 )
                 col1, col2 = st.columns(2, gap="small")
                 with col1:
-                    if st.button("Forgot password?", key="forgot_link"):
+                    if st.button("Forgot Password", key="forgot_link"):
                         st.session_state.auth_view = "forgot"
                         st.rerun()
                 with col2:
-                    if st.button("Reset password", key="reset_link"):
+                    if st.button("Reset Password", key="reset_link"):
                         st.session_state.auth_view = "reset"
                         st.rerun()
 
             # ─────────────── VIEW: forgot ───────────────
             elif st.session_state.auth_view == "forgot":
                 st.markdown(
-                    '<div class="auth-view-title">Forgot password?</div>',
+                    '<div class="auth-view-title">Forgot Password</div>',
                     unsafe_allow_html=True,
                 )
                 with st.form("forgot_form"):
@@ -847,7 +897,7 @@ if st.session_state["supabase_user"] is None:
             # ─────────────── VIEW: reset ───────────────
             elif st.session_state.auth_view == "reset":
                 st.markdown(
-                    '<div class="auth-view-title">Reset password</div>',
+                    '<div class="auth-view-title">Reset Password</div>',
                     unsafe_allow_html=True,
                 )
                 with st.form("reset_form"):
@@ -890,14 +940,6 @@ if st.session_state["supabase_user"] is None:
         # SIGN UP TAB — backend logic unchanged
         # ════════════════════════════════════════════════════════════
         with tab_signup:
-            if st.button(
-                "Continue with Google", key="google_signup", use_container_width=True
-            ):
-                _begin_google_sign_in()
-            st.markdown(
-                '<div class="auth-divider"><span>or create an account with email</span></div>',
-                unsafe_allow_html=True,
-            )
             with st.form("signup_form"):
                 new_name = st.text_input("Full name", placeholder="Jane Doe")
                 new_email = st.text_input("Email", placeholder="you@example.com")
@@ -974,17 +1016,14 @@ if st.session_state["supabase_user"] is None:
             <div class="auth-feature">
                 <span class="feature-icon">◎</span>
                 <span class="feature-title">Track Macros</span>
-                <span class="feature-copy">Log meals with precision</span>
             </div>
             <div class="auth-feature">
                 <span class="feature-icon">✦</span>
                 <span class="feature-title">Personalized Nutrition</span>
-                <span class="feature-copy">Plans tuned to your goals</span>
             </div>
             <div class="auth-feature">
                 <span class="feature-icon">⌁</span>
                 <span class="feature-title">AI-Powered Recommendations</span>
-                <span class="feature-copy">Smarter swaps, anywhere</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
