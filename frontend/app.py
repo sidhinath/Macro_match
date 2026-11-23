@@ -2648,6 +2648,15 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
 .search-card-title--spaced {
     margin-top: 1.1rem !important;
 }
+.selected-value {
+    font-size: 0.8rem !important;
+    color: var(--text-muted) !important;
+    margin: 0.35rem 0 0.55rem !important;
+}
+.selected-value strong {
+    color: #7EE2A8 !important;
+    font-weight: 700 !important;
+}
 
 /* Quick-tap pills: active choice is emerald green. */
 div[data-testid="stPills"] button,
@@ -3181,11 +3190,17 @@ with st.container(border=True):
             if canonical in products:
                 product_pairs.append((label, canonical))
 
+    all_foods = sorted(set(products))
+    selected_product = _canonical_value(
+        st.session_state["selected_product"], PRODUCT_DISPLAY_ALIASES
+    )
+    st.session_state["selected_product"] = selected_product
+
     if product_pairs:
         product_display_options = [label for label, _ in product_pairs]
         product_canonical_by_display = dict(product_pairs)
         _current_product_display = _display_label(
-            st.session_state["selected_product"],
+            selected_product,
             PRODUCT_DISPLAY_ALIASES,
             product_display_options,
         )
@@ -3199,13 +3214,34 @@ with st.container(border=True):
             label_visibility="collapsed",
         )
         if product_pick:
-            st.session_state["selected_product"] = product_canonical_by_display[
-                product_pick
-            ]
+            selected_product = product_canonical_by_display[product_pick]
+            st.session_state["selected_product"] = selected_product
 
-    selected_product = st.session_state["selected_product"]
     # Legacy aliases keep saved-match restore and older sessions in sync.
     st.session_state["product_select"] = selected_product
+    st.markdown(
+        '<div class="selected-value">Selected food: '
+        f"<strong>{html.escape(selected_product)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.expander(
+        f"📋 Browse all available foods ({len(all_foods)} items)", expanded=False
+    ):
+        # No key: the default always follows the latest session value, so a
+        # tap here or on the quick pills stays in sync without extra state.
+        _all_food_default = selected_product if selected_product in all_foods else None
+        all_food_pick = st.pills(
+            "All foods",
+            options=all_foods,
+            selection_mode="single",
+            default=_all_food_default,
+            label_visibility="collapsed",
+        )
+        if all_food_pick:
+            selected_product = all_food_pick
+            st.session_state["selected_product"] = selected_product
+            st.session_state["product_select"] = selected_product
 
     st.markdown(
         '<div class="search-card-title search-card-title--spaced">DESTINATION</div>',
@@ -3219,6 +3255,11 @@ with st.container(border=True):
     )
     city_query = (city_query or "").strip().lower()
     city_options = load_city_list() or CITIES_FALLBACK
+    all_cities = sorted(set(city_options))
+    selected_city = _canonical_value(
+        st.session_state["selected_city"], CITY_DISPLAY_ALIASES
+    )
+    st.session_state["selected_city"] = selected_city
 
     if city_query:
         city_matches = [c for c in city_options if city_query in c.lower()][:12]
@@ -3248,7 +3289,7 @@ with st.container(border=True):
         city_display_options = [label for label, _ in city_pairs]
         city_canonical_by_display = dict(city_pairs)
         _current_city_display = _display_label(
-            st.session_state["selected_city"],
+            selected_city,
             CITY_DISPLAY_ALIASES,
             city_display_options,
         )
@@ -3262,10 +3303,31 @@ with st.container(border=True):
             label_visibility="collapsed",
         )
         if city_pick:
-            st.session_state["selected_city"] = city_canonical_by_display[city_pick]
+            selected_city = city_canonical_by_display[city_pick]
+            st.session_state["selected_city"] = selected_city
 
-    selected_city = st.session_state["selected_city"]
     st.session_state["city_select"] = selected_city
+    st.markdown(
+        '<div class="selected-value">Selected city: '
+        f"<strong>{html.escape(selected_city)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.expander(
+        f"📍 Browse all available cities ({len(all_cities)} cities)", expanded=False
+    ):
+        _all_city_default = selected_city if selected_city in all_cities else None
+        all_city_pick = st.pills(
+            "All cities",
+            options=all_cities,
+            selection_mode="single",
+            default=_all_city_default,
+            label_visibility="collapsed",
+        )
+        if all_city_pick:
+            selected_city = all_city_pick
+            st.session_state["selected_city"] = selected_city
+            st.session_state["city_select"] = selected_city
 
     with st.expander("🥦 Filters — diet, allergens & priority", expanded=False):
         selected_diet_labels = st.pills(
