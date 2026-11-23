@@ -1288,6 +1288,8 @@ def load_saved_match(match):
 
     st.session_state["selected_product"] = product
     st.session_state["selected_city"] = city
+    st.session_state["food_search_input"] = product
+    st.session_state["city_search_input"] = city
     # Legacy aliases kept so older saved-state keys stay in sync.
     st.session_state["product_select"] = product
     st.session_state["city_select"] = city
@@ -1416,6 +1418,29 @@ def _display_label(value: str, aliases: dict[str, str], options: list[str]) -> s
         if canonical == value:
             return label
     return value
+
+
+def _query_represents_selection(raw_query, selected_value, aliases) -> bool:
+    """True when the search box holds the current choice (including aliases)."""
+    raw = (raw_query or "").strip()
+    if not raw:
+        return True
+    canonical = aliases.get(raw, aliases.get(raw.title(), raw))
+    return canonical.lower() == (selected_value or "").lower()
+
+
+def _sync_food_selection(canonical: str, search_value: str | None = None) -> None:
+    """Keep the selected food and its visible search text in lockstep."""
+    st.session_state["selected_product"] = canonical
+    st.session_state["product_select"] = canonical
+    st.session_state["food_search_input"] = search_value or canonical
+
+
+def _sync_city_selection(canonical: str, search_value: str | None = None) -> None:
+    """Keep the selected city and its visible search text in lockstep."""
+    st.session_state["selected_city"] = canonical
+    st.session_state["city_select"] = canonical
+    st.session_state["city_search_input"] = search_value or canonical
 
 
 PRODUCT_EMOJI = {
@@ -2809,6 +2834,63 @@ button[data-baseweb="pill"][data-selected="true"] {
     }
 }
 
+/* ── Unified results container + dashboard tabs ── */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) {
+    background-color: #161B22 !important;
+    border: 1px solid #30363D !important;
+    border-radius: 16px !important;
+    padding: 1.1rem !important;
+}
+.results-tabs-marker {
+    display: none !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs [data-baseweb="tab-list"] {
+    gap: 0.4rem !important;
+    background: #0B0F19 !important;
+    border: 1px solid #30363D !important;
+    border-radius: 12px !important;
+    padding: 0.25rem !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs button[data-baseweb="tab"] {
+    color: #94A3B8 !important;
+    background: transparent !important;
+    border-radius: 999px !important;
+    padding: 0.45rem 0.9rem !important;
+    font-size: 0.88rem !important;
+    font-weight: 700 !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs button[data-baseweb="tab"][aria-selected="true"] {
+    color: #FFFFFF !important;
+    background: linear-gradient(135deg, #2EA043 0%, #10B981 100%) !important;
+    box-shadow: 0 6px 16px rgba(46, 160, 67, 0.28) !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs [data-baseweb="tab-highlight"],
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs [data-baseweb="tab-border"] {
+    background: transparent !important;
+}
+
+/* ── Saved-match rows: label + delete icon stay on one mobile row ── */
+section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"],
+div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] {
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child,
+section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child,
+div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child,
+div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:last-child,
+section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:last-child,
+div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:last-child,
+div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:last-child {
+    width: 46px !important;
+    min-width: 46px !important;
+    flex: 0 0 46px !important;
+}
+
 /* Lightweight mobile layout — no backdrop blur, tighter spacing. */
 @media (max-width: 768px) {
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
@@ -3154,11 +3236,9 @@ def render_product_guide(details: dict[str, dict]) -> None:
                 use_container_width=True,
                 type="secondary",
             ):
-                st.session_state["selected_product"] = item_name
-                st.session_state["product_select"] = item_name
-                # Clear any stale filter so the chosen food is visible in the
-                # main search card immediately after the rerun.
-                st.session_state["product_query"] = ""
+                # Updating both keys before the rerun makes the chosen food
+                # appear in the main search box and the active-selection badge.
+                _sync_food_selection(item_name)
                 st.rerun()
 
     st.caption(
@@ -3295,16 +3375,35 @@ with st.container(border=True):
         st.error("The backend returned an empty product list. Please try again.")
         st.stop()
 
-    product_query = st.text_input(
+    if "food_search_input" not in st.session_state:
+        st.session_state["food_search_input"] = ""
+    food_search_raw = st.text_input(
         "Search food",
+        value=st.session_state["food_search_input"],
         placeholder="🔍 Search food (e.g., Almond Butter, Oats)...",
         label_visibility="collapsed",
-        key="product_query",
     )
-    product_query = (product_query or "").strip().lower()
+    # The text widget is deliberately keyless: mirroring into our own state key
+    # lets a pill tap update the box from this same run without hitting
+    # Streamlit's "widget already instantiated" restriction.
+    st.session_state["food_search_input"] = food_search_raw or ""
+    food_query = (food_search_raw or "").strip().lower()
 
-    if product_query:
-        product_matches = [p for p in products if product_query in p.lower()][:12]
+    all_foods = sorted(set(products))
+    selected_product = _canonical_value(
+        st.session_state["selected_product"], PRODUCT_DISPLAY_ALIASES
+    )
+    st.session_state["selected_product"] = selected_product
+
+    # A pill tap puts the chosen food in the box. Treat that as "no active
+    # filter" so the default quick-pill set stays visible instead of collapsing
+    # to a single result.
+    food_query_is_selection = _query_represents_selection(
+        food_search_raw, selected_product, PRODUCT_DISPLAY_ALIASES
+    )
+
+    if food_query and not food_query_is_selection:
+        product_matches = [p for p in products if food_query in p.lower()][:12]
         if not product_matches:
             st.caption("No foods match that search. Try another term.")
         product_pairs = [
@@ -3319,12 +3418,6 @@ with st.container(border=True):
             canonical = _canonical_value(label, PRODUCT_DISPLAY_ALIASES)
             if canonical in products:
                 product_pairs.append((label, canonical))
-
-    all_foods = sorted(set(products))
-    selected_product = _canonical_value(
-        st.session_state["selected_product"], PRODUCT_DISPLAY_ALIASES
-    )
-    st.session_state["selected_product"] = selected_product
 
     if product_pairs:
         product_display_options = [label for label, _ in product_pairs]
@@ -3345,7 +3438,9 @@ with st.container(border=True):
         )
         if product_pick:
             selected_product = product_canonical_by_display[product_pick]
-            st.session_state["selected_product"] = selected_product
+            # Show the friendly pill label in the box; the canonical value is
+            # still what the backend receives.
+            _sync_food_selection(selected_product, product_pick)
 
     # Legacy aliases keep saved-match restore and older sessions in sync.
     st.session_state["product_select"] = selected_product
@@ -3370,20 +3465,22 @@ with st.container(border=True):
         )
         if all_food_pick:
             selected_product = all_food_pick
-            st.session_state["selected_product"] = selected_product
-            st.session_state["product_select"] = selected_product
+            _sync_food_selection(selected_product)
 
     st.markdown(
         '<div class="search-card-title search-card-title--spaced">DESTINATION</div>',
         unsafe_allow_html=True,
     )
-    city_query = st.text_input(
+    if "city_search_input" not in st.session_state:
+        st.session_state["city_search_input"] = ""
+    city_search_raw = st.text_input(
         "Search city",
+        value=st.session_state["city_search_input"],
         placeholder="🔍 Search city (e.g., Delhi, Mumbai)...",
         label_visibility="collapsed",
-        key="city_query",
     )
-    city_query = (city_query or "").strip().lower()
+    st.session_state["city_search_input"] = city_search_raw or ""
+    city_query = (city_search_raw or "").strip().lower()
     city_options = load_city_list() or CITIES_FALLBACK
     all_cities = sorted(set(city_options))
     selected_city = _canonical_value(
@@ -3391,7 +3488,13 @@ with st.container(border=True):
     )
     st.session_state["selected_city"] = selected_city
 
-    if city_query:
+    # Same rule as food: the clicked pill stays in the box, but the popular
+    # options remain available instead of a one-item filtered list.
+    city_query_is_selection = _query_represents_selection(
+        city_search_raw, selected_city, CITY_DISPLAY_ALIASES
+    )
+
+    if city_query and not city_query_is_selection:
         city_matches = [c for c in city_options if city_query in c.lower()][:12]
         for label, canonical in CITY_DISPLAY_ALIASES.items():
             if (
@@ -3434,7 +3537,9 @@ with st.container(border=True):
         )
         if city_pick:
             selected_city = city_canonical_by_display[city_pick]
-            st.session_state["selected_city"] = selected_city
+            # Keep the friendly label visible ("Bengaluru") while the backend
+            # still receives the canonical city ("Bangalore").
+            _sync_city_selection(selected_city, city_pick)
 
     st.session_state["city_select"] = selected_city
     st.markdown(
@@ -3456,8 +3561,7 @@ with st.container(border=True):
         )
         if all_city_pick:
             selected_city = all_city_pick
-            st.session_state["selected_city"] = selected_city
-            st.session_state["city_select"] = selected_city
+            _sync_city_selection(selected_city)
 
     with st.expander("🥦 Filters — diet, allergens & priority", expanded=False):
         selected_diet_labels = st.pills(
@@ -3614,335 +3718,356 @@ if st.button("🏠 Back to home", key="back_to_home", help="Return to the start 
     st.session_state.pop("match_result_data", None)
     st.rerun()
 
-# ── Summary strip ─────────────────────────────
-# Built as one unindented string: a whitespace-only line would end the Markdown
-# HTML block and turn the closing tags into a code block.
-diet_text = (
-    f"&nbsp;·&nbsp; Diet: {', '.join(DIET_LABELS[d] for d in selected_diets)}"
-    if selected_diets else ""
-)
-allergen_text = (
-    f"&nbsp;·&nbsp; Avoiding: {', '.join(selected_allergens)}"
-    if selected_allergens
-    else ""
-)
-summary_html = (
-    '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;'
-    'padding:0.75rem 1.25rem;margin-bottom:1.25rem;display:flex;'
-    'align-items:center;gap:1rem;">'
-    '<span style="font-size:1.5rem">✅</span>'
-    '<div>'
-    '<span style="color:#f1f5f9;font-weight:600;">'
-    f"Top {len(alternatives)} Swap{'s' if len(alternatives) != 1 else ''} for <em>{selected_product}</em> in {selected_city}"
-    '</span><br>'
-    '<span style="color:var(--text-muted);font-size:0.85rem;">'
-    f"Priority: {PRIORITY_LABELS[priority_label].split('—')[0].strip()}"
-    f"{diet_text}{allergen_text}"
-    '</span>'
-    '</div></div>'
-)
-st.markdown(summary_html, unsafe_allow_html=True)
-
-# ─── Saved-match confirmation (surfaced after per-card saves) ─────────
-if st.session_state.pop("saved_match_flash", None):
-    st.success("Saved to your history — only your own account can see it.")
-
-# ── Per-serving toggle (shared by all comparison cards) ────────────────
-_srv_col, _lbl_col = st.columns([2, 5], gap="small")
-with _srv_col:
-    per_serving_on = st.toggle(
-        "Per Serving",
-        value=False,
-        key="per_serving_toggle",
-        help="Switch between Per 100 g (default) and the product's defined serving size",
+# ── Your Regular Food — directly above the unified results container ───
+if selected_detail:
+    st.markdown("### 🥗 Your Regular Food")
+    render_product_spotlight(
+        selected_product,
+        selected_detail,
+        keto="keto" in selected_diets,
     )
-_unit_label = "per serving" if per_serving_on else "per 100 g"
-keto_on     = "keto" in selected_diets   # used for net-carbs highlight
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
+# ── One results container: ranked cards + exact numbers in tabs ────────────
+with st.container(border=True):
+    st.markdown(
+        '<div class="results-tabs-marker" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
 
-def _scale(macros: dict, product_name: str) -> dict:
-    """Return a copy of macros dict scaled to serving size (if toggle is on)."""
-    if not per_serving_on:
-        return macros
-    srv_g = PRODUCT_SERVING_G.get(product_name, 100)
-    factor = srv_g / 100.0
-    return {
-        "protein":  round(macros["protein"]  * factor, 1),
-        "carbs":    round(macros["carbs"]    * factor, 1),
-        "fat":      round(macros["fat"]      * factor, 1),
-        "fiber":    round(macros["fiber"]    * factor, 1),
-        "calories": round(macros["calories"] * factor),
-    }
+    # ── Summary strip ─────────────────────────────
+    # Built as one unindented string: a whitespace-only line would end the Markdown
+    # HTML block and turn the closing tags into a code block.
+    diet_text = (
+        f"&nbsp;·&nbsp; Diet: {', '.join(DIET_LABELS[d] for d in selected_diets)}"
+        if selected_diets else ""
+    )
+    allergen_text = (
+        f"&nbsp;·&nbsp; Avoiding: {', '.join(selected_allergens)}"
+        if selected_allergens
+        else ""
+    )
+    summary_html = (
+        '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;'
+        'padding:0.75rem 1.25rem;margin-bottom:1.25rem;display:flex;'
+        'align-items:center;gap:1rem;">'
+        '<span style="font-size:1.5rem">✅</span>'
+        '<div>'
+        '<span style="color:#f1f5f9;font-weight:600;">'
+        f"Top {len(alternatives)} Swap{'s' if len(alternatives) != 1 else ''} for <em>{selected_product}</em> in {selected_city}"
+        '</span><br>'
+        '<span style="color:var(--text-muted);font-size:0.85rem;">'
+        f"Priority: {PRIORITY_LABELS[priority_label].split('—')[0].strip()}"
+        f"{diet_text}{allergen_text}"
+        '</span>'
+        '</div></div>'
+    )
+    st.markdown(summary_html, unsafe_allow_html=True)
 
+    # ─── Saved-match confirmation (surfaced after per-card saves) ─────────
+    if st.session_state.pop("saved_match_flash", None):
+        st.success("Saved to your history — only your own account can see it.")
 
-def _delta_html(label: str, alt_val: float, orig_val: float | None,
-                unit: str = "g", higher_is_better: bool = False) -> str:
-    """Compact trade-off badge comparing an alternative with the regular food."""
-    if orig_val is None:
-        return ""
-    diff = round(float(alt_val) - float(orig_val), 1)
-    if abs(diff) < 0.05:
-        return f'<span class="swap-delta">±0{unit} {label}</span>'
-    sign = "+" if diff > 0 else "−"
-    good = diff > 0 if higher_is_better else diff < 0
-    cls = "swap-delta swap-delta--good" if good else "swap-delta swap-delta--warn"
-    return f'<span class="{cls}">{sign}{abs(diff):g}{unit} {label}</span>'
-
-
-orig_scaled = _scale(orig_macros, selected_product) if orig_macros else None
-
-# ── Ranked swaps — 3 equal columns on desktop, stacked on mobile ───────
-st.markdown("### 🔁 Ranked Swaps")
-cols = st.columns(3)
-
-for col, alt in zip(cols, alternatives[:3]):
-    with col:
-        rank_i = max(0, min(int(alt.get("rank", 1)) - 1, 2))
-        color  = RANK_COLORS[rank_i]
-        label  = RANK_LABELS[rank_i]
-        score_pct = max(0, min(100, round((1 - float(alt["match_score"])) * 100)))
-        match_pct_str = f"{score_pct}% match"
-
-        nutr        = alt["nutrition"]
-        nutr_scaled = _scale(nutr, alt["name"])
-
-        thumb = product_image_src(alt["name"])
-        if thumb:
-            thumb_html = (
-                f'<img class="swap-thumb" src="{thumb}" '
-                f'alt="{html.escape(alt["name"], quote=True)}">'
-            )
-        else:
-            thumb_html = (
-                '<div class="swap-thumb swap-thumb-fallback">'
-                f'{PRODUCT_EMOJI.get(alt["name"], "🥗")}</div>'
-            )
-
-        alt_local = PRODUCT_LOCAL_NAMES.get(alt["name"], "")
-        local_tag = (
-            f'<span class="local-name-tag" style="margin-left:0;">🗺️ {html.escape(alt_local)}</span>'
-            if alt_local else ""
+    # ── Per-serving toggle (shared by all comparison cards) ────────────────
+    _srv_col, _lbl_col = st.columns([2, 5], gap="small")
+    with _srv_col:
+        per_serving_on = st.toggle(
+            "Per Serving",
+            value=False,
+            key="per_serving_toggle",
+            help="Switch between Per 100 g (default) and the product's defined serving size",
         )
-        meta_text = html.escape(
-            f"{alt['category']} · Available in: {alt['cities'].replace(',', ', ')}"
-        )
+    _unit_label = "per serving" if per_serving_on else "per 100 g"
+    keto_on     = "keto" in selected_diets   # used for net-carbs highlight
 
-        macro_html = (
-            f'<span class="swap-macro-pill protein">P {nutr_scaled["protein"]:g}g</span>'
-            f'<span class="swap-macro-pill carbs">C {nutr_scaled["carbs"]:g}g</span>'
-            f'<span class="swap-macro-pill fat">F {nutr_scaled["fat"]:g}g</span>'
-            f'<span class="swap-macro-pill calories">{nutr_scaled["calories"]:g} kcal</span>'
-        )
 
-        delta_html = ""
-        if orig_scaled:
-            delta_html = (
-                '<div class="swap-deltas">'
-                + _delta_html("Protein", nutr_scaled["protein"], orig_scaled["protein"],
-                              higher_is_better=True)
-                + _delta_html("Carbs", nutr_scaled["carbs"], orig_scaled["carbs"])
-                + _delta_html("Fat", nutr_scaled["fat"], orig_scaled["fat"])
-                + _delta_html("kcal", nutr_scaled["calories"], orig_scaled["calories"],
-                              unit="")
-                + "</div>"
-            )
+    def _scale(macros: dict, product_name: str) -> dict:
+        """Return a copy of macros dict scaled to serving size (if toggle is on)."""
+        if not per_serving_on:
+            return macros
+        srv_g = PRODUCT_SERVING_G.get(product_name, 100)
+        factor = srv_g / 100.0
+        return {
+            "protein":  round(macros["protein"]  * factor, 1),
+            "carbs":    round(macros["carbs"]    * factor, 1),
+            "fat":      round(macros["fat"]      * factor, 1),
+            "fiber":    round(macros["fiber"]    * factor, 1),
+            "calories": round(macros["calories"] * factor),
+        }
 
-        explanation = str(alt.get("explanation", "")).strip()
-        if explanation:
-            # Strip raw-score artifacts leaked by older backend prompts.
-            explanation = re.sub(
-                r"\(?\s*match\s+score\s*[:\-]?\s*\d+\.\d+\s*\)?",
-                f"({match_pct_str})",
-                explanation,
-                flags=re.IGNORECASE,
-            )
-            explanation = re.sub(r"\b0\.\d{3,6}\b", "", explanation).strip()
-        if not explanation:
-            explanation = (
-                f"A strong local swap for {selected_product} in {selected_city}, "
-                f"chosen for your {PRIORITY_LABELS[priority_label].split('—')[0].strip().lower()} priority."
-            )
 
-        top_cls = " swap-card--top" if rank_i == 0 else ""
-        with st.container(border=True):
-            st.markdown(
-                f'<div class="swap-card{top_cls}">'
-                '<div class="swap-card-header">'
-                f'<span class="swap-rank-pill" style="background:{color}22;color:{color};">{label}</span>'
-                f'<span class="swap-score-pill">{score_pct}% Match</span>'
-                '</div>'
-                f'{thumb_html}'
-                f'<p class="swap-name">{PRODUCT_EMOJI.get(alt["name"], "🥗")} '
-                f'{html.escape(alt["name"])}</p>'
-                f'{f"<p>{local_tag}</p>" if local_tag else ""}'
-                f'<p class="swap-meta">{meta_text}</p>'
-                f'<div class="swap-macros">{macro_html}</div>'
-                f'{delta_html}'
-                '<div class="swap-explanation">'
-                f'<strong>Why this swap:</strong> {html.escape(explanation)}'
-                '<div style="margin-top:0.6rem;padding-top:0.5rem;'
-                'border-top:1px solid rgba(126,226,168,0.22);'
-                'font-size:0.82rem;color:#94A3B8;">'
-                f'📊 {_unit_label} · <strong style="color:#7EE2A8;">{match_pct_str}</strong>'
-                '</div>'
-                '</div>'
-                '</div>',
-                unsafe_allow_html=True,
-            )
-            if st.button(
-                "💾 Save Match",
-                key=f"save_swap_{rank_i + 1}",
-                use_container_width=True,
-                type="primary",
-            ):
-                if save_match(
-                    CURRENT_USER_ID,
-                    selected_product,
-                    selected_city,
-                    selected_diets,
-                    selected_allergens,
-                    priority_label,
-                    [alt],
-                ):
-                    st.session_state["saved_match_flash"] = True
-                    st.rerun()
+    def _delta_html(label: str, alt_val: float, orig_val: float | None,
+                    unit: str = "g", higher_is_better: bool = False) -> str:
+        """Compact trade-off badge comparing an alternative with the regular food."""
+        if orig_val is None:
+            return ""
+        diff = round(float(alt_val) - float(orig_val), 1)
+        if abs(diff) < 0.05:
+            return f'<span class="swap-delta">±0{unit} {label}</span>'
+        sign = "+" if diff > 0 else "−"
+        good = diff > 0 if higher_is_better else diff < 0
+        cls = "swap-delta swap-delta--good" if good else "swap-delta swap-delta--warn"
+        return f'<span class="{cls}">{sign}{abs(diff):g}{unit} {label}</span>'
 
-# ── Detailed comparison (kept available without cluttering the cards) ───
-with st.expander("📊 Detailed nutrition comparison", expanded=False):
-    if not orig_scaled:
-        st.info("Original product macros not available for comparison.")
-    else:
-        for swap in alternatives[:3]:
-            swap_nutr = _scale(swap["nutrition"], swap["name"])
-            orig_nc = max(
-                0.0, round(orig_scaled["carbs"] - orig_scaled["fiber"], 1)
-            )
-            swap_nc = max(
-                0.0, round(swap_nutr["carbs"] - swap_nutr["fiber"], 1)
-            )
 
-            st.markdown(
-                f"#### {PRODUCT_EMOJI.get(swap['name'], '🥗')} "
-                f"{html.escape(swap['name'])}"
-            )
-            st.caption(
-                f"{html.escape(swap.get('category', ''))} · {_unit_label}"
-            )
+    orig_scaled = _scale(orig_macros, selected_product) if orig_macros else None
 
-            col_table, col_chart = st.columns([1, 1], gap="medium")
-            with col_table:
-                st.markdown(f"**Nutrition Breakdown** *({_unit_label})*")
-                orig_label = f"🥗 {selected_product}"
-                swap_label = f"✨ {swap['name']}"
-                comparison_df = pd.DataFrame(
-                    {
-                        "Nutrient": [
-                            "Protein (g)",
-                            "Carbs (g)",
-                            "Fat (g)",
-                            "Fiber (g)",
-                            "⚡ Net Carbs (g)",
-                            "Calories (kcal)",
-                        ],
-                        orig_label: [
-                            orig_scaled["protein"],
-                            orig_scaled["carbs"],
-                            orig_scaled["fat"],
-                            orig_scaled["fiber"],
-                            orig_nc,
-                            orig_scaled["calories"],
-                        ],
-                        swap_label: [
-                            swap_nutr["protein"],
-                            swap_nutr["carbs"],
-                            swap_nutr["fat"],
-                            swap_nutr["fiber"],
-                            swap_nc,
-                            swap_nutr["calories"],
-                        ],
-                    }
-                )
-                st.dataframe(
-                    comparison_df.set_index("Nutrient"),
-                    use_container_width=True,
-                    column_config={
-                        orig_label: st.column_config.NumberColumn(
-                            orig_label, format="%.1f"
-                        ),
-                        swap_label: st.column_config.NumberColumn(
-                            swap_label, format="%.1f"
-                        ),
-                    },
-                )
+    tab_swaps, tab_nutrition = st.tabs(
+        ["🏆 Ranked Swaps (Top 3)", "📊 Detailed Nutrition Comparison"]
+    )
 
-            with col_chart:
-                st.markdown(f"**Nutrient Chart** *(excl. calories · {_unit_label})*")
-                import altair as alt_chart
+    with tab_swaps:
+        # ── Ranked swaps — 3 equal columns on desktop, stacked on mobile ───────
+        cols = st.columns(3)
 
-                chart_df = pd.DataFrame(
-                    {
-                        orig_label: [
-                            orig_scaled["protein"],
-                            orig_scaled["carbs"],
-                            orig_scaled["fat"],
-                            orig_scaled["fiber"],
-                        ],
-                        swap_label: [
-                            swap_nutr["protein"],
-                            swap_nutr["carbs"],
-                            swap_nutr["fat"],
-                            swap_nutr["fiber"],
-                        ],
-                    },
-                    index=["Protein", "Carbs", "Fat", "Fiber"],
-                )
-                chart_long = (
-                    chart_df.reset_index()
-                    .melt(id_vars="index", var_name="Product", value_name="Value (g)")
-                    .rename(columns={"index": "Nutrient"})
-                )
-                bars = (
-                    alt_chart.Chart(chart_long)
-                    .mark_bar()
-                    .encode(
-                        x=alt_chart.X(
-                            "Nutrient:N",
-                            sort=["Protein", "Carbs", "Fat", "Fiber"],
-                            axis=alt_chart.Axis(
-                                labelAngle=0,
-                                labelFontSize=12,
-                                titleFontSize=13,
-                                labelPadding=6,
-                            ),
-                            title=None,
-                        ),
-                        xOffset=alt_chart.XOffset("Product:N"),
-                        y=alt_chart.Y(
-                            "Value (g):Q", axis=alt_chart.Axis(labelFontSize=11)
-                        ),
-                        color=alt_chart.Color(
-                            "Product:N",
-                            legend=alt_chart.Legend(
-                                orient="bottom",
-                                labelFontSize=11,
-                                titleFontSize=11,
-                            ),
-                        ),
-                        tooltip=["Nutrient:N", "Product:N", "Value (g):Q"],
+        for col, alt in zip(cols, alternatives[:3]):
+            with col:
+                rank_i = max(0, min(int(alt.get("rank", 1)) - 1, 2))
+                color  = RANK_COLORS[rank_i]
+                label  = RANK_LABELS[rank_i]
+                score_pct = max(0, min(100, round((1 - float(alt["match_score"])) * 100)))
+                match_pct_str = f"{score_pct}% match"
+
+                nutr        = alt["nutrition"]
+                nutr_scaled = _scale(nutr, alt["name"])
+
+                thumb = product_image_src(alt["name"])
+                if thumb:
+                    thumb_html = (
+                        f'<img class="swap-thumb" src="{thumb}" '
+                        f'alt="{html.escape(alt["name"], quote=True)}">'
                     )
-                    .properties(height=220)
-                    .configure_view(strokeWidth=0)
-                    .configure_axis(grid=True, gridColor="#334155")
-                    .configure_legend(labelColor="#cbd5e1", titleColor="#b0b8c4")
-                )
-                st.altair_chart(bars, use_container_width=True)
+                else:
+                    thumb_html = (
+                        '<div class="swap-thumb swap-thumb-fallback">'
+                        f'{PRODUCT_EMOJI.get(alt["name"], "🥗")}</div>'
+                    )
 
-            nc_class = "net-carbs-keto" if keto_on else "net-carbs-normal"
-            st.markdown(
-                f'<span class="{nc_class}">⚡ Net Carbs {swap_nc:g} g '
-                f"({_unit_label})</span>",
-                unsafe_allow_html=True,
-            )
-            st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+                alt_local = PRODUCT_LOCAL_NAMES.get(alt["name"], "")
+                local_tag = (
+                    f'<span class="local-name-tag" style="margin-left:0;">🗺️ {html.escape(alt_local)}</span>'
+                    if alt_local else ""
+                )
+                meta_text = html.escape(
+                    f"{alt['category']} · Available in: {alt['cities'].replace(',', ', ')}"
+                )
+
+                macro_html = (
+                    f'<span class="swap-macro-pill protein">P {nutr_scaled["protein"]:g}g</span>'
+                    f'<span class="swap-macro-pill carbs">C {nutr_scaled["carbs"]:g}g</span>'
+                    f'<span class="swap-macro-pill fat">F {nutr_scaled["fat"]:g}g</span>'
+                    f'<span class="swap-macro-pill calories">{nutr_scaled["calories"]:g} kcal</span>'
+                )
+
+                delta_html = ""
+                if orig_scaled:
+                    delta_html = (
+                        '<div class="swap-deltas">'
+                        + _delta_html("Protein", nutr_scaled["protein"], orig_scaled["protein"],
+                                      higher_is_better=True)
+                        + _delta_html("Carbs", nutr_scaled["carbs"], orig_scaled["carbs"])
+                        + _delta_html("Fat", nutr_scaled["fat"], orig_scaled["fat"])
+                        + _delta_html("kcal", nutr_scaled["calories"], orig_scaled["calories"],
+                                      unit="")
+                        + "</div>"
+                    )
+
+                explanation = str(alt.get("explanation", "")).strip()
+                if explanation:
+                    # Strip raw-score artifacts leaked by older backend prompts.
+                    explanation = re.sub(
+                        r"\(?\s*match\s+score\s*[:\-]?\s*\d+\.\d+\s*\)?",
+                        f"({match_pct_str})",
+                        explanation,
+                        flags=re.IGNORECASE,
+                    )
+                    explanation = re.sub(r"\b0\.\d{3,6}\b", "", explanation).strip()
+                if not explanation:
+                    explanation = (
+                        f"A strong local swap for {selected_product} in {selected_city}, "
+                        f"chosen for your {PRIORITY_LABELS[priority_label].split('—')[0].strip().lower()} priority."
+                    )
+
+                top_cls = " swap-card--top" if rank_i == 0 else ""
+                with st.container(border=True):
+                    st.markdown(
+                        f'<div class="swap-card{top_cls}">'
+                        '<div class="swap-card-header">'
+                        f'<span class="swap-rank-pill" style="background:{color}22;color:{color};">{label}</span>'
+                        f'<span class="swap-score-pill">{score_pct}% Match</span>'
+                        '</div>'
+                        f'{thumb_html}'
+                        f'<p class="swap-name">{PRODUCT_EMOJI.get(alt["name"], "🥗")} '
+                        f'{html.escape(alt["name"])}</p>'
+                        f'{f"<p>{local_tag}</p>" if local_tag else ""}'
+                        f'<p class="swap-meta">{meta_text}</p>'
+                        f'<div class="swap-macros">{macro_html}</div>'
+                        f'{delta_html}'
+                        '<div class="swap-explanation">'
+                        f'<strong>Why this swap:</strong> {html.escape(explanation)}'
+                        '<div style="margin-top:0.6rem;padding-top:0.5rem;'
+                        'border-top:1px solid rgba(126,226,168,0.22);'
+                        'font-size:0.82rem;color:#94A3B8;">'
+                        f'📊 {_unit_label} · <strong style="color:#7EE2A8;">{match_pct_str}</strong>'
+                        '</div>'
+                        '</div>'
+                        '</div>',
+                        unsafe_allow_html=True,
+                    )
+                    if st.button(
+                        "💾 Save Match",
+                        key=f"save_swap_{rank_i + 1}",
+                        use_container_width=True,
+                        type="primary",
+                    ):
+                        if save_match(
+                            CURRENT_USER_ID,
+                            selected_product,
+                            selected_city,
+                            selected_diets,
+                            selected_allergens,
+                            priority_label,
+                            [alt],
+                        ):
+                            st.session_state["saved_match_flash"] = True
+                            st.rerun()
+
+    with tab_nutrition:
+        # ── Exact macro table + chart (second tab) ────────────────────────────
+        if not orig_scaled:
+            st.info("Original product macros not available for comparison.")
+        else:
+            for swap in alternatives[:3]:
+                swap_nutr = _scale(swap["nutrition"], swap["name"])
+                orig_nc = max(
+                    0.0, round(orig_scaled["carbs"] - orig_scaled["fiber"], 1)
+                )
+                swap_nc = max(
+                    0.0, round(swap_nutr["carbs"] - swap_nutr["fiber"], 1)
+                )
+
+                st.markdown(
+                    f"#### {PRODUCT_EMOJI.get(swap['name'], '🥗')} "
+                    f"{html.escape(swap['name'])}"
+                )
+                st.caption(
+                    f"{html.escape(swap.get('category', ''))} · {_unit_label}"
+                )
+
+                col_table, col_chart = st.columns([1, 1], gap="medium")
+                with col_table:
+                    st.markdown(f"**Nutrition Breakdown** *({_unit_label})*")
+                    orig_label = f"🥗 {selected_product}"
+                    swap_label = f"✨ {swap['name']}"
+                    comparison_df = pd.DataFrame(
+                        {
+                            "Nutrient": [
+                                "Protein (g)",
+                                "Carbs (g)",
+                                "Fat (g)",
+                                "Fiber (g)",
+                                "⚡ Net Carbs (g)",
+                                "Calories (kcal)",
+                            ],
+                            orig_label: [
+                                orig_scaled["protein"],
+                                orig_scaled["carbs"],
+                                orig_scaled["fat"],
+                                orig_scaled["fiber"],
+                                orig_nc,
+                                orig_scaled["calories"],
+                            ],
+                            swap_label: [
+                                swap_nutr["protein"],
+                                swap_nutr["carbs"],
+                                swap_nutr["fat"],
+                                swap_nutr["fiber"],
+                                swap_nc,
+                                swap_nutr["calories"],
+                            ],
+                        }
+                    )
+                    st.dataframe(
+                        comparison_df.set_index("Nutrient"),
+                        use_container_width=True,
+                        column_config={
+                            orig_label: st.column_config.NumberColumn(
+                                orig_label, format="%.1f"
+                            ),
+                            swap_label: st.column_config.NumberColumn(
+                                swap_label, format="%.1f"
+                            ),
+                        },
+                    )
+
+                with col_chart:
+                    st.markdown(f"**Nutrient Chart** *(excl. calories · {_unit_label})*")
+                    import altair as alt_chart
+
+                    chart_df = pd.DataFrame(
+                        {
+                            orig_label: [
+                                orig_scaled["protein"],
+                                orig_scaled["carbs"],
+                                orig_scaled["fat"],
+                                orig_scaled["fiber"],
+                            ],
+                            swap_label: [
+                                swap_nutr["protein"],
+                                swap_nutr["carbs"],
+                                swap_nutr["fat"],
+                                swap_nutr["fiber"],
+                            ],
+                        },
+                        index=["Protein", "Carbs", "Fat", "Fiber"],
+                    )
+                    chart_long = (
+                        chart_df.reset_index()
+                        .melt(id_vars="index", var_name="Product", value_name="Value (g)")
+                        .rename(columns={"index": "Nutrient"})
+                    )
+                    bars = (
+                        alt_chart.Chart(chart_long)
+                        .mark_bar()
+                        .encode(
+                            x=alt_chart.X(
+                                "Nutrient:N",
+                                sort=["Protein", "Carbs", "Fat", "Fiber"],
+                                axis=alt_chart.Axis(
+                                    labelAngle=0,
+                                    labelFontSize=12,
+                                    titleFontSize=13,
+                                    labelPadding=6,
+                                ),
+                                title=None,
+                            ),
+                            xOffset=alt_chart.XOffset("Product:N"),
+                            y=alt_chart.Y(
+                                "Value (g):Q", axis=alt_chart.Axis(labelFontSize=11)
+                            ),
+                            color=alt_chart.Color(
+                                "Product:N",
+                                legend=alt_chart.Legend(
+                                    orient="bottom",
+                                    labelFontSize=11,
+                                    titleFontSize=11,
+                                ),
+                            ),
+                            tooltip=["Nutrient:N", "Product:N", "Value (g):Q"],
+                        )
+                        .properties(height=220)
+                        .configure_view(strokeWidth=0)
+                        .configure_axis(grid=True, gridColor="#334155")
+                        .configure_legend(labelColor="#cbd5e1", titleColor="#b0b8c4")
+                    )
+                    st.altair_chart(bars, use_container_width=True)
+
+                nc_class = "net-carbs-keto" if keto_on else "net-carbs-normal"
+                st.markdown(
+                    f'<span class="{nc_class}">⚡ Net Carbs {swap_nc:g} g '
+                    f"({_unit_label})</span>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
 st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
