@@ -3845,9 +3845,13 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
     font-variant-numeric: tabular-nums !important;
 }
 .sidebar-stats .stats-tip {
-    color: #FBBF24 !important;
-    font-weight: 500 !important;
+    color: #C9D1D9 !important;
+    font-weight: 400 !important;
     font-size: 14.5px !important;
+}
+.sidebar-stats .stats-tip strong {
+    color: #FBBF24 !important;
+    font-weight: 700 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -4525,7 +4529,7 @@ with st.sidebar:
                 <span class="stats-value">{_saved_count}</span>
             </div>
             <div class="stats-tip">
-                💡 Tip: Click any product in the guide to load it instantly.
+                <div style="font-size: 14.5px; color: #C9D1D9; line-height: 1.45;"><strong style="color: #FBBF24;">💡 Tip:</strong> Click any product in the guide to load it instantly.</div>
             </div>
         </div>
         """,
