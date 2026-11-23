@@ -100,28 +100,50 @@ if "supabase_user_name" not in st.session_state:
     st.session_state["supabase_user_name"] = None
 
 
-# Restore an existing Supabase session from stored tokens so the user stays
-# signed in across Streamlit reruns within the same browser session.
-if (
-    st.session_state["supabase_access_token"]
-    and st.session_state["supabase_refresh_token"]
-    and st.session_state["supabase_user"] is None
-):
+def _ensure_supabase_session() -> None:
+    """Attach stored tokens to the client on EVERY rerun.
+
+    get_supabase_client() creates a fresh client each script run. Without
+    calling set_session() again, PostgREST requests are anonymous and RLS
+    policies (`auth.uid() = user_id`) reject the saved-matches queries.
+    """
+    access = st.session_state["supabase_access_token"]
+    refresh = st.session_state["supabase_refresh_token"]
+    if not access or not refresh:
+        return
+
     try:
-        supabase.auth.set_session(
-            st.session_state["supabase_access_token"],
-            st.session_state["supabase_refresh_token"],
-        )
+        supabase.auth.set_session(access, refresh)
+    except Exception:
+        try:
+            refreshed = supabase.auth.refresh_session(refresh)
+            session = getattr(refreshed, "session", None)
+            if not (session and session.access_token and session.refresh_token):
+                raise RuntimeError("refresh_session returned no tokens")
+            access, refresh = session.access_token, session.refresh_token
+            st.session_state["supabase_access_token"] = access
+            st.session_state["supabase_refresh_token"] = refresh
+            supabase.auth.set_session(access, refresh)
+        except Exception as exc:
+            st.session_state["supabase_access_token"] = None
+            st.session_state["supabase_refresh_token"] = None
+            st.session_state["supabase_user"] = None
+            st.session_state["supabase_user_name"] = None
+            st.error(f"Supabase session expired — please sign in again: {exc}")
+            return
+
+    try:
         user_response = supabase.auth.get_user()
         if user_response and user_response.user:
             st.session_state["supabase_user"] = user_response.user
             st.session_state["supabase_user_name"] = fetch_profile_name(
                 user_response.user.id, user_response.user.email or ""
             )
-    except Exception:
-        # Tokens expired or invalid — clear them so the user can sign in again.
-        st.session_state["supabase_access_token"] = None
-        st.session_state["supabase_refresh_token"] = None
+    except Exception as exc:
+        st.error(f"Could not verify Supabase session: {exc}")
+
+
+_ensure_supabase_session()
 
 
 # ─────────────────────────────────────────────
@@ -535,43 +557,63 @@ CURRENT_USER_ID = st.session_state["supabase_user"].id
 CURRENT_USER_EMAIL = st.session_state["supabase_user"].email or ""
 
 
+def _attach_session() -> None:
+    """Re-attach stored tokens before any DB call (client is new each rerun)."""
+    _ensure_supabase_session()
+
+
 def save_match(user_id, product, city, diet_rules, allergens, priority, alternatives):
-    """Insert one saved match; report failure without crashing the app."""
+    """Insert one row into public.saved_matches.
+
+    Column names/types match the setup SQL in DEPLOYMENT.md:
+        user_id       text/uuid   = auth.uid()
+        product       text
+        city          text
+        diet_rules    jsonb       = list[str]
+        allergens     jsonb       = list[str]
+        priority      text
+        alternatives  jsonb       = list[dict]
+        created_at    timestamptz
+    """
+    _attach_session()  # RLS requires an authenticated PostgREST session
     try:
         supabase.table("saved_matches").insert(
             {
-                "user_id": user_id,
-                "product": product,
-                "city": city,
-                "diet_rules": diet_rules,
-                "allergens": allergens,
-                "priority": priority,
-                "alternatives": alternatives,
+                "user_id": str(user_id),
+                "product": str(product),
+                "city": str(city),
+                "diet_rules": list(diet_rules or []),
+                "allergens": list(allergens or []),
+                "priority": str(priority),
+                "alternatives": (
+                    alternatives if isinstance(alternatives, (list, dict)) else []
+                ),
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
         ).execute()
         return True
-    except Exception as exc:
-        st.warning(f"⚠️ Could not save this match: {exc}")
+    except Exception as e:
+        st.error(f"Save failed: {e}")
         return False
 
 
 def get_saved_matches(user_id):
-    """Return saved matches for ONE user — RLS hides other users' rows.
+    """Return this user's rows from public.saved_matches, newest first.
 
-    If the table has not been created yet (or PostgREST returns any other
-    error), return an empty list so the rest of the app keeps working.
+    No caching: the sidebar must always show the latest database state.
     """
+    _attach_session()  # RLS requires an authenticated PostgREST session
     try:
         result = (
             supabase.table("saved_matches")
             .select("*")
-            .eq("user_id", user_id)
+            .eq("user_id", str(user_id))
             .order("created_at", desc=True)
             .execute()
         )
         return result.data or []
-    except Exception:
+    except Exception as e:
+        st.error(f"Could not load saved matches: {e}")
         return []
 
 
@@ -581,10 +623,14 @@ def render_saved_matches(container):
     if not matches:
         container.caption("No saved matches yet — save a result below.")
         return
-    lines = [
-        f"- {m['product']} → {m['city']} · {m['priority']}" for m in matches
-    ]
-    container.markdown("\n".join(lines))
+    lines = []
+    for m in matches:
+        created = str(m.get("created_at", ""))[:10]
+        lines.append(
+            f"**{m.get('product', 'Saved match')}** → {m.get('city', '—')}  \n"
+            f"  Priority: {m.get('priority', '—')} · {created}"
+        )
+    container.markdown("\n\n".join(lines))
 
 
 # ─────────────────────────────────────────────
@@ -2208,10 +2254,13 @@ with st.sidebar:
         st.rerun()
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
-    # ─── NEW: per-user saved matches history (Supabase, user_id-keyed) ──
-    with st.expander("🕘 My saved matches", expanded=False):
-        # Placeholder lets us refresh this list from the Save button later in
-        # the same rerun (the sidebar is rendered before the main body).
+    # ─── Per-user saved matches history (Supabase, user_id-keyed) ────────
+    # Open the expander automatically on the rerun right after a save so the
+    # newly inserted row is immediately visible.
+    with st.expander(
+        "🕘 My saved matches",
+        expanded=bool(st.session_state.get("saved_match_flash")),
+    ):
         saved_matches_slot = st.empty()
         render_saved_matches(saved_matches_slot)
 
@@ -2288,7 +2337,15 @@ with st.sidebar:
     )
 
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
-    find_btn = st.button("🔍 Find Alternatives", use_container_width=True, type="primary")
+    if st.button(
+        "🔍 Find Alternatives",
+        use_container_width=True,
+        type="primary",
+        key="find_alternatives",
+    ):
+        st.session_state["show_match_results"] = True
+        st.session_state.pop("match_result_data", None)  # force a fresh API call
+    find_btn = st.session_state.get("show_match_results", False)
 
 
 # ─────────────────────────────────────────────
@@ -2356,58 +2413,64 @@ if not find_btn:
     st.stop()
 
 
-# ── Call the API ──────────────────────────────
-with st.spinner("Searching for alternatives and generating explanations…"):
-    response = call_api({
-        "product":    selected_product,
-        "city":       selected_city,
-        "diet_rules": selected_diets,
-        "allergens":  selected_allergens,
-        "priority":   priority_label,
-    })
+# ── Call the API (result cached in session state so save-reruns keep the view)
+if "match_result_data" not in st.session_state:
+    with st.spinner("Searching for alternatives and generating explanations…"):
+        response = call_api({
+            "product":    selected_product,
+            "city":       selected_city,
+            "diet_rules": selected_diets,
+            "allergens":  selected_allergens,
+            "priority":   priority_label,
+        })
 
-# ── Handle errors ─────────────────────────────
-if response is None:
-    st.error(
-        f"⚠️ **Cannot reach the backend at `{API_BASE}`.**\n\n"
-        "It may be starting up (free hosting sleeps after inactivity) or the "
-        "URL may be wrong. Wait a minute and try again."
-    )
-    st.caption("Local dev: `python -m uvicorn backend.main:app --reload`")
-    st.stop()
+    # ── Handle errors ─────────────────────────
+    if response is None:
+        st.error(
+            f"⚠️ **Cannot reach the backend at `{API_BASE}`.**\n\n"
+            "It may be starting up (free hosting sleeps after inactivity) or the "
+            "URL may be wrong. Wait a minute and try again."
+        )
+        st.caption("Local dev: `python -m uvicorn backend.main:app --reload`")
+        st.stop()
 
-if response.status_code == 404:
-    detail = response.json().get("detail", {})
-    err    = detail.get("error", "")
-    msg    = detail.get("message", response.text)
+    if response.status_code == 404:
+        detail = response.json().get("detail", {})
+        err    = detail.get("error", "")
+        msg    = detail.get("message", response.text)
 
-    if err == "product_not_found":
-        st.error(f"❌ **Product not found:** {msg}")
-    elif err == "no_alternatives_found":
-        st.warning(f"🔍 **No alternatives found:** {msg}")
-    else:
-        st.error(f"❌ {msg}")
-    st.stop()
+        if err == "product_not_found":
+            st.error(f"❌ **Product not found:** {msg}")
+        elif err == "no_alternatives_found":
+            st.warning(f"🔍 **No alternatives found:** {msg}")
+        else:
+            st.error(f"❌ {msg}")
+        st.stop()
 
-if response.status_code == 422:
-    # FastAPI validation errors arrive as a list of {loc, msg, type} objects.
-    st.error("❌ **Invalid input.** Check your selections and try again.")
-    with st.expander("Details"):
-        st.json(response.json().get("detail", response.text))
-    st.stop()
+    if response.status_code == 422:
+        # FastAPI validation errors arrive as a list of {loc, msg, type} objects.
+        st.error("❌ **Invalid input.** Check your selections and try again.")
+        with st.expander("Details"):
+            st.json(response.json().get("detail", response.text))
+        st.stop()
 
-if response.status_code != 200:
-    st.error(f"❌ Unexpected error ({response.status_code}): {response.text}")
-    st.stop()
+    if response.status_code != 200:
+        st.error(f"❌ Unexpected error ({response.status_code}): {response.text}")
+        st.stop()
+
+    st.session_state["match_result_data"] = response.json()
 
 # ── Parse response ────────────────────────────
-data         = response.json()
+data         = st.session_state["match_result_data"]
 alternatives = data.get("alternatives", [])
 orig_macros  = get_original_macros(selected_product)
 
 # ── Back to home ──────────────────────────────
-# Clicking this reruns the script with find_btn False, which renders the landing page.
-st.button("🏠 Back to home", key="back_to_home", help="Return to the start page")
+# Clear the persisted results flag so the landing page renders after rerun.
+if st.button("🏠 Back to home", key="back_to_home", help="Return to the start page"):
+    st.session_state["show_match_results"] = False
+    st.session_state.pop("match_result_data", None)
+    st.rerun()
 
 # ── Summary strip ─────────────────────────────
 # Built as one unindented string: a whitespace-only line would end the Markdown
@@ -2438,7 +2501,10 @@ summary_html = (
 )
 st.markdown(summary_html, unsafe_allow_html=True)
 
-# ─── NEW: save the current match to the logged-in user's history (Supabase) ─
+# ─── Save the current match to the logged-in user's history (Supabase) ───
+if st.session_state.pop("saved_match_flash", None):
+    st.success("Saved to your history — only your own account can see it.")
+
 if st.button("💾 Save this match to my history", key="save_match_to_history"):
     if save_match(
         CURRENT_USER_ID,
@@ -2449,10 +2515,10 @@ if st.button("💾 Save this match to my history", key="save_match_to_history"):
         priority_label,
         alternatives,
     ):
-        st.success("Saved to your history — only your own account can see it.")
-        # Refresh the sidebar immediately without a full rerun (which would
-        # discard the current results view).
-        render_saved_matches(saved_matches_slot)
+        # Rerun re-renders the sidebar from fresh DB data. The results view
+        # and the success message are restored from session state.
+        st.session_state["saved_match_flash"] = True
+        st.rerun()
 
 # ── Result cards ──────────────────────────────
 
