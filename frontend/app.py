@@ -1553,7 +1553,7 @@ def load_saved_match(match):
         "priority": priority,
         "alternatives": match.get("alternatives") or [],
     }
-    st.session_state["show_match_results"] = True
+    st.session_state["show_swaps_results"] = True
     st.rerun()
 
 
@@ -1660,6 +1660,10 @@ if "food_box_ver" not in st.session_state:
     st.session_state["food_box_ver"] = 0
 if "city_box_ver" not in st.session_state:
     st.session_state["city_box_ver"] = 0
+# Home shows the regular-food spotlight; Find Alternatives switches to the
+# ranked swaps view. This flag is the single source of truth for that switch.
+if "show_swaps_results" not in st.session_state:
+    st.session_state["show_swaps_results"] = False
 if "daily_protein_goal" not in st.session_state:
     st.session_state["daily_protein_goal"] = 120
 if "daily_calorie_goal" not in st.session_state:
@@ -1772,6 +1776,12 @@ def _protein_goal_badge(protein_per_100g) -> str:
         return ""
     percent = int(round(protein / goal * 100))
     return f'<span class="macro-goal-badge">Covers {percent}% of daily protein</span>'
+
+
+def _reset_swaps_view() -> None:
+    """Return to the home view and drop any cached ranked results."""
+    st.session_state["show_swaps_results"] = False
+    st.session_state.pop("match_result_data", None)
 
 
 def _sync_food_selection(canonical: str, search_value: str | None = None) -> None:
@@ -3854,6 +3864,7 @@ def render_product_guide(details: dict[str, dict]) -> None:
                 # On mobile, the injected parent-document listener collapses
                 # the sidebar immediately after this widget is clicked.
                 _sync_food_selection(item_name)
+                _reset_swaps_view()
                 st.session_state["food_box_ver"] += 1
                 st.rerun()
 
@@ -4164,7 +4175,8 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
             st.session_state["selected_product"] = canonical_food
             if canonical_food != selected_product:
                 _sync_food_selection(canonical_food, selected_food)
-                st.rerun(scope="fragment")
+                _reset_swaps_view()
+                st.rerun()
 
     selected_product = st.session_state["selected_product"]
     st.session_state["product_select"] = selected_product
@@ -4202,8 +4214,9 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
             if picked_product != selected_product:
                 selected_product = picked_product
                 _sync_food_selection(selected_product, product_pick)
+                _reset_swaps_view()
                 st.session_state["food_box_ver"] += 1
-                st.rerun(scope="fragment")
+                st.rerun()
 
     with st.expander(
         f"📋 Browse all available foods ({len(all_foods)} items)", expanded=False
@@ -4219,8 +4232,9 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         if all_food_pick and all_food_pick != selected_product:
             selected_product = all_food_pick
             _sync_food_selection(selected_product)
+            _reset_swaps_view()
             st.session_state["food_box_ver"] += 1
-            st.rerun(scope="fragment")
+            st.rerun()
 
     # ── City ────────────────────────────────────────────────────────────
     st.markdown(
@@ -4398,9 +4412,11 @@ with st.container(border=True):
         type="primary",
         key="find_alternatives",
     ):
-        st.session_state["show_match_results"] = True
+        st.session_state["show_swaps_results"] = True
         st.session_state.pop("match_result_data", None)  # force a fresh API call
-    find_btn = st.session_state.get("show_match_results", False)
+        st.rerun()
+
+    show_swaps_results = st.session_state["show_swaps_results"]
 
 
 # ─────────────────────────────────────────────
@@ -4409,7 +4425,7 @@ with st.container(border=True):
 
 selected_detail = product_details.get(selected_product)
 
-if not find_btn:
+if not show_swaps_results:
     # The 3-step guide is pinned above the search card; results follow immediately.
     if selected_detail:
         st.markdown("### 🥗 Your Regular Food")
@@ -4422,6 +4438,14 @@ if not find_btn:
 
     render_footer()
     st.stop()
+
+
+# ── Back to home ──────────────────────────────
+# In the swaps view this stays at the very top, immediately before the results
+# container. The regular-food card (including How to Eat / Use) is home-only.
+if st.button("🏠 Back to home", key="back_to_home", help="Return to the start page"):
+    _reset_swaps_view()
+    st.rerun()
 
 
 # ── Call the API (result cached in session state so save-reruns keep the view)
@@ -4475,23 +4499,6 @@ if "match_result_data" not in st.session_state:
 data         = st.session_state["match_result_data"]
 alternatives = data.get("alternatives", [])
 orig_macros  = get_original_macros(selected_product)
-
-# ── Back to home ──────────────────────────────
-# Clear the persisted results flag so the landing page renders after rerun.
-if st.button("🏠 Back to home", key="back_to_home", help="Return to the start page"):
-    st.session_state["show_match_results"] = False
-    st.session_state.pop("match_result_data", None)
-    st.rerun()
-
-# ── Your Regular Food — directly above the unified results container ───
-if selected_detail:
-    st.markdown("### 🥗 Your Regular Food")
-    render_product_spotlight(
-        selected_product,
-        selected_detail,
-        keto="keto" in selected_diets,
-    )
-    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
 # ── One results container: ranked cards + exact numbers in tabs ────────────
 with st.container(border=True):
