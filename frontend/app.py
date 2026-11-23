@@ -4527,7 +4527,7 @@ with st.container(border=True):
         _apply_default_diet()
         _apply_default_allergens()
 
-    with st.expander("🥦 Filters — diet, allergens & priority", expanded=False):
+    with st.expander("🥦 Filters — diet, allergens & priority", expanded=True):
         selected_diet_labels = st.pills(
             "Diet Rules",
             options=list(DIET_LABELS.values()),
