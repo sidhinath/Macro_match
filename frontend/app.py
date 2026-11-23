@@ -1429,6 +1429,39 @@ def _query_represents_selection(raw_query, selected_value, aliases) -> bool:
     return canonical.lower() == (selected_value or "").lower()
 
 
+def _ordered_suggestions(query: str, options) -> list:
+    """Prefix matches first, then keyword matches, with no duplicates."""
+    q = (query or "").strip().lower()
+    if not q:
+        return []
+    starts = [food for food in options if food.lower().startswith(q)]
+    partial = [food for food in options if q in food.lower() and food not in starts]
+    return starts + partial
+
+
+def _ordered_city_suggestions(query: str, options) -> list:
+    """City matches, including friendly labels such as Bengaluru."""
+    q = (query or "").strip().lower()
+    if not q:
+        return []
+    starts = [city for city in options if city.lower().startswith(q)]
+    partial = [city for city in options if q in city.lower() and city not in starts]
+    suggestions = starts + partial
+    for label, canonical in CITY_DISPLAY_ALIASES.items():
+        if canonical not in options or canonical in suggestions:
+            continue
+        if label.lower().startswith(q):
+            suggestions.insert(0, canonical)
+        elif q in label.lower():
+            suggestions.append(canonical)
+    return suggestions
+
+
+def _suggestion_label(value: str, aliases: dict[str, str], options) -> str:
+    """Use the catalogue value when it is real; otherwise a friendly alias."""
+    return _display_label(value, aliases, options)
+
+
 def _sync_food_selection(canonical: str, search_value: str | None = None) -> None:
     """Keep the selected food and its visible search text in lockstep."""
     st.session_state["selected_product"] = canonical
@@ -3441,7 +3474,7 @@ with st.container(border=True):
     # lets a pill tap update the box from this same run without hitting
     # Streamlit's "widget already instantiated" restriction.
     st.session_state["food_search_input"] = food_search_raw or ""
-    food_query = (food_search_raw or "").strip().lower()
+    food_query = st.session_state["food_search_input"].strip().lower()
 
     all_foods = sorted(set(products))
     selected_product = _canonical_value(
@@ -3449,22 +3482,18 @@ with st.container(border=True):
     )
     st.session_state["selected_product"] = selected_product
 
-    # A pill tap puts the chosen food in the box. Treat that as "no active
-    # filter" so the default quick-pill set stays visible instead of collapsing
-    # to a single result.
-    food_query_is_selection = _query_represents_selection(
-        food_search_raw, selected_product, PRODUCT_DISPLAY_ALIASES
+    # Empty input (or the current selection, including its friendly alias)
+    # shows the six defaults. Anything else becomes live autocomplete.
+    food_uses_defaults = (
+        not food_query
+        or food_query == selected_product.lower()
+        or food_query == st.session_state["selected_product"].lower()
+        or _query_represents_selection(
+            food_search_raw, selected_product, PRODUCT_DISPLAY_ALIASES
+        )
     )
 
-    if food_query and not food_query_is_selection:
-        product_matches = [p for p in products if food_query in p.lower()][:12]
-        if not product_matches:
-            st.caption("No foods match that search. Try another term.")
-        product_pairs = [
-            (_display_label(p, PRODUCT_DISPLAY_ALIASES, product_matches), p)
-            for p in product_matches
-        ]
-    else:
+    if food_uses_defaults:
         # Friendly labels ("Oats", "Whey Protein") map to the exact backend
         # names ("Rolled Oats", "Whey Protein Powder") before any API call.
         product_pairs = []
@@ -3472,6 +3501,19 @@ with st.container(border=True):
             canonical = _canonical_value(label, PRODUCT_DISPLAY_ALIASES)
             if canonical in products:
                 product_pairs.append((label, canonical))
+    else:
+        # Prefix hits lead the list ("a" -> Almonds, Almond Butter, Almond
+        # Milk), followed by looser keyword hits.
+        food_suggestions = _ordered_suggestions(food_query, all_foods)[:8]
+        product_pairs = [
+            (_suggestion_label(food, PRODUCT_DISPLAY_ALIASES, all_foods), food)
+            for food in food_suggestions
+        ]
+        if not product_pairs:
+            st.caption(
+                f'No matching food found for "{food_query}". '
+                "Try Browse all available foods below."
+            )
 
     if product_pairs:
         product_display_options = [label for label, _ in product_pairs]
@@ -3484,17 +3526,23 @@ with st.container(border=True):
         if _current_product_display not in product_display_options:
             _current_product_display = None
         product_pick = st.pills(
-            "Quick food picks",
+            "Matching foods" if not food_uses_defaults else "Quick food picks",
             options=product_display_options,
             selection_mode="single",
             default=_current_product_display,
             label_visibility="collapsed",
         )
         if product_pick:
-            selected_product = product_canonical_by_display[product_pick]
-            # Show the friendly pill label in the box; the canonical value is
-            # still what the backend receives.
-            _sync_food_selection(selected_product, product_pick)
+            picked_product = product_canonical_by_display[product_pick]
+            # Only act on a real tap. The default pill is echoed back on every
+            # rerun; resetting from it would erase what the user is typing.
+            if picked_product != selected_product:
+                selected_product = picked_product
+                # Show the friendly pill label in the box; the canonical value
+                # is still what the backend receives. Rerun so the text input
+                # repaints with the new value immediately.
+                _sync_food_selection(selected_product, product_pick)
+                st.rerun()
 
     # Legacy aliases keep saved-match restore and older sessions in sync.
     st.session_state["product_select"] = selected_product
@@ -3517,9 +3565,10 @@ with st.container(border=True):
             default=_all_food_default,
             label_visibility="collapsed",
         )
-        if all_food_pick:
+        if all_food_pick and all_food_pick != selected_product:
             selected_product = all_food_pick
             _sync_food_selection(selected_product)
+            st.rerun()
 
     st.markdown(
         '<div class="search-card-title search-card-title--spaced">DESTINATION</div>',
@@ -3534,7 +3583,7 @@ with st.container(border=True):
         label_visibility="collapsed",
     )
     st.session_state["city_search_input"] = city_search_raw or ""
-    city_query = (city_search_raw or "").strip().lower()
+    city_query = st.session_state["city_search_input"].strip().lower()
     city_options = load_city_list() or CITIES_FALLBACK
     all_cities = sorted(set(city_options))
     selected_city = _canonical_value(
@@ -3542,28 +3591,18 @@ with st.container(border=True):
     )
     st.session_state["selected_city"] = selected_city
 
-    # Same rule as food: the clicked pill stays in the box, but the popular
-    # options remain available instead of a one-item filtered list.
-    city_query_is_selection = _query_represents_selection(
-        city_search_raw, selected_city, CITY_DISPLAY_ALIASES
+    # Same rule as food: empty input (or the current selection, including its
+    # alias) keeps the six popular picks visible; other text is autocomplete.
+    city_uses_defaults = (
+        not city_query
+        or city_query == selected_city.lower()
+        or city_query == st.session_state["selected_city"].lower()
+        or _query_represents_selection(
+            city_search_raw, selected_city, CITY_DISPLAY_ALIASES
+        )
     )
 
-    if city_query and not city_query_is_selection:
-        city_matches = [c for c in city_options if city_query in c.lower()][:12]
-        for label, canonical in CITY_DISPLAY_ALIASES.items():
-            if (
-                city_query in label.lower()
-                and canonical in city_options
-                and canonical not in city_matches
-            ):
-                city_matches.append(canonical)
-        if not city_matches:
-            st.caption("No cities match that search. Try another term.")
-        city_pairs = [
-            (_display_label(c, CITY_DISPLAY_ALIASES, city_matches), c)
-            for c in city_matches
-        ]
-    else:
+    if city_uses_defaults:
         # "Greater Noida" is shown as a quick pick but maps to the nearest
         # dataset city ("Delhi") so the matching backend still returns results.
         city_pairs = []
@@ -3571,6 +3610,17 @@ with st.container(border=True):
             canonical = _canonical_value(label, CITY_DISPLAY_ALIASES)
             if canonical in city_options:
                 city_pairs.append((label, canonical))
+    else:
+        city_suggestions = _ordered_city_suggestions(city_query, all_cities)[:8]
+        city_pairs = [
+            (_suggestion_label(city, CITY_DISPLAY_ALIASES, all_cities), city)
+            for city in city_suggestions
+        ]
+        if not city_pairs:
+            st.caption(
+                f'No matching city found for "{city_query}". '
+                "Try Browse all available cities below."
+            )
 
     if city_pairs:
         city_display_options = [label for label, _ in city_pairs]
@@ -3583,17 +3633,21 @@ with st.container(border=True):
         if _current_city_display not in city_display_options:
             _current_city_display = None
         city_pick = st.pills(
-            "Quick city picks",
+            "Matching cities" if not city_uses_defaults else "Quick city picks",
             options=city_display_options,
             selection_mode="single",
             default=_current_city_display,
             label_visibility="collapsed",
         )
         if city_pick:
-            selected_city = city_canonical_by_display[city_pick]
-            # Keep the friendly label visible ("Bengaluru") while the backend
-            # still receives the canonical city ("Bangalore").
-            _sync_city_selection(selected_city, city_pick)
+            picked_city = city_canonical_by_display[city_pick]
+            # Ignore the echoed default so typing is never overwritten.
+            if picked_city != selected_city:
+                selected_city = picked_city
+                # Keep the friendly label visible ("Bengaluru") while the
+                # backend still receives the canonical city ("Bangalore").
+                _sync_city_selection(selected_city, city_pick)
+                st.rerun()
 
     st.session_state["city_select"] = selected_city
     st.markdown(
@@ -3613,9 +3667,10 @@ with st.container(border=True):
             default=_all_city_default,
             label_visibility="collapsed",
         )
-        if all_city_pick:
+        if all_city_pick and all_city_pick != selected_city:
             selected_city = all_city_pick
             _sync_city_selection(selected_city)
+            st.rerun()
 
     with st.expander("🥦 Filters — diet, allergens & priority", expanded=False):
         selected_diet_labels = st.pills(
