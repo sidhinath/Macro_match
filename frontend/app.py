@@ -3230,6 +3230,18 @@ def load_city_list() -> list[str]:
 
 
 @st.cache_data(ttl=60)
+def cached_all_foods() -> list[str]:
+    """Plain sorted Python list used for O(n) prefix autocomplete."""
+    return sorted(set(fetch_product_list()))
+
+
+@st.cache_data(ttl=60)
+def cached_all_cities() -> list[str]:
+    """Plain sorted Python list used for O(n) city autocomplete."""
+    return sorted(set(load_city_list() or CITIES_FALLBACK))
+
+
+@st.cache_data(ttl=60)
 def get_original_macros(product_name: str) -> dict | None:
     """Return the macro dict for the original product from local CSV."""
     df = load_product_csv()
@@ -3759,36 +3771,16 @@ with st.sidebar:
     )
 
 
-# ─────────────────────────────────────────────
-# Main area — touch-first search card + results
-# ─────────────────────────────────────────────
+@st.fragment(key="search_controls")
+def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
+    """Isolated food/city autocomplete.
 
-with st.container(border=True):
-    st.markdown(
-        '<div class="search-card-title">YOUR PRODUCT — What do you normally eat?</div>',
-        unsafe_allow_html=True,
-    )
-    try:
-        with st.spinner(
-            "Connecting to the backend — free hosting can take up to a minute to wake…"
-        ):
-            products = fetch_product_list()
-    except BackendUnavailable:
-        st.error(
-            f"⚠️ Cannot reach the backend at `{API_BASE}`.\n\n"
-            "The free-tier API may be asleep or still starting. Retry in a "
-            "moment; locally, start it with:\n\n"
-            "`uvicorn backend.main:app --reload`"
-        )
-        if st.button("🔄 Retry", use_container_width=True):
-            fetch_product_list.clear()
-            st.rerun()
-        st.stop()
-
-    if not products:
-        st.error("The backend returned an empty product list. Please try again.")
-        st.stop()
-
+    Widget interactions here rerun only this fragment. Typing "al" therefore
+    never re-executes the sidebar, Supabase queries, saved matches, or results.
+    The option lists are cached plain Python lists, so prefix matching is O(n)
+    over 30/14 items and effectively instant.
+    """
+    # ── Food ────────────────────────────────────────────────────────────
     if "food_search_input" not in st.session_state:
         st.session_state["food_search_input"] = ""
     food_search_raw = st.text_input(
@@ -3797,20 +3789,16 @@ with st.container(border=True):
         placeholder="🔍 Search food (e.g., Almond Butter, Oats)...",
         label_visibility="collapsed",
     )
-    # The text widget is deliberately keyless: mirroring into our own state key
-    # lets a pill tap update the box from this same run without hitting
-    # Streamlit's "widget already instantiated" restriction.
+    # Keyless widget + mirrored custom key: a pill tap can repaint the box from
+    # this same fragment without hitting Streamlit's widget-key restriction.
     st.session_state["food_search_input"] = food_search_raw or ""
     food_query = st.session_state["food_search_input"].strip().lower()
 
-    all_foods = sorted(set(products))
     selected_product = _canonical_value(
         st.session_state["selected_product"], PRODUCT_DISPLAY_ALIASES
     )
     st.session_state["selected_product"] = selected_product
 
-    # Empty input (or the current selection, including its friendly alias)
-    # shows the six defaults. Anything else becomes live autocomplete.
     food_uses_defaults = (
         not food_query
         or food_query == selected_product.lower()
@@ -3821,16 +3809,12 @@ with st.container(border=True):
     )
 
     if food_uses_defaults:
-        # Friendly labels ("Oats", "Whey Protein") map to the exact backend
-        # names ("Rolled Oats", "Whey Protein Powder") before any API call.
         product_pairs = []
         for label in POPULAR_PRODUCTS:
             canonical = _canonical_value(label, PRODUCT_DISPLAY_ALIASES)
-            if canonical in products:
+            if canonical in all_foods:
                 product_pairs.append((label, canonical))
     else:
-        # Prefix hits lead the list ("a" -> Almonds, Almond Butter, Almond
-        # Milk), followed by looser keyword hits.
         food_suggestions = _ordered_suggestions(food_query, all_foods)[:8]
         product_pairs = [
             (_suggestion_label(food, PRODUCT_DISPLAY_ALIASES, all_foods), food)
@@ -3861,17 +3845,13 @@ with st.container(border=True):
         )
         if product_pick:
             picked_product = product_canonical_by_display[product_pick]
-            # Only act on a real tap. The default pill is echoed back on every
-            # rerun; resetting from it would erase what the user is typing.
             if picked_product != selected_product:
                 selected_product = picked_product
-                # Show the friendly pill label in the box; the canonical value
-                # is still what the backend receives. Rerun so the text input
-                # repaints with the new value immediately.
                 _sync_food_selection(selected_product, product_pick)
-                st.rerun()
+                # Fragment-scoped rerun repaints the text box without touching
+                # the rest of the app.
+                st.rerun(scope="fragment")
 
-    # Legacy aliases keep saved-match restore and older sessions in sync.
     st.session_state["product_select"] = selected_product
     st.markdown(
         '<div class="selected-value">Selected food: '
@@ -3882,8 +3862,6 @@ with st.container(border=True):
     with st.expander(
         f"📋 Browse all available foods ({len(all_foods)} items)", expanded=False
     ):
-        # No key: the default always follows the latest session value, so a
-        # tap here or on the quick pills stays in sync without extra state.
         _all_food_default = selected_product if selected_product in all_foods else None
         all_food_pick = st.pills(
             "All foods",
@@ -3895,8 +3873,9 @@ with st.container(border=True):
         if all_food_pick and all_food_pick != selected_product:
             selected_product = all_food_pick
             _sync_food_selection(selected_product)
-            st.rerun()
+            st.rerun(scope="fragment")
 
+    # ── City ────────────────────────────────────────────────────────────
     st.markdown(
         '<div class="search-card-title search-card-title--spaced">DESTINATION</div>',
         unsafe_allow_html=True,
@@ -3911,15 +3890,12 @@ with st.container(border=True):
     )
     st.session_state["city_search_input"] = city_search_raw or ""
     city_query = st.session_state["city_search_input"].strip().lower()
-    city_options = load_city_list() or CITIES_FALLBACK
-    all_cities = sorted(set(city_options))
+
     selected_city = _canonical_value(
         st.session_state["selected_city"], CITY_DISPLAY_ALIASES
     )
     st.session_state["selected_city"] = selected_city
 
-    # Same rule as food: empty input (or the current selection, including its
-    # alias) keeps the six popular picks visible; other text is autocomplete.
     city_uses_defaults = (
         not city_query
         or city_query == selected_city.lower()
@@ -3930,12 +3906,10 @@ with st.container(border=True):
     )
 
     if city_uses_defaults:
-        # "Greater Noida" is shown as a quick pick but maps to the nearest
-        # dataset city ("Delhi") so the matching backend still returns results.
         city_pairs = []
         for label in POPULAR_CITIES:
             canonical = _canonical_value(label, CITY_DISPLAY_ALIASES)
-            if canonical in city_options:
+            if canonical in all_cities:
                 city_pairs.append((label, canonical))
     else:
         city_suggestions = _ordered_city_suggestions(city_query, all_cities)[:8]
@@ -3968,13 +3942,10 @@ with st.container(border=True):
         )
         if city_pick:
             picked_city = city_canonical_by_display[city_pick]
-            # Ignore the echoed default so typing is never overwritten.
             if picked_city != selected_city:
                 selected_city = picked_city
-                # Keep the friendly label visible ("Bengaluru") while the
-                # backend still receives the canonical city ("Bangalore").
                 _sync_city_selection(selected_city, city_pick)
-                st.rerun()
+                st.rerun(scope="fragment")
 
     st.session_state["city_select"] = selected_city
     st.markdown(
@@ -3997,7 +3968,48 @@ with st.container(border=True):
         if all_city_pick and all_city_pick != selected_city:
             selected_city = all_city_pick
             _sync_city_selection(selected_city)
+            st.rerun(scope="fragment")
+
+
+# ─────────────────────────────────────────────
+# Main area — touch-first search card + results
+# ─────────────────────────────────────────────
+
+with st.container(border=True):
+    st.markdown(
+        '<div class="search-card-title">YOUR PRODUCT — What do you normally eat?</div>',
+        unsafe_allow_html=True,
+    )
+    try:
+        with st.spinner(
+            "Connecting to the backend — free hosting can take up to a minute to wake…"
+        ):
+            # Cached plain lists: built once, reused by every fragment rerun.
+            all_foods = cached_all_foods()
+            all_cities = cached_all_cities()
+    except BackendUnavailable:
+        st.error(
+            f"⚠️ Cannot reach the backend at `{API_BASE}`.\n\n"
+            "The free-tier API may be asleep or still starting. Retry in a "
+            "moment; locally, start it with:\n\n"
+            "`uvicorn backend.main:app --reload`"
+        )
+        if st.button("🔄 Retry", use_container_width=True):
+            fetch_product_list.clear()
+            cached_all_foods.clear()
             st.rerun()
+        st.stop()
+
+    if not all_foods:
+        st.error("The backend returned an empty product list. Please try again.")
+        st.stop()
+
+    # Only this small fragment reruns on typing or pill taps; the sidebar,
+    # Supabase queries, filters, and results below stay untouched. The fragment
+    # publishes its canonical choices through Session State.
+    render_search_controls(all_foods, all_cities)
+    selected_product = st.session_state["selected_product"]
+    selected_city = st.session_state["selected_city"]
 
     # Saved preferences are hydrated once per sign-in; mirror them into the
     # filter widgets here, before those widgets are instantiated.
