@@ -3303,6 +3303,54 @@ button[data-baseweb="pill"][data-selected="true"] {
     }
 }
 
+/* ── Back-to-home pill — centered above the Top 3 Swaps container ── */
+.back-home-marker {
+    display: none !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.back-home-marker) {
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+    margin: 0 0 0.8rem 0 !important;
+    box-shadow: none !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.back-home-marker) div[data-testid="stButton"] {
+    display: flex !important;
+    justify-content: center !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.back-home-marker) .stButton > button,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.back-home-marker) button[data-testid="stBaseButton-secondary"] {
+    background-color: rgba(46, 160, 67, 0.12) !important;
+    border: 1px solid rgba(46, 160, 67, 0.55) !important;
+    border-radius: 10px !important;
+    padding: 8px 20px !important;
+    color: #A3E6B7 !important;
+    font-size: 15px !important;
+    font-weight: 500 !important;
+    line-height: 1.2 !important;
+    box-shadow: none !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.back-home-marker) .stButton > button p,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.back-home-marker) button[data-testid="stBaseButton-secondary"] p {
+    color: #A3E6B7 !important;
+    font-size: 15px !important;
+    font-weight: 500 !important;
+    margin: 0 !important;
+}
+@media (hover: hover) {
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.back-home-marker) .stButton > button:hover,
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.back-home-marker) button[data-testid="stBaseButton-secondary"]:hover {
+        background-color: rgba(46, 160, 67, 0.22) !important;
+        border-color: #3FB950 !important;
+        color: #FFFFFF !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.back-home-marker) .stButton > button:hover p,
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.back-home-marker) button[data-testid="stBaseButton-secondary"]:hover p {
+        color: #FFFFFF !important;
+    }
+}
+
 /* ── Unified results container + dashboard tabs ── */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) {
     background-color: #161B22 !important;
@@ -4443,9 +4491,18 @@ if not show_swaps_results:
 # ── Back to home ──────────────────────────────
 # In the swaps view this stays at the very top, immediately before the results
 # container. The regular-food card (including How to Eat / Use) is home-only.
-if st.button("🏠 Back to home", key="back_to_home", help="Return to the start page"):
-    _reset_swaps_view()
-    st.rerun()
+_back_left, btn_col, _back_right = st.columns([2, 1, 2])
+with btn_col:
+    with st.container(border=True):
+        st.markdown(
+            '<div class="back-home-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        if st.button(
+            "⌂ Back to home", key="back_to_home", help="Return to the start page"
+        ):
+            _reset_swaps_view()
+            st.rerun()
 
 
 # ── Call the API (result cached in session state so save-reruns keep the view)
