@@ -265,7 +265,7 @@ if st.session_state["supabase_user"] is None:
         --auth-green-bright: #3FB950;
         --auth-text: #F8FAFC;
         --auth-muted: #94A3B8;
-        --auth-glass: rgba(255, 255, 255, 0.10);
+        --auth-glass: rgba(255, 255, 255, 0.14);
         --auth-radius: 24px;
     }
 
@@ -368,14 +368,20 @@ if st.session_state["supabase_user"] is None:
     .stApp::after {
         content: "";
         position: fixed;
-        top: 44%;
+        top: 46%;
         left: 50%;
-        width: min(760px, 92vw);
-        height: min(760px, 92vw);
+        width: min(860px, 96vw);
+        height: min(860px, 96vw);
         transform: translate(-50%, -50%);
         z-index: 0;
         pointer-events: none;
-        background: radial-gradient(circle, rgba(46, 160, 67, 0.17) 0%, rgba(16, 185, 129, 0.07) 38%, transparent 70%);
+        background: radial-gradient(circle, rgba(46, 160, 67, 0.26) 0%, rgba(16, 185, 129, 0.10) 40%, transparent 72%);
+    }
+
+    /* Single centered card: the side spacer/hero columns are never rendered. */
+    div[data-testid="stHorizontalBlock"]:has(.auth-brand) > div[data-testid="column"]:nth-of-type(1),
+    div[data-testid="stHorizontalBlock"]:has(.auth-brand) > div[data-testid="column"]:nth-of-type(3) {
+        display: none !important;
     }
 
     /* The middle column from st.columns([1.4, 1.3, 1.4]) is the auth card. */
@@ -388,15 +394,15 @@ if st.session_state["supabase_user"] is None:
         max-width: 560px !important;
         margin: clamp(1.5rem, 4vh, 3.25rem) auto 2rem !important;
         padding: 2.25rem 2.25rem 1.75rem !important;
-        background: linear-gradient(160deg, rgba(21, 31, 49, 0.74), rgba(7, 12, 22, 0.86)) !important;
+        background: linear-gradient(160deg, rgba(21, 31, 49, 0.66), rgba(7, 12, 22, 0.80)) !important;
         border: 1px solid var(--auth-glass) !important;
         border-radius: var(--auth-radius) !important;
         box-shadow:
-            0 28px 70px rgba(0, 0, 0, 0.55),
-            0 0 55px rgba(46, 160, 67, 0.18),
-            inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
-        -webkit-backdrop-filter: blur(24px) saturate(140%) !important;
-        backdrop-filter: blur(24px) saturate(140%) !important;
+            0 30px 80px rgba(0, 0, 0, 0.58),
+            0 0 85px rgba(46, 160, 67, 0.28),
+            inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+        -webkit-backdrop-filter: blur(26px) saturate(150%) !important;
+        backdrop-filter: blur(26px) saturate(150%) !important;
         animation: authRise 0.45s ease both;
     }
     div[data-testid="column"]:has(.auth-brand)::before {
@@ -417,18 +423,18 @@ if st.session_state["supabase_user"] is None:
         margin-bottom: 1.1rem;
     }
     .auth-brand-mark {
-        width: 76px;
-        height: 76px;
-        border-radius: 22px;
+        width: 84px;
+        height: 84px;
+        border-radius: 24px;
         display: grid;
         place-items: center;
         background: linear-gradient(145deg, #EAFBF0 0%, #BFF0CE 100%);
         border: 1px solid rgba(126, 226, 168, 0.55);
-        box-shadow: 0 14px 38px rgba(46, 160, 67, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        box-shadow: 0 16px 44px rgba(46, 160, 67, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.9);
     }
     .auth-brand-mark img {
-        width: 58px;
-        height: 58px;
+        width: 64px;
+        height: 64px;
         object-fit: contain;
         display: block;
     }
@@ -737,10 +743,6 @@ if st.session_state["supabase_user"] is None:
     }
 
     @media (max-width: 900px) {
-        div[data-testid="stHorizontalBlock"]:has(.auth-brand) > div[data-testid="column"]:nth-of-type(1),
-        div[data-testid="stHorizontalBlock"]:has(.auth-brand) > div[data-testid="column"]:nth-of-type(3) {
-            display: none !important;
-        }
         div[data-testid="column"]:has(.auth-brand) {
             flex: 0 0 min(560px, calc(100% - 1rem)) !important;
             width: min(560px, calc(100% - 1rem)) !important;
@@ -754,8 +756,8 @@ if st.session_state["supabase_user"] is None:
         }
         .auth-title { font-size: 1.75rem !important; }
         .auth-subtitle { font-size: 0.86rem !important; }
-        .auth-brand-mark { width: 64px; height: 64px; border-radius: 18px; }
-        .auth-brand-mark img { width: 48px; height: 48px; }
+        .auth-brand-mark { width: 68px; height: 68px; border-radius: 20px; }
+        .auth-brand-mark img { width: 52px; height: 52px; }
         .stTabs button[data-baseweb="tab"] { font-size: 0.82rem !important; padding: 0.55rem 0.6rem !important; }
         .auth-features { grid-template-columns: 1fr !important; }
         .auth-feature { justify-content: flex-start; }
