@@ -2745,6 +2745,9 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) .stButton > butt
 button[title="View fullscreen"], [data-testid="StyledFullScreenButton"] {
     display: none !important;
 }
+.spotlight-card-marker {
+    display: none !important;
+}
 .spotlight-thumb {
     width: 100%;
     height: 210px;
@@ -3314,6 +3317,15 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
         padding: 5px 11px !important;
     }
 
+    /* Richer macro pills only inside the "Your Regular Food" spotlight card. */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.spotlight-card-marker) .macro-pill,
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.spotlight-card-marker) .net-carbs-keto,
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.spotlight-card-marker) .net-carbs-normal,
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.spotlight-card-marker) .macro-goal-badge {
+        font-size: 16px !important;
+        padding: 6px 12px !important;
+    }
+
     section[data-testid="stSidebar"] p,
     section[data-testid="stSidebar"] label,
     section[data-testid="stSidebar"] button,
@@ -3579,7 +3591,13 @@ def render_product_spotlight(name: str, detail: dict, keto: bool = False) -> Non
     )
 
     with st.container(border=True):
-        col_img, col_info = st.columns([1, 2.2], vertical_alignment="center")
+        # Hidden marker scopes desktop-only sizing to this card, like the
+        # results container's .results-tabs-marker.
+        st.markdown(
+            '<div class="spotlight-card-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        col_img, col_info = st.columns([1.2, 2.5], vertical_alignment="center")
         with col_img:
             image_src = product_image_src(name)
             if image_src:
