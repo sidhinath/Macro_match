@@ -137,6 +137,59 @@ if "supabase_recovery_mode" not in st.session_state:
     st.session_state["supabase_recovery_mode"] = False
 
 
+def _metadata_int(metadata: dict, key: str, default: int, low: int, high: int) -> int:
+    """Read a bounded integer goal from Supabase metadata without failing on junk."""
+    try:
+        value = int(metadata.get(key, default))
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(high, value))
+
+
+def _normalize_diet_label(value) -> str:
+    """Accept either a diet key or its pill label from saved metadata."""
+    if not isinstance(value, str):
+        return "None"
+    if value in DIET_LABELS.values():
+        return value
+    if value in DIET_LABELS:
+        return DIET_LABELS[value]
+    return "None"
+
+
+def _normalize_allergens(value) -> list[str]:
+    """Drop unknown allergen keys so the multiselect never receives junk."""
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, (list, tuple, set)):
+        return []
+    return [item for item in value if item in ALLERGEN_OPTIONS]
+
+
+def _load_user_preferences(user) -> None:
+    """Initialize per-user goals/preferences once from Supabase Auth metadata."""
+    user_id = getattr(user, "id", None)
+    if user_id is not None and st.session_state.get("_preferences_user_id") == user_id:
+        return
+
+    metadata = getattr(user, "user_metadata", None) or {}
+    st.session_state["daily_protein_goal"] = _metadata_int(
+        metadata, "daily_protein_goal", 120, 1, 500
+    )
+    st.session_state["daily_calorie_goal"] = _metadata_int(
+        metadata, "daily_calorie_goal", 2000, 500, 10000
+    )
+    st.session_state["default_diet_select"] = _normalize_diet_label(
+        metadata.get("default_diet")
+    )
+    st.session_state["default_allergens_select"] = _normalize_allergens(
+        metadata.get("default_allergens")
+    )
+
+    st.session_state["_preferences_user_id"] = user_id
+    st.session_state["_preferences_filters_pending"] = True
+
+
 def _ensure_supabase_session() -> None:
     """Attach stored tokens to the client on EVERY rerun.
 
@@ -1412,6 +1465,11 @@ if "default_diet_select" not in st.session_state:
 if "default_allergens_select" not in st.session_state:
     st.session_state["default_allergens_select"] = []
 
+# Auth has already been enforced above, so it is safe to hydrate the signed-in
+# user's saved targets/preferences before any dashboard widgets are created.
+if st.session_state.get("supabase_user") is not None:
+    _load_user_preferences(st.session_state["supabase_user"])
+
 
 def _canonical_value(label: str, aliases: dict[str, str]) -> str:
     """Turn a friendly pill label into the exact value the backend expects."""
@@ -1481,6 +1539,22 @@ def _apply_default_allergens() -> None:
     st.session_state["allergen_select"] = list(
         st.session_state.get("default_allergens_select") or []
     )
+
+
+def _save_user_metadata(updates: dict, success_message: str) -> None:
+    """Merge selected keys into the user's Supabase Auth user_metadata."""
+    _attach_session()
+    current = getattr(st.session_state.get("supabase_user"), "user_metadata", None) or {}
+    metadata = dict(current)
+    metadata.update(updates)
+    try:
+        response = supabase.auth.update_user({"data": metadata})
+        user = getattr(response, "user", None)
+        if user is not None:
+            st.session_state["supabase_user"] = user
+        st.success(success_message)
+    except Exception as exc:
+        st.error(f"Could not save your settings: {exc}")
 
 
 def _protein_goal_badge(protein_per_100g) -> str:
@@ -3571,6 +3645,8 @@ with st.sidebar:
         st.session_state["supabase_refresh_token"] = None
         st.session_state["supabase_user_name"] = None
         st.session_state["supabase_recovery_mode"] = False
+        st.session_state.pop("_preferences_user_id", None)
+        st.session_state.pop("_preferences_filters_pending", None)
         st.rerun()
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
@@ -3613,6 +3689,19 @@ with st.sidebar:
             step=100,
             key="daily_calorie_goal",
         )
+        if st.button(
+            "💾 Save Target",
+            type="primary",
+            use_container_width=True,
+            key="save_macro_target",
+        ):
+            _save_user_metadata(
+                {
+                    "daily_protein_goal": int(st.session_state["daily_protein_goal"]),
+                    "daily_calorie_goal": int(st.session_state["daily_calorie_goal"]),
+                },
+                "Target saved!",
+            )
 
     # ─── Reusable filter defaults ──────────────────────────────────────
     with st.expander("⚙️ Default Diet & Allergens", expanded=False):
@@ -3631,6 +3720,25 @@ with st.sidebar:
             key="default_allergens_select",
             on_change=_apply_default_allergens,
         )
+        if st.button(
+            "💾 Save Preferences",
+            type="primary",
+            use_container_width=True,
+            key="save_preferences",
+        ):
+            # Apply immediately as well as persisting, so the main filters show
+            # the saved defaults on this same rerun.
+            _apply_default_diet()
+            _apply_default_allergens()
+            _save_user_metadata(
+                {
+                    "default_diet": st.session_state["default_diet_select"],
+                    "default_allergens": list(
+                        st.session_state.get("default_allergens_select") or []
+                    ),
+                },
+                "Preferences saved!",
+            )
 
     # ─── Bottom activity footer ────────────────────────────────────────
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
@@ -3890,6 +3998,12 @@ with st.container(border=True):
             selected_city = all_city_pick
             _sync_city_selection(selected_city)
             st.rerun()
+
+    # Saved preferences are hydrated once per sign-in; mirror them into the
+    # filter widgets here, before those widgets are instantiated.
+    if st.session_state.pop("_preferences_filters_pending", False):
+        _apply_default_diet()
+        _apply_default_allergens()
 
     with st.expander("🥦 Filters — diet, allergens & priority", expanded=False):
         selected_diet_labels = st.pills(
