@@ -3388,6 +3388,20 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
     margin-top: 1.1rem !important;
 }
 
+/* ── Filter questions — bold, crisp labels; choices stay regular weight ── */
+.filters-expander-marker {
+    display: none !important;
+}
+div[data-testid="stExpander"]:has(.filters-expander-marker) label[data-testid="stWidgetLabel"] p {
+    font-weight: 700 !important;
+    color: #E6EDF3 !important;
+    font-size: 16px !important;
+}
+div[data-testid="stExpander"]:has(.filters-expander-marker) .stRadio div[role="radiogroup"] label,
+div[data-testid="stExpander"]:has(.filters-expander-marker) .stRadio div[role="radiogroup"] span {
+    font-weight: 400 !important;
+}
+
 /* ── Sidebar product guide — compact single-column cards ── */
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.guide-card) {
     background-color: #161B22 !important;
@@ -4627,6 +4641,10 @@ with st.container(border=True):
         _apply_default_allergens()
 
     with st.expander("🥦 Filters — diet, allergens & priority", expanded=True):
+        st.markdown(
+            '<div class="filters-expander-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
         selected_diet_labels = st.pills(
             "Diet Rules",
             options=list(DIET_LABELS.values()),
@@ -4639,7 +4657,7 @@ with st.container(border=True):
         selected_diets = [_label_to_key[lbl] for lbl in selected_diet_labels]
 
         selected_allergens = st.multiselect(
-            "Allergens to avoid",
+            "**Allergens to avoid**",
             options=ALLERGEN_OPTIONS,
             format_func=lambda x: {
                 "soy": "🫘 Soy", "nuts": "🥜 Nuts", "dairy": "🥛 Dairy"
@@ -4648,7 +4666,7 @@ with st.container(border=True):
         )
 
         priority_label = st.radio(
-            "What matters most in the match?",
+            "**What matters most in the match?**",
             options=PRIORITY_KEYS,
             format_func=lambda k: PRIORITY_LABELS[k].replace(" ", "\u00a0", 1),
             index=2,   # default: balanced
