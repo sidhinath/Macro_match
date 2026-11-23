@@ -3694,6 +3694,32 @@ def call_api(payload: dict) -> requests.Response | None:
         return None
 
 
+def render_footer() -> None:
+    """Centered, mobile-safe footer for the bottom of the main page."""
+    st.markdown(
+        """
+        <div style="
+            text-align: center;
+            padding: 1.5rem 1rem 3rem 1rem;
+            color: #8B949E;
+            font-size: 14px;
+            line-height: 1.6;
+        ">
+            <div>
+                <strong style="color: #E6EDF3; font-size: 15px;">🥗 MacroMatch</strong>
+                — Smart local food swaps tailored to your macros.
+            </div>
+            <div>
+                Nutritional values are approximate per 100g. Always check local
+                packaging labels for exact allergen details.
+            </div>
+            <div>© 2026 MacroMatch · Eat Smart, Travel Anywhere.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_how_it_works() -> None:
     """Collapsible top guide — the original 3-step card, unchanged inside."""
     # Marker lets CSS find this expander even while it is collapsed.
@@ -4214,6 +4240,7 @@ if not find_btn:
         )
         st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
+    render_footer()
     st.stop()
 
 
@@ -4632,3 +4659,4 @@ with st.container(border=True):
                 st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
 st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+render_footer()
