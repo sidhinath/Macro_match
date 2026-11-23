@@ -1403,6 +1403,14 @@ if "selected_product" not in st.session_state:
     st.session_state["selected_product"] = "Almond Butter"
 if "selected_city" not in st.session_state:
     st.session_state["selected_city"] = "Delhi"
+if "daily_protein_goal" not in st.session_state:
+    st.session_state["daily_protein_goal"] = 120
+if "daily_calorie_goal" not in st.session_state:
+    st.session_state["daily_calorie_goal"] = 2000
+if "default_diet_select" not in st.session_state:
+    st.session_state["default_diet_select"] = "None"
+if "default_allergens_select" not in st.session_state:
+    st.session_state["default_allergens_select"] = []
 
 
 def _canonical_value(label: str, aliases: dict[str, str]) -> str:
@@ -1460,6 +1468,32 @@ def _ordered_city_suggestions(query: str, options) -> list:
 def _suggestion_label(value: str, aliases: dict[str, str], options) -> str:
     """Use the catalogue value when it is real; otherwise a friendly alias."""
     return _display_label(value, aliases, options)
+
+
+def _apply_default_diet() -> None:
+    """Mirror the sidebar default into the main diet pills widget key."""
+    choice = st.session_state.get("default_diet_select", "None")
+    st.session_state["diet_pills"] = [] if choice == "None" else [choice]
+
+
+def _apply_default_allergens() -> None:
+    """Mirror the sidebar defaults into the main allergen multiselect key."""
+    st.session_state["allergen_select"] = list(
+        st.session_state.get("default_allergens_select") or []
+    )
+
+
+def _protein_goal_badge(protein_per_100g) -> str:
+    """Small badge showing daily protein coverage for a 100 g portion."""
+    try:
+        protein = float(protein_per_100g)
+        goal = float(st.session_state.get("daily_protein_goal", 120))
+    except (TypeError, ValueError):
+        return ""
+    if goal <= 0:
+        return ""
+    percent = int(round(protein / goal * 100))
+    return f'<span class="macro-goal-badge">Covers {percent}% of daily protein</span>'
 
 
 def _sync_food_selection(canonical: str, search_value: str | None = None) -> None:
@@ -2180,6 +2214,39 @@ h1, h2, h3, .stHeading {
     color: inherit !important;
     text-decoration: none !important;
 }
+/* ── Sidebar bottom activity stats ── */
+.sidebar-stats {
+    background: rgba(11, 15, 25, 0.55);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.7rem 0.85rem;
+    margin-top: 0.75rem;
+}
+.sidebar-stats .stats-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.sidebar-stats .stats-label {
+    font-size: 0.82rem;
+    color: var(--text-body);
+    font-weight: 600;
+}
+.sidebar-stats .stats-value {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #7EE2A8;
+    font-variant-numeric: tabular-nums;
+}
+.sidebar-stats .stats-tip {
+    margin-top: 0.45rem;
+    padding-top: 0.45rem;
+    border-top: 1px dashed var(--border);
+    font-size: 0.74rem;
+    line-height: 1.35;
+    color: #94A3B8;
+}
 @media (hover: hover) {
     .sidebar-welcome a:hover {
         color: inherit !important;
@@ -2738,6 +2805,18 @@ button[title="View fullscreen"], [data-testid="StyledFullScreenButton"] {
     font-size: 0.8rem;
     margin-left: 0.4rem;
 }
+.macro-goal-badge {
+    display: inline-block;
+    background: rgba(46,160,67,0.12);
+    border: 1px solid rgba(46,160,67,0.38);
+    color: #7EE2A8;
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    margin: 0.25rem 0.35rem 0 0;
+    white-space: nowrap;
+}
 
 /* ── Local name tag ── */
 .local-name-tag {
@@ -3216,7 +3295,10 @@ def render_product_spotlight(name: str, detail: dict, keto: bool = False) -> Non
             st.caption(detail["category"])
             st.markdown(_macro_line(detail), unsafe_allow_html=True)
             # Net carbs badge (highlighted amber when keto is active)
-            st.markdown(nc_badge, unsafe_allow_html=True)
+            st.markdown(
+                nc_badge + _protein_goal_badge(detail["protein"]),
+                unsafe_allow_html=True,
+            )
             st.markdown(_badges_html(detail), unsafe_allow_html=True)
             with st.expander(f"📍 Available in {len(detail['cities'])} cities"):
                 st.write(", ".join(detail["cities"]))
@@ -3471,6 +3553,62 @@ with st.sidebar:
     )
     if st.toggle(f"Show all {len(product_details)} products", key="show_product_guide"):
         render_product_guide(product_details)
+
+    # ─── Daily macro goal ──────────────────────────────────────────────
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    with st.expander("🎯 Daily Macro Target", expanded=False):
+        st.number_input(
+            "Daily Protein Goal (g)",
+            min_value=1,
+            max_value=500,
+            value=120,
+            step=5,
+            key="daily_protein_goal",
+        )
+        st.number_input(
+            "Daily Calorie Goal (kcal)",
+            min_value=500,
+            max_value=10000,
+            value=2000,
+            step=100,
+            key="daily_calorie_goal",
+        )
+
+    # ─── Reusable filter defaults ──────────────────────────────────────
+    with st.expander("⚙️ Default Diet & Allergens", expanded=False):
+        st.selectbox(
+            "Default diet rule",
+            options=["None", *DIET_LABELS.values()],
+            key="default_diet_select",
+            on_change=_apply_default_diet,
+        )
+        st.multiselect(
+            "Default allergens",
+            options=ALLERGEN_OPTIONS,
+            format_func=lambda x: {
+                "soy": "🫘 Soy", "nuts": "🥜 Nuts", "dairy": "🥛 Dairy"
+            }[x],
+            key="default_allergens_select",
+            on_change=_apply_default_allergens,
+        )
+
+    # ─── Bottom activity footer ────────────────────────────────────────
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    _saved_count = len(get_saved_matches(CURRENT_USER_ID) or [])
+    st.markdown(
+        f"""
+        <div class="sidebar-stats">
+            <div class="stats-row">
+                <span class="stats-label">Saved matches</span>
+                <span class="stats-value">{_saved_count}</span>
+            </div>
+            <div class="stats-tip">
+                Tip: Click any product in the guide to load it instantly.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # ─────────────────────────────────────────────
@@ -3974,6 +4112,8 @@ with st.container(border=True):
                     f'<span class="swap-macro-pill fat">F {nutr_scaled["fat"]:g}g</span>'
                     f'<span class="swap-macro-pill calories">{nutr_scaled["calories"]:g} kcal</span>'
                 )
+                # Always based on 100 g, independent of the per-serving toggle.
+                protein_goal_html = _protein_goal_badge(nutr["protein"])
 
                 delta_html = ""
                 if orig_scaled:
@@ -4018,6 +4158,7 @@ with st.container(border=True):
                         f'{f"<p>{local_tag}</p>" if local_tag else ""}'
                         f'<p class="swap-meta">{meta_text}</p>'
                         f'<div class="swap-macros">{macro_html}</div>'
+                        f'{protein_goal_html}'
                         f'{delta_html}'
                         '<div class="swap-explanation">'
                         f'<strong>Why this swap:</strong> {html.escape(explanation)}'
