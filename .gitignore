@@ -14,8 +14,8 @@ env/
 .env
 .streamlit/secrets.toml
 
-# App runtime data — created at runtime, contains user data (hashed passwords
-# in config.yaml, saved matches in user_data.db). NEVER commit these.
+# App runtime data — kept ignored for safety (no longer used by the app;
+# users and saved matches now live in Supabase).
 config.yaml
 data/user_data.db
 *.db

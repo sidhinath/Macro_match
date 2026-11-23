@@ -51,9 +51,10 @@ nutrition data, constrained by availability, diet rules, and allergens.**
   show a photo, category, macros per 100 g, diet/allergen badges and city
   availability, so unfamiliar foods are easy to recognise.
 - **Username/password authentication** — sign in / sign up / sign out powered
-  by `streamlit-authenticator`. Accounts live in `config.yaml` with
-  bcrypt-hashed passwords (never plain text); saved match history is kept per
-  user in SQLite keyed by username.
+  by Supabase Auth. Accounts live in Supabase (cloud); passwords are handled
+  by Supabase and never stored locally. Saved match history is kept per user
+  in a Supabase table keyed by user ID, with Row Level Security so each user
+  sees only their own rows.
 - **Auto-generated API docs** at `/docs` (Swagger UI) and `/redoc`.
 - **Test suite** covering city filtering, invalid products, vegan and allergen
   invariants, and weight sensitivity.

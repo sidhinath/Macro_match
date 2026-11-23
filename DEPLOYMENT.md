@@ -107,6 +107,56 @@ Swagger docs are at `https://<your-service>.onrender.com/docs`.
 
 ---
 
+## 1.5. Set up Supabase Authentication (free tier)
+
+1. Go to <https://supabase.com> and create a free project.
+2. In **Project Settings → API**, copy the **Project URL** and **anon public key**.
+   These become `SUPABASE_URL` and `SUPABASE_ANON_KEY` in Streamlit secrets.
+3. In **Authentication → Providers**, enable **Email** (email/password sign-in).
+4. In the **SQL Editor**, run this to create the tables the app needs:
+
+   ```sql
+   -- Profiles: public name linked to each Supabase Auth user
+   create table profiles (
+     id uuid references auth.users not null primary key,
+     email text not null,
+     name text not null,
+     created_at timestamptz default now()
+   );
+
+   -- Saved matches: one row per saved food swap, owned by a user
+   create table saved_matches (
+     id bigserial primary key,
+     user_id uuid references auth.users not null,
+     product text not null,
+     city text not null,
+     diet_rules jsonb not null default '[]',
+     allergens jsonb not null default '[]',
+     priority text not null,
+     alternatives jsonb not null default '[]',
+     created_at timestamptz default now()
+   );
+
+   -- Enable Row Level Security so users only see their own rows
+   alter table profiles enable row level security;
+   alter table saved_matches enable row level security;
+
+   create policy "users can view own profile" on profiles
+     for select using (auth.uid() = id);
+   create policy "users can insert own profile" on profiles
+     for insert with check (auth.uid() = id);
+   create policy "users can view own saved matches" on saved_matches
+     for select using (auth.uid() = user_id);
+   create policy "users can insert own saved matches" on saved_matches
+     for insert with check (auth.uid() = user_id);
+   ```
+
+5. In **Authentication → URL Configuration**, add your Streamlit app URL
+   (e.g. `https://macromatch.streamlit.app`) to **Redirect URLs** if you later
+   add email confirmation or OAuth providers.
+
+---
+
 ## 2. Deploy the UI on Streamlit Community Cloud
 
 1. Go to <https://share.streamlit.io> and sign in with GitHub.
@@ -125,14 +175,13 @@ Swagger docs are at `https://<your-service>.onrender.com/docs`.
    ```toml
    MACROMATCH_API_URL = "https://<your-service>.onrender.com"
 
-   [auth]
-   # Cookie signing secret for streamlit-authenticator's remember-me cookie.
-   # Generate one with:  python -c "import secrets; print(secrets.token_hex(32))"
-   cookie_key = "<long-random-secret>"
+   # Supabase — get these from Project Settings → API in your Supabase dashboard
+   SUPABASE_URL = "https://<your-project-ref>.supabase.co"
+   SUPABASE_ANON_KEY = "<your-anon-key>"
    ```
 
-   The frontend reads both values via `st.secrets`. The cookie key must be set
-   here — it is intentionally never stored in the repository (see
+   The frontend reads all three values via `st.secrets`. Supabase credentials are
+   intentionally never stored in the repository (see
    `.streamlit/secrets.toml.example`). `MACROMATCH_API_URL` also accepts the
    same name as an environment variable for local/container use and falls back
    to `http://127.0.0.1:8000` when neither is set.
@@ -246,25 +295,18 @@ testable and documented, which is why it is the recommended setup.
 
 ---
 
-## 8. Limitation: ephemeral filesystem (accounts & saved matches can reset)
+## 8. Persistence note
 
-Streamlit Community Cloud does **not** give you a persistent disk. Every time
-the app redeploys or reboots, the local filesystem is reset, so:
+User accounts (Supabase Auth) and saved matches (Supabase `saved_matches`
+table) live in the cloud, so they **persist across Streamlit deployments and
+reboots**. Nothing is stored on the local filesystem anymore — `config.yaml`
+and `data/user_data.db` are no longer used.
 
-- `config.yaml` (user accounts with hashed passwords) is lost — users must
-  sign up again.
-- `data/user_data.db` (SQLite saved matches) is lost — saved history is gone.
+The only client-side caveat: Streamlit's `st.session_state` resets when the
+browser tab is closed or refreshed. The app attempts to restore the Supabase
+session from stored tokens on each run, but after a hard refresh the user may
+need to sign in again. This is normal behavior for a client-side session.
 
-This is by design in this mini project: everything stays file-based and simple
-so the code is easy to explain in a viva. If you need real persistence, the
-simple upgrade path is to replace the file-based storage with a hosted store
-still keyed by username, e.g.:
-
-- **Supabase** (free PostgreSQL tier) — `users` and `saved_matches` tables,
-  Row Level Security so each user sees only their own rows.
-- **Google Sheets** — one sheet for users, one for saved matches, appended via
-  the Sheets API.
-
-The login / logout / session-check flow in `frontend/app.py` stays exactly the
-same; only the `load_config` / `save_config` / `save_match` / `get_saved_matches`
-functions would swap files for API calls.
+If you need true "remember me" across browser sessions, enable email
+confirmation in Supabase Auth or implement OAuth (Google/GitHub) login in
+Authentication → Providers.

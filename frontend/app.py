@@ -12,18 +12,15 @@ import os
 import re
 import base64
 import json
-import sqlite3
 from datetime import datetime, timezone
 
 import streamlit as st
 import requests
 import pandas as pd
-import yaml
-from yaml.loader import SafeLoader
 from pathlib import Path
 from dotenv import load_dotenv
 
-import streamlit_authenticator as stauth  # >>> NEW: username/password auth (0.3.x API)
+from supabase import create_client, Client  # >>> NEW: Supabase client for Auth + database
 
 # Load .env (local dev). On Streamlit Community Cloud, use the app's Secrets instead.
 load_dotenv()
@@ -42,69 +39,82 @@ st.set_page_config(
 
 
 # ─────────────────────────────────────────────
-# NEW: Authentication — streamlit-authenticator (0.3.x API)
+# NEW: Supabase Authentication
+# Users live in Supabase Auth (cloud). No config.yaml, no local SQLite.
+# Session tokens are stored in st.session_state; user data persists across
+# deployments because it lives in Supabase.
 # ─────────────────────────────────────────────
-# Users are stored in config.yaml (name, username, email, bcrypt-hashed
-# password). Passwords are NEVER stored as plain text. The cookie signing
-# secret comes from st.secrets, never from this file.
-# streamlit-authenticator handles the remember-me cookie and the login form;
-# this code only calls its public methods.
-
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.yaml"
-
-DEFAULT_CONFIG = {
-    "credentials": {"usernames": {}},
-    "cookie": {"name": "macro_match_session", "expiry_days": 7},
-}
 
 
-def load_config():
-    """Read users + cookie settings from config.yaml."""
-    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        return yaml.load(f, Loader=SafeLoader)
+def get_supabase_client() -> Client:
+    """Create a Supabase client from st.secrets (Cloud) or env vars (local dev)."""
+    url = st.secrets.get("SUPABASE_URL", "") if hasattr(st, "secrets") else ""
+    key = (
+        st.secrets.get("SUPABASE_ANON_KEY", "") if hasattr(st, "secrets") else ""
+    )
+    if not url:
+        url = os.environ.get("SUPABASE_URL", "")
+    if not key:
+        key = os.environ.get("SUPABASE_ANON_KEY", "")
+    if not url or not key:
+        st.error(
+            "⚠️ Supabase is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY "
+            "to .streamlit/secrets.toml (or set them as environment variables)."
+        )
+        st.stop()
+    return create_client(url, key)
 
 
-def save_config(config):
-    """Persist config back to config.yaml. Passwords are already hashed."""
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        yaml.dump(config, f, default_flow_style=False)
+supabase: Client = get_supabase_client()
 
 
-def get_cookie_key():
-    """Cookie signing secret from st.secrets (local fallback for dev only)."""
+# Session-state keys for Supabase Auth persistence
+if "supabase_user" not in st.session_state:
+    st.session_state["supabase_user"] = None
+if "supabase_access_token" not in st.session_state:
+    st.session_state["supabase_access_token"] = None
+if "supabase_refresh_token" not in st.session_state:
+    st.session_state["supabase_refresh_token"] = None
+if "supabase_user_name" not in st.session_state:
+    st.session_state["supabase_user_name"] = None
+
+
+# Restore an existing Supabase session from stored tokens so the user stays
+# signed in across Streamlit reruns within the same browser session.
+if (
+    st.session_state["supabase_access_token"]
+    and st.session_state["supabase_refresh_token"]
+    and st.session_state["supabase_user"] is None
+):
     try:
-        return st.secrets["auth"]["cookie_key"]
+        supabase.auth.set_session(
+            st.session_state["supabase_access_token"],
+            st.session_state["supabase_refresh_token"],
+        )
+        user_response = supabase.auth.get_user()
+        if user_response and user_response.user:
+            st.session_state["supabase_user"] = user_response.user
+            profile = (
+                supabase.table("profiles")
+                .select("name")
+                .eq("id", user_response.user.id)
+                .single()
+                .execute()
+            )
+            if profile.data:
+                st.session_state["supabase_user_name"] = profile.data["name"]
     except Exception:
-        # Local development only. Deployments MUST set [auth] cookie_key in secrets.
-        return "dev-only-cookie-key-please-set-in-secrets"
-
-
-# Create config.yaml on first run (it is git-ignored; real user data is never
-# committed to the repository).
-if not CONFIG_PATH.exists():
-    save_config(dict(DEFAULT_CONFIG))
-
-config = load_config()
-
-authenticator = stauth.Authenticate(
-    config["credentials"],
-    config.get("cookie", {}).get("name", "macro_match_session"),
-    get_cookie_key(),
-    int(config.get("cookie", {}).get("expiry_days", 7)),
-    config.get("preauthorized") or {},
-)
-
-# Make sure the session-state key exists before anything reads it.
-if "authentication_status" not in st.session_state:
-    st.session_state["authentication_status"] = None
+        # Tokens expired or invalid — clear them so the user can sign in again.
+        st.session_state["supabase_access_token"] = None
+        st.session_state["supabase_refresh_token"] = None
 
 
 # ─────────────────────────────────────────────
-# NEW: Landing screen — "Sign in" / "Sign up" tabs
+# NEW: Landing screen — "Sign in" / "Sign up" tabs (Supabase Auth)
 # Shown ONLY when the user is not logged in; everything below this point runs
 # for logged-in users only.
 # ─────────────────────────────────────────────
-if st.session_state["authentication_status"] is not True:
+if st.session_state["supabase_user"] is None:
     st.markdown("## 🔐 Welcome to MacroMatch")
     st.caption("Sign in to continue, or create a new account below.")
     tab_sign_in, tab_sign_up = st.tabs(["🔐 Sign in", "📝 Sign up"])
@@ -112,18 +122,48 @@ if st.session_state["authentication_status"] is not True:
     # ─── Sign in tab ───
     with tab_sign_in:
         st.subheader("Sign in")
-        # streamlit-authenticator 0.3.x: login(location='main', ...)
-        # Returns (name, authentication_status, username). A valid remember-me
-        # cookie (7-day expiry, set in the constructor above) signs the user
-        # in silently. Mirror the result into st.session_state, which the
-        # guard above checks before showing any app content.
-        _name, _auth_status, _username = authenticator.login("main")
-        if _auth_status is not None:
-            st.session_state["authentication_status"] = _auth_status
-            st.session_state["name"] = _name
-            st.session_state["username"] = _username
-        if st.session_state["authentication_status"] is False:
-            st.error("❌ Wrong username or password. Please try again.")
+        with st.form("sign_in_form", clear_on_submit=True):
+            email = st.text_input("Email address")
+            password = st.text_input("Password", type="password")
+            sign_in_btn = st.form_submit_button("Sign in", type="primary")
+
+        if sign_in_btn:
+            if not email or not password:
+                st.error("Please enter both email and password.")
+            else:
+                with st.spinner("Signing in…"):
+                    try:
+                        response = supabase.auth.sign_in_with_password(
+                            {"email": email, "password": password}
+                        )
+                        if response.user:
+                            session = response.session
+                            st.session_state["supabase_user"] = response.user
+                            st.session_state["supabase_access_token"] = (
+                                session.access_token if session else None
+                            )
+                            st.session_state["supabase_refresh_token"] = (
+                                session.refresh_token if session else None
+                            )
+                            # Fetch and cache the display name
+                            profile = (
+                                supabase.table("profiles")
+                                .select("name")
+                                .eq("id", response.user.id)
+                                .single()
+                                .execute()
+                            )
+                            st.session_state["supabase_user_name"] = (
+                                profile.data["name"] if profile.data else response.user.email
+                            )
+                            st.success("✅ Signed in successfully!")
+                            st.rerun()
+                        else:
+                            st.error(
+                                "❌ Sign in failed. Please check your credentials."
+                            )
+                    except Exception as exc:
+                        st.error(f"❌ Sign in error: {exc}")
 
     # ─── Sign up tab ───
     with tab_sign_up:
@@ -131,7 +171,6 @@ if st.session_state["authentication_status"] is not True:
         with st.form("sign_up_form"):  # keep filled fields if validation fails
             new_name = st.text_input("Full name")
             new_email = st.text_input("Email address")
-            new_user = st.text_input("Username")
             new_pw = st.text_input(
                 "Password", type="password", help="At least 6 characters"
             )
@@ -141,7 +180,7 @@ if st.session_state["authentication_status"] is not True:
         if create_btn:
             # Basic validation before anything is saved.
             problems = []
-            if not new_name or not new_email or not new_user or not new_pw or not new_pw2:
+            if not new_name or not new_email or not new_pw or not new_pw2:
                 problems.append("Please fill in every field.")
             elif not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", new_email or ""):
                 problems.append("Please enter a valid email address.")
@@ -149,115 +188,86 @@ if st.session_state["authentication_status"] is not True:
                 problems.append("Password must be at least 6 characters long.")
             elif new_pw != new_pw2:
                 problems.append("Passwords do not match.")
-            elif new_user in config["credentials"]["usernames"]:
-                problems.append("Username already exists — choose another one.")
 
             if problems:
                 for p in problems:
                     st.error(p)
             else:
-                # Hash the password with bcrypt (via streamlit-authenticator).
-                # Never store or log the plain-text password.
-                hashed_pw = stauth.Hasher([new_pw]).generate()[0]
-                config["credentials"]["usernames"][new_user] = {
-                    "name": new_name,
-                    "email": new_email,
-                    "password": hashed_pw,
-                }
-                save_config(config)  # persist the new user to config.yaml
-                st.success("✅ Account created! Go to the 'Sign in' tab to log in.")
-                st.rerun()  # restart so the new user can sign in immediately
+                with st.spinner("Creating account…"):
+                    try:
+                        response = supabase.auth.sign_up(
+                            {"email": new_email, "password": new_pw}
+                        )
+                        if response.user:
+                            # Create a profile row linked to the auth user
+                            supabase.table("profiles").insert(
+                                {
+                                    "id": response.user.id,
+                                    "email": new_email,
+                                    "name": new_name,
+                                }
+                            ).execute()
+                            st.session_state["supabase_user"] = response.user
+                            st.session_state["supabase_user_name"] = new_name
+                            if response.session:
+                                st.session_state["supabase_access_token"] = (
+                                    response.session.access_token
+                                )
+                                st.session_state["supabase_refresh_token"] = (
+                                    response.session.refresh_token
+                                )
+                            st.success(
+                                "✅ Account created! You are now signed in."
+                            )
+                            st.rerun()
+                        else:
+                            st.error(
+                                "❌ Sign up failed. The email may already be registered."
+                            )
+                    except Exception as exc:
+                        st.error(f"❌ Sign up error: {exc}")
 
-# A valid remember-me cookie may have just authenticated the user.
-if st.session_state["authentication_status"] is not True:
+# If still not authenticated after the landing screen, stop here.
+if st.session_state["supabase_user"] is None:
     st.stop()
 
 
 # ─────────────────────────────────────────────
-# NEW: Per-user SQLite storage (saved matches)
-# Requirement 7: data is keyed by username; each user sees only their own rows.
+# NEW: Supabase-backed saved matches (replaces local SQLite)
+# Each user sees only their own data; stored in Supabase so it persists
+# across deployments. RLS (Row Level Security) should be enabled on this
+# table so users can only read/write their own rows.
 # ─────────────────────────────────────────────
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "user_data.db"
+CURRENT_USER_ID = st.session_state["supabase_user"].id
+CURRENT_USER_EMAIL = st.session_state["supabase_user"].email or ""
 
 
-def init_db():
-    """Create the saved_matches table if it does not exist yet."""
-    conn = sqlite3.connect(DB_PATH)
-    try:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS saved_matches (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
-                product TEXT NOT NULL,
-                city TEXT NOT NULL,
-                diet_rules TEXT NOT NULL,
-                allergens TEXT NOT NULL,
-                priority TEXT NOT NULL,
-                alternatives TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_saved_matches_username "
-            "ON saved_matches(username)"
-        )
-        conn.commit()
-    finally:
-        conn.close()
+def save_match(user_id, product, city, diet_rules, allergens, priority, alternatives):
+    """Insert one saved match for the given Supabase user id."""
+    supabase.table("saved_matches").insert(
+        {
+            "user_id": user_id,
+            "product": product,
+            "city": city,
+            "diet_rules": diet_rules,
+            "allergens": allergens,
+            "priority": priority,
+            "alternatives": alternatives,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).execute()
 
 
-def save_match(username, product, city, diet_rules, allergens, priority, alternatives):
-    """Insert one saved match for the given username."""
-    conn = sqlite3.connect(DB_PATH)
-    try:
-        conn.execute(
-            "INSERT INTO saved_matches "
-            "(username, product, city, diet_rules, allergens, priority, alternatives, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                username,
-                product,
-                city,
-                json.dumps(diet_rules),
-                json.dumps(allergens),
-                priority,
-                json.dumps(alternatives),
-                datetime.now(timezone.utc).isoformat(),
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def get_saved_matches(username):
-    """Return saved matches for ONE username only — other users' rows are hidden."""
-    conn = sqlite3.connect(DB_PATH)
-    try:
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT * FROM saved_matches WHERE username = ? ORDER BY created_at DESC",
-            (username,),
-        ).fetchall()
-        return [dict(row) for row in rows]
-    finally:
-        conn.close()
-
-
-# Create the table on first run.
-init_db()
-
-
-# ⚠️ LIMITATION (requirement 10): Streamlit Community Cloud has an ephemeral
-# filesystem. config.yaml (users) and data/user_data.db (saved matches) are
-# local files, so they reset whenever the app redeploys or reboots — accounts
-# and saved matches can disappear. Optional production fix: replace this
-# file-based storage with Supabase (PostgreSQL) or Google Sheets, still keyed
-# by username. The login / logout / session-check flow stays the same; only the
-# storage layer changes. Kept simple here because this is a mini project.
-# ─────────────────────────────────────────────
+def get_saved_matches(user_id):
+    """Return saved matches for ONE user only — other users' rows are hidden by RLS."""
+    result = (
+        supabase.table("saved_matches")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return result.data or []
 
 # ─────────────────────────────────────────────
 # Constants
@@ -1752,14 +1762,24 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # ─── NEW: signed-in welcome + sign out (authentication) ─────────
-    st.success(f"Welcome, {st.session_state['name']}")
-    authenticator.logout("Sign out", "main")
+    # ─── NEW: signed-in welcome + sign out (Supabase Auth) ─────────
+    _user_name = st.session_state.get("supabase_user_name", CURRENT_USER_EMAIL)
+    st.success(f"Welcome, {_user_name} ({CURRENT_USER_EMAIL})")
+    if st.button("🚪 Sign out", key="supabase_sign_out"):
+        try:
+            supabase.auth.sign_out()
+        except Exception:
+            pass
+        st.session_state["supabase_user"] = None
+        st.session_state["supabase_access_token"] = None
+        st.session_state["supabase_refresh_token"] = None
+        st.session_state["supabase_user_name"] = None
+        st.rerun()
     st.mark('<hr class="section-divider">', unsafe_allow_html=True)
 
-    # ─── NEW: per-user saved matches history (SQLite, username-keyed) ──
+    # ─── NEW: per-user saved matches history (Supabase, user_id-keyed) ──
     with st.expander("🕘 My saved matches", expanded=False):
-        _matches = get_saved_matches(st.session_state["username"])
+        _matches = get_saved_matches(CURRENT_USER_ID)
         if not _matches:
             st.caption("No saved matches yet — save a result below.")
         else:
@@ -1989,10 +2009,10 @@ summary_html = (
 )
 st.markdown(summary_html, unsafe_allow_html=True)
 
-# ─── NEW: save the current match to the logged-in user's history ────────
+# ─── NEW: save the current match to the logged-in user's history (Supabase) ─
 if st.button("💾 Save this match to my history", key="save_match_to_history"):
     save_match(
-        st.session_state["username"],
+        CURRENT_USER_ID,
         selected_product,
         selected_city,
         selected_diets,

@@ -10,7 +10,5 @@ httpx>=0.27.0
 requests>=2.32.0
 pytest>=8.0.0
 
-# >>> NEW: username/password authentication (streamlit-authenticator 0.3.x)
-# Includes bcrypt (password hashing) and PyYAML (config.yaml) as dependencies.
-streamlit-authenticator>=0.3.0
-pyyaml
+# >>> NEW: Supabase Authentication + database
+supabase>=2.0.0
