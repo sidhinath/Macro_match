@@ -2186,15 +2186,23 @@ h1, h2, h3, .stHeading {
     }
 }
 
-/* ── Hero header ── */
+/* ── Hero header — one centered flex column (mobile-safe) ── */
 .hero-block {
-    text-align: center;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box !important;
     padding: 0.4rem 1rem 0.6rem;
 }
-.hero-brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.75rem;
+.hero-block .logo-pill {
+    flex-shrink: 0;
+    padding: 8px 14px !important;
+    border-radius: 14px !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
 }
 .hero-logo {
     height: 2.7rem;
@@ -2893,14 +2901,35 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
 
 /* Lightweight mobile layout — no backdrop blur, tighter spacing. */
 @media (max-width: 768px) {
+    /* Keep the fixed ☰ Menu button from covering the centered brand header. */
+    section.main > div[data-testid="stMainBlockContainer"],
+    .block-container {
+        padding-top: 3.6rem !important;
+    }
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
         padding: 0.85rem !important;
         border-radius: 14px !important;
     }
-    /* The search card is the first thing mobile users see. */
-    .hero-block,
+    .hero-block {
+        padding: 0.35rem 0.75rem 0.55rem !important;
+    }
+    .hero-block .logo-pill {
+        padding: 7px 12px !important;
+        border-radius: 14px !important;
+    }
+    .hero-logo {
+        height: 2.4rem !important;
+    }
+    .hero-title {
+        font-size: 2rem !important;
+        letter-spacing: -0.02em !important;
+    }
+    .hero-tagline {
+        font-size: 0.9rem !important;
+        margin-top: 0.3rem !important;
+    }
     .hero-divider {
-        display: none !important;
+        margin: 0.5rem 0 !important;
     }
     .steps { grid-template-columns: 1fr !important; }
 }
@@ -3270,12 +3299,10 @@ def call_api(payload: dict) -> requests.Response | None:
 # ─────────────────────────────────────────────
 st.markdown(f"""
 <div class="hero-block">
-    <div class="hero-brand">
-        <span class="logo-pill">
-            <img src="{LOGO_SRC}" alt="MacroMatch logo" class="hero-logo">
-        </span>
-        <div class="hero-title">MacroMatch</div>
-    </div>
+    <span class="logo-pill">
+        <img src="{LOGO_SRC}" alt="MacroMatch logo" class="hero-logo">
+    </span>
+    <div class="hero-title">MacroMatch</div>
     <div class="hero-tagline">Your macros, anywhere.</div>
 </div>
 """, unsafe_allow_html=True)
