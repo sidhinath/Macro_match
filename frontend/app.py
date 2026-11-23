@@ -3354,6 +3354,47 @@ def call_api(payload: dict) -> requests.Response | None:
         return None
 
 
+def render_how_it_works() -> None:
+    """Collapsible footer guide — the original 3-step card, unchanged inside."""
+    with st.expander("ℹ️ How MacroMatch Works — 3 simple steps", expanded=False):
+        # Built as one unindented HTML string: Markdown ends an HTML block at
+        # the first blank line and would turn any indented remainder into code.
+        steps = [
+            ("1", "Choose your usual product",
+             "Pick from 30 everyday foods — paneer, oats, whey, tofu, dals and more."),
+            ("2", "Set the destination",
+             "14 cities, from Delhi and Mumbai to Jaipur, Kolkata and Kochi."),
+            ("3", "Filter and prioritise",
+             "Add vegan, gluten-free or keto rules, exclude allergens, and pick what matters most."),
+        ]
+        steps_html = "".join(
+            f'<div class="step"><div class="step-num">{n}</div>'
+            f"<h3>{title}</h3><p>{body}</p></div>"
+            for n, title, body in steps
+        )
+        facts_html = "".join(
+            f"<span>{fact}</span>"
+            for fact in ("30 products", "14 cities", "3 ranked matches",
+                         "Diet &amp; allergen aware")
+        )
+        st.markdown(
+            '<div class="landing">'
+            '<div class="landing-eyebrow">Ready when you are</div>'
+            '<div class="landing-title">Three local swaps, ranked by your macros.</div>'
+            '<p class="landing-sub">Tell MacroMatch what you normally eat, where you '
+            "are going, and what to avoid. It compares protein, carbs, fat, fibre and "
+            "calories, applies your diet and allergy rules, then explains each pick "
+            "in plain language.</p>"
+            f'<div class="steps">{steps_html}</div>'
+            '<div class="landing-cta"><span class="arrow">&larr;</span>'
+            "<span>Use the search card above, then hit <strong>Find Alternatives</strong>."
+            "</span></div>"
+            f'<div class="landing-facts">{facts_html}</div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+
 # ─────────────────────────────────────────────
 # Hero header
 # ─────────────────────────────────────────────
@@ -3719,43 +3760,8 @@ with st.container(border=True):
 selected_detail = product_details.get(selected_product)
 
 if not find_btn:
-    # Built as one unindented HTML string: Markdown ends an HTML block at the
-    # first blank line and would turn any indented remainder into a code block.
-    steps = [
-        ("1", "Choose your usual product",
-         "Pick from 30 everyday foods — paneer, oats, whey, tofu, dals and more."),
-        ("2", "Set the destination",
-         "14 cities, from Delhi and Mumbai to Jaipur, Kolkata and Kochi."),
-        ("3", "Filter and prioritise",
-         "Add vegan, gluten-free or keto rules, exclude allergens, and pick what matters most."),
-    ]
-    steps_html = "".join(
-        f'<div class="step"><div class="step-num">{n}</div>'
-        f"<h3>{title}</h3><p>{body}</p></div>"
-        for n, title, body in steps
-    )
-    facts_html = "".join(
-        f"<span>{fact}</span>"
-        for fact in ("30 products", "14 cities", "3 ranked matches",
-                     "Diet &amp; allergen aware")
-    )
-    st.markdown(
-        '<div class="landing">'
-        '<div class="landing-eyebrow">Ready when you are</div>'
-        '<div class="landing-title">Three local swaps, ranked by your macros.</div>'
-        '<p class="landing-sub">Tell MacroMatch what you normally eat, where you '
-        "are going, and what to avoid. It compares protein, carbs, fat, fibre and "
-        "calories, applies your diet and allergy rules, then explains each pick "
-        "in plain language.</p>"
-        f'<div class="steps">{steps_html}</div>'
-        '<div class="landing-cta"><span class="arrow">&larr;</span>'
-        "<span>Use the search card above, then hit <strong>Find Alternatives</strong>."
-        "</span></div>"
-        f'<div class="landing-facts">{facts_html}</div>'
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
+    # The 3-step guide now lives in a collapsed footer expander; nothing sits
+    # between the search card and the results/preview anymore.
     if selected_detail:
         st.markdown("### 🥗 Your Regular Food")
         render_product_spotlight(
@@ -3765,6 +3771,7 @@ if not find_btn:
         )
         st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
+    render_how_it_works()
     st.stop()
 
 
@@ -4180,3 +4187,4 @@ with st.container(border=True):
                 st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
 st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+render_how_it_works()
