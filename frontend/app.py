@@ -1798,6 +1798,50 @@ def _sync_city_selection(canonical: str, search_value: str | None = None) -> Non
     st.session_state["city_search_input"] = search_value or canonical
 
 
+def select_food_callback(widget_key: str) -> None:
+    """Pill callback: sync food state before the widget's own single rerun."""
+    picked = st.session_state.get(widget_key)
+    if not picked:
+        return
+    display_label = str(picked)
+    canonical = _canonical_value(display_label, PRODUCT_DISPLAY_ALIASES)
+    if canonical == st.session_state.get("selected_product"):
+        return
+    was_showing_results = st.session_state.get("show_swaps_results", False)
+    _sync_food_selection(canonical, display_label)
+    _reset_swaps_view()
+    # Only remount the searchbox when its visible text must change.
+    st.session_state["food_box_ver"] = st.session_state.get("food_box_ver", 0) + 1
+    # The outer results view needs a full pass; home-view taps stay fragment-only.
+    if was_showing_results:
+        st.rerun()
+
+
+def select_food_value_callback(product: str) -> None:
+    """Sidebar guide `on_click` callback for an explicitly named product."""
+    if not product:
+        return
+    was_showing_results = st.session_state.get("show_swaps_results", False)
+    _sync_food_selection(product, product)
+    _reset_swaps_view()
+    st.session_state["food_box_ver"] = st.session_state.get("food_box_ver", 0) + 1
+    if was_showing_results:
+        st.rerun()
+
+
+def select_city_callback(widget_key: str) -> None:
+    """Pill callback: sync city state before the widget's own single rerun."""
+    picked = st.session_state.get(widget_key)
+    if not picked:
+        return
+    display_label = str(picked)
+    canonical = _canonical_value(display_label, CITY_DISPLAY_ALIASES)
+    if canonical == st.session_state.get("selected_city"):
+        return
+    _sync_city_selection(canonical, display_label)
+    st.session_state["city_box_ver"] = st.session_state.get("city_box_ver", 0) + 1
+
+
 PRODUCT_EMOJI = {
     "Whey Protein Powder": "🥤",
     "Pea Protein Powder": "🥤",
@@ -3901,20 +3945,18 @@ def render_product_guide(details: dict[str, dict]) -> None:
                 "</div>",
                 unsafe_allow_html=True,
             )
-            if st.button(
+            # Callback updates every state key before the button's single
+            # rerun, so the chosen food appears immediately in the search box.
+            # On mobile, the injected parent-document listener collapses the
+            # sidebar as soon as this widget is clicked.
+            st.button(
                 "Select",
                 key=f"guide_select_{item_name}",
                 use_container_width=True,
                 type="secondary",
-            ):
-                # Updating both keys before the rerun makes the chosen food
-                # appear in the main search box and the active-selection badge.
-                # On mobile, the injected parent-document listener collapses
-                # the sidebar immediately after this widget is clicked.
-                _sync_food_selection(item_name)
-                _reset_swaps_view()
-                st.session_state["food_box_ver"] += 1
-                st.rerun()
+                on_click=select_food_value_callback,
+                args=(item_name,),
+            )
 
     st.caption(
         "Product photos: Wikipedia / Wikimedia Commons — "
@@ -4223,8 +4265,11 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
             st.session_state["selected_product"] = canonical_food
             if canonical_food != selected_product:
                 _sync_food_selection(canonical_food, selected_food)
-                _reset_swaps_view()
-                st.rerun()
+                # A full pass is only needed to dismiss the outer swaps view;
+                # on home the fragment rerun triggered by st_searchbox is enough.
+                if st.session_state.get("show_swaps_results"):
+                    _reset_swaps_view()
+                    st.rerun()
 
     selected_product = st.session_state["selected_product"]
     st.session_state["product_select"] = selected_product
@@ -4242,7 +4287,6 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
     ]
     if product_pairs:
         product_display_options = [label for label, _ in product_pairs]
-        product_canonical_by_display = dict(product_pairs)
         _current_product_display = _display_label(
             selected_product,
             PRODUCT_DISPLAY_ALIASES,
@@ -4250,39 +4294,31 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         )
         if _current_product_display not in product_display_options:
             _current_product_display = None
-        product_pick = st.pills(
+        st.pills(
             "Quick food picks",
             options=product_display_options,
             selection_mode="single",
             default=_current_product_display,
             label_visibility="collapsed",
+            key="quick_food_pills",
+            on_change=select_food_callback,
+            args=("quick_food_pills",),
         )
-        if product_pick:
-            picked_product = product_canonical_by_display[product_pick]
-            if picked_product != selected_product:
-                selected_product = picked_product
-                _sync_food_selection(selected_product, product_pick)
-                _reset_swaps_view()
-                st.session_state["food_box_ver"] += 1
-                st.rerun()
 
     with st.expander(
         f"📋 Browse all available foods ({len(all_foods)} items)", expanded=False
     ):
         _all_food_default = selected_product if selected_product in all_foods else None
-        all_food_pick = st.pills(
+        st.pills(
             "All foods",
             options=all_foods,
             selection_mode="single",
             default=_all_food_default,
             label_visibility="collapsed",
+            key="all_food_pills",
+            on_change=select_food_callback,
+            args=("all_food_pills",),
         )
-        if all_food_pick and all_food_pick != selected_product:
-            selected_product = all_food_pick
-            _sync_food_selection(selected_product)
-            _reset_swaps_view()
-            st.session_state["food_box_ver"] += 1
-            st.rerun()
 
     # ── City ────────────────────────────────────────────────────────────
     st.markdown(
@@ -4321,7 +4357,6 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
             st.session_state["selected_city"] = canonical_city
             if canonical_city != selected_city:
                 _sync_city_selection(canonical_city, selected_city_value)
-                st.rerun(scope="fragment")
 
     selected_city = st.session_state["selected_city"]
     st.session_state["city_select"] = selected_city
@@ -4338,7 +4373,6 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
             city_pairs.append((label, canonical))
     if city_pairs:
         city_display_options = [label for label, _ in city_pairs]
-        city_canonical_by_display = dict(city_pairs)
         _current_city_display = _display_label(
             selected_city,
             CITY_DISPLAY_ALIASES,
@@ -4346,37 +4380,31 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         )
         if _current_city_display not in city_display_options:
             _current_city_display = None
-        city_pick = st.pills(
+        st.pills(
             "Quick city picks",
             options=city_display_options,
             selection_mode="single",
             default=_current_city_display,
             label_visibility="collapsed",
+            key="quick_city_pills",
+            on_change=select_city_callback,
+            args=("quick_city_pills",),
         )
-        if city_pick:
-            picked_city = city_canonical_by_display[city_pick]
-            if picked_city != selected_city:
-                selected_city = picked_city
-                _sync_city_selection(selected_city, city_pick)
-                st.session_state["city_box_ver"] += 1
-                st.rerun(scope="fragment")
 
     with st.expander(
         f"📍 Browse all available cities ({len(all_cities)} cities)", expanded=False
     ):
         _all_city_default = selected_city if selected_city in all_cities else None
-        all_city_pick = st.pills(
+        st.pills(
             "All cities",
             options=all_cities,
             selection_mode="single",
             default=_all_city_default,
             label_visibility="collapsed",
+            key="all_city_pills",
+            on_change=select_city_callback,
+            args=("all_city_pills",),
         )
-        if all_city_pick and all_city_pick != selected_city:
-            selected_city = all_city_pick
-            _sync_city_selection(selected_city)
-            st.session_state["city_box_ver"] += 1
-            st.rerun(scope="fragment")
 
 
 # ─────────────────────────────────────────────
