@@ -376,10 +376,12 @@ if show_auth_ui:
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
         transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease !important;
     }
-    [data-testid="stSidebarCollapsedControl"]:hover,
-    [data-testid="collapsedControl"]:hover {
-        background-color: #21262D !important;
-        border-color: #2EA043 !important;
+    @media (hover: hover) {
+        [data-testid="stSidebarCollapsedControl"]:hover,
+        [data-testid="collapsedControl"]:hover {
+            background-color: #21262D !important;
+            border-color: #2EA043 !important;
+        }
     }
     [data-testid="stSidebarCollapsedControl"] svg,
     [data-testid="collapsedControl"] svg {
@@ -546,12 +548,14 @@ if show_auth_ui:
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
         transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease !important;
     }
-    div[data-testid="stVerticalBlockElement"]:has(.auth-google-slot) + div[data-testid="stVerticalBlockElement"] button:hover {
-        transform: translateY(-1px) !important;
-        color: #FFFFFF !important;
-        background: rgba(46, 160, 67, 0.12) !important;
-        border-color: rgba(126, 226, 168, 0.5) !important;
-        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3), 0 0 20px rgba(46, 160, 67, 0.16) !important;
+    @media (hover: hover) {
+        div[data-testid="stVerticalBlockElement"]:has(.auth-google-slot) + div[data-testid="stVerticalBlockElement"] button:hover {
+            transform: translateY(-1px) !important;
+            color: #FFFFFF !important;
+            background: rgba(46, 160, 67, 0.12) !important;
+            border-color: rgba(126, 226, 168, 0.5) !important;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3), 0 0 20px rgba(46, 160, 67, 0.16) !important;
+        }
     }
 
     .auth-divider {
@@ -597,9 +601,11 @@ if show_auth_ui:
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
         transition: background-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease !important;
     }
-    .stTabs button[data-baseweb="tab"]:hover {
-        color: #E2E8F0 !important;
-        background: rgba(148, 163, 184, 0.12) !important;
+    @media (hover: hover) {
+        .stTabs button[data-baseweb="tab"]:hover {
+            color: #E2E8F0 !important;
+            background: rgba(148, 163, 184, 0.12) !important;
+        }
     }
     .stTabs button[data-baseweb="tab"][aria-selected="true"] {
         color: #FFFFFF !important;
@@ -677,11 +683,13 @@ if show_auth_ui:
         box-shadow: 0 12px 28px rgba(46, 160, 67, 0.28), 0 0 20px rgba(46, 160, 67, 0.16) !important;
         transition: transform 0.18s ease, box-shadow 0.18s ease !important;
     }
-    div.stButton > button[kind="primary"]:hover,
-    html body button[kind="primary"]:hover,
-    html body .stFormSubmitButton button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 16px 34px rgba(46, 160, 67, 0.36), 0 0 26px rgba(46, 160, 67, 0.22) !important;
+    @media (hover: hover) {
+        div.stButton > button[kind="primary"]:hover,
+        html body button[kind="primary"]:hover,
+        html body .stFormSubmitButton button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 16px 34px rgba(46, 160, 67, 0.36), 0 0 26px rgba(46, 160, 67, 0.22) !important;
+        }
     }
     div.stButton > button[kind="primary"]:active,
     html body button[kind="primary"]:active,
@@ -703,12 +711,14 @@ if show_auth_ui:
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
         transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease !important;
     }
-    div[data-testid="column"]:has(.auth-brand) button[kind="secondary"]:hover,
-    div[data-testid="column"]:has(.auth-brand) button:not([kind="primary"]):hover {
-        color: #F8FAFC !important;
-        background: rgba(46, 160, 67, 0.12) !important;
-        border-color: rgba(126, 226, 168, 0.42) !important;
-        text-decoration: none !important;
+    @media (hover: hover) {
+        div[data-testid="column"]:has(.auth-brand) button[kind="secondary"]:hover,
+        div[data-testid="column"]:has(.auth-brand) button:not([kind="primary"]):hover {
+            color: #F8FAFC !important;
+            background: rgba(46, 160, 67, 0.12) !important;
+            border-color: rgba(126, 226, 168, 0.42) !important;
+            text-decoration: none !important;
+        }
     }
 
     /* Forgot Password / Reset Password: modern link pills, left + right. */
@@ -724,12 +734,14 @@ if show_auth_ui:
         font-weight: 600 !important;
         box-shadow: none !important;
     }
-    div[data-testid="stVerticalBlockElement"]:has(.auth-recovery-slot) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] button:hover {
-        color: #7EE2A8 !important;
-        background: transparent !important;
-        border: none !important;
-        text-decoration: underline !important;
-        text-underline-offset: 4px !important;
+    @media (hover: hover) {
+        div[data-testid="stVerticalBlockElement"]:has(.auth-recovery-slot) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] button:hover {
+            color: #7EE2A8 !important;
+            background: transparent !important;
+            border: none !important;
+            text-decoration: underline !important;
+            text-underline-offset: 4px !important;
+        }
     }
     div[data-testid="stVerticalBlockElement"]:has(.auth-recovery-slot) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-of-type(2) {
         text-align: right !important;
@@ -805,6 +817,14 @@ if show_auth_ui:
         div[data-testid="column"]:has(.auth-brand) {
             flex: 0 0 min(560px, calc(100% - 1rem)) !important;
             width: min(560px, calc(100% - 1rem)) !important;
+        }
+    }
+    /* Mobile GPUs: solid surface instead of an expensive backdrop blur. */
+    @media (max-width: 768px) {
+        div[data-testid="column"]:has(.auth-brand) {
+            -webkit-backdrop-filter: none !important;
+            backdrop-filter: none !important;
+            background: rgba(9, 14, 24, 0.96) !important;
         }
     }
     @media (max-width: 600px) {
@@ -1266,6 +1286,9 @@ def load_saved_match(match):
     allergens = list(match.get("allergens") or [])
     priority = match.get("priority") or "balanced"
 
+    st.session_state["selected_product"] = product
+    st.session_state["selected_city"] = city
+    # Legacy aliases kept so older saved-state keys stay in sync.
     st.session_state["product_select"] = product
     st.session_state["city_select"] = city
     st.session_state["diet_pills"] = [DIET_LABELS[d] for d in diets if d in DIET_LABELS]
@@ -1348,11 +1371,52 @@ API_BASE         = _resolve_api_base()
 GET_TIMEOUT      = 90   # seconds; Render's free tier can need 30-60 s to wake from sleep
 POST_TIMEOUT     = 90   # seconds; includes the optional Claude call
 CITIES_FALLBACK   = ["Delhi", "Mumbai", "Bangalore", "Dehradun", "Pune"]
+
+# Touch-friendly quick picks. Display labels are mapped back to the exact
+# dataset/API names so the matching backend keeps receiving valid values.
+POPULAR_PRODUCTS = [
+    "Almond Butter", "Peanut Butter", "Paneer", "Greek Yogurt", "Oats", "Whey Protein",
+]
+POPULAR_CITIES = [
+    "Delhi", "Mumbai", "Bengaluru", "Greater Noida", "Hyderabad", "Pune",
+]
+PRODUCT_DISPLAY_ALIASES = {
+    "Oats": "Rolled Oats",
+    "Whey Protein": "Whey Protein Powder",
+}
+CITY_DISPLAY_ALIASES = {
+    "Bengaluru": "Bangalore",
+    "Greater Noida": "Delhi",
+}
+
 DIET_OPTIONS    = ["vegetarian", "vegan", "dairy_free", "gluten_free", "keto", "low_sugar"]
 ALLERGEN_OPTIONS= ["soy", "nuts", "dairy"]
 MACRO_COLS      = ["protein", "carbs", "fat", "fiber", "calories"]
 
 PRODUCT_IMAGE_DIR = Path(__file__).resolve().parent.parent / "assets" / "products"
+
+# Single source of truth for the touch UI. These keys are never cleared by a
+# filter change, so a mobile user's food/city survives quick reruns.
+if "selected_product" not in st.session_state:
+    st.session_state["selected_product"] = "Almond Butter"
+if "selected_city" not in st.session_state:
+    st.session_state["selected_city"] = "Delhi"
+
+
+def _canonical_value(label: str, aliases: dict[str, str]) -> str:
+    """Turn a friendly pill label into the exact value the backend expects."""
+    return aliases.get(label, label)
+
+
+def _display_label(value: str, aliases: dict[str, str], options: list[str]) -> str:
+    """Pick the pill label for a stored value, preferring the real value itself."""
+    if value in options:
+        return value
+    for label, canonical in aliases.items():
+        if canonical == value:
+            return label
+    return value
+
 
 PRODUCT_EMOJI = {
     "Whey Protein Powder": "🥤",
@@ -1859,10 +1923,12 @@ button[data-testid="collapsedControl"],
     transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease !important;
 }
 
-[data-testid="stSidebarCollapsedControl"]:hover,
-[data-testid="collapsedControl"]:hover {
-    background-color: #21262D !important;
-    border-color: #2EA043 !important;
+@media (hover: hover) {
+    [data-testid="stSidebarCollapsedControl"]:hover,
+    [data-testid="collapsedControl"]:hover {
+        background-color: #21262D !important;
+        border-color: #2EA043 !important;
+    }
 }
 
 /* Hide the native chevron in BOTH DOM shapes. */
@@ -2052,10 +2118,15 @@ h1, h2, h3, .stHeading {
     text-decoration: none !important;
     word-break: break-all;
 }
-.sidebar-welcome a,
-.sidebar-welcome a:hover {
+.sidebar-welcome a {
     color: inherit !important;
     text-decoration: none !important;
+}
+@media (hover: hover) {
+    .sidebar-welcome a:hover {
+        color: inherit !important;
+        text-decoration: none !important;
+    }
 }
 /* Consistent spacing / clean borders for sidebar sections */
 [data-testid="stSidebar"] .stMarkdown h2 {
@@ -2083,9 +2154,11 @@ h1, h2, h3, .stHeading {
     background-color: rgba(22, 27, 34, 0.9) !important;
     color: var(--text-body) !important;
 }
-[data-testid="stSidebar"] div[data-testid="stExpander"] button:hover {
-    background-color: #21262D !important;
-    border-color: #2EA043 !important;
+@media (hover: hover) {
+    [data-testid="stSidebar"] div[data-testid="stExpander"] button:hover {
+        background-color: #21262D !important;
+        border-color: #2EA043 !important;
+    }
 }
 
 /* ── Hero header ── */
@@ -2143,14 +2216,17 @@ button[kind="primary"] p {
     transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease !important;
     box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
 }
-.stButton > button[kind="primary"]:hover,
-.stButton > button[data-testid="stBaseButton-primary"]:hover,
-button[kind="primary"]:hover,
-button[kind="primary"] p:hover {
-    background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
-    color: #FFFFFF !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.5) !important;
+/* Touch devices must get a clean first tap: hover effects are desktop-only. */
+@media (hover: hover) {
+    .stButton > button[kind="primary"]:hover,
+    .stButton > button[data-testid="stBaseButton-primary"]:hover,
+    button[kind="primary"]:hover,
+    button[kind="primary"] p:hover {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+        color: #FFFFFF !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 6px 18px rgba(16, 185, 129, 0.5) !important;
+    }
 }
 
 /* ── Section divider ── */
@@ -2169,10 +2245,12 @@ button[kind="primary"] p:hover {
     margin-bottom: 1rem;
     transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
 }
-.result-card:hover {
-    transform: translateY(-3px);
-    border-color: var(--border-hover);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+@media (hover: hover) {
+    .result-card:hover {
+        transform: translateY(-3px);
+        border-color: var(--border-hover);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
 }
 
 /* ── Product images — fixed aspect ratio ── */
@@ -2361,9 +2439,11 @@ button[kind="primary"] p:hover {
     padding: 0.75rem 0.7rem 0.8rem;
     transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
 }
-.step:hover {
-    border-color: rgba(255, 255, 255, 0.18);
-    transform: translateY(-2px);
+@media (hover: hover) {
+    .step:hover {
+        border-color: rgba(255, 255, 255, 0.18);
+        transform: translateY(-2px);
+    }
 }
 .step-num {
     display: inline-flex;
@@ -2547,7 +2627,72 @@ button[kind="primary"] p:hover {
 .caution-box strong {
     color: #f87171;
     font-weight: 600;
-}</style>
+}
+
+/* ── Touch-first search card ── */
+/* Only the main search card gets this surface, not every bordered container. */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
+    background: linear-gradient(160deg, rgba(19, 28, 44, 0.82), rgba(8, 13, 23, 0.92)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 18px !important;
+    padding: 1.1rem !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28) !important;
+}
+.search-card-title {
+    font-size: 0.78rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.14em !important;
+    color: #7EE2A8 !important;
+    margin: 0 0 0.6rem !important;
+}
+.search-card-title--spaced {
+    margin-top: 1.1rem !important;
+}
+
+/* Quick-tap pills: active choice is emerald green. */
+div[data-testid="stPills"] button,
+button[data-baseweb="pill"] {
+    border-radius: 999px !important;
+    border: 1px solid rgba(148, 163, 184, 0.22) !important;
+    background: rgba(148, 163, 184, 0.08) !important;
+    color: #CBD5E1 !important;
+    font-weight: 600 !important;
+    padding: 0.45rem 0.85rem !important;
+    transition: background-color 0.12s ease, border-color 0.12s ease !important;
+}
+div[data-testid="stPills"] button[aria-pressed="true"],
+div[data-testid="stPills"] button[aria-checked="true"],
+div[data-testid="stPills"] button[data-selected="true"],
+button[data-baseweb="pill"][aria-pressed="true"],
+button[data-baseweb="pill"][aria-checked="true"],
+button[data-baseweb="pill"][data-selected="true"] {
+    background: #2EA043 !important;
+    border-color: #2EA043 !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 6px 16px rgba(46, 160, 67, 0.32) !important;
+}
+@media (hover: hover) {
+    div[data-testid="stPills"] button:hover,
+    button[data-baseweb="pill"]:hover {
+        border-color: rgba(46, 160, 67, 0.55) !important;
+        color: #FFFFFF !important;
+    }
+}
+
+/* Lightweight mobile layout — no backdrop blur, tighter spacing. */
+@media (max-width: 768px) {
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
+        padding: 0.85rem !important;
+        border-radius: 14px !important;
+    }
+    /* The search card is the first thing mobile users see. */
+    .hero-block,
+    .hero-divider {
+        display: none !important;
+    }
+    .steps { grid-template-columns: 1fr !important; }
+}
+</style>
 """, unsafe_allow_html=True)
 
 # NOTE: Authentication CSS now lives INSIDE the logged-out block near the top
@@ -2925,11 +3070,11 @@ st.markdown(f"""
     <div class="hero-tagline">Your macros, anywhere.</div>
 </div>
 """, unsafe_allow_html=True)
-st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+st.markdown('<hr class="section-divider hero-divider">', unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────
-# Sidebar — inputs
+# Sidebar — profile + saved matches only
 # ─────────────────────────────────────────────
 with st.sidebar:
     st.markdown(f"""
@@ -2980,7 +3125,16 @@ with st.sidebar:
         saved_matches_slot = st.empty()
         render_saved_matches(saved_matches_slot)
 
-    st.markdown("## 🛒 Your Product")
+
+# ─────────────────────────────────────────────
+# Main area — touch-first search card + results
+# ─────────────────────────────────────────────
+
+with st.container(border=True):
+    st.markdown(
+        '<div class="search-card-title">YOUR PRODUCT — What do you normally eat?</div>',
+        unsafe_allow_html=True,
+    )
     try:
         with st.spinner(
             "Connecting to the backend — free hosting can take up to a minute to wake…"
@@ -3002,69 +3156,146 @@ with st.sidebar:
         st.error("The backend returned an empty product list. Please try again.")
         st.stop()
 
-    product_options = list(products)
-    _saved_product = st.session_state.get("product_select")
-    if _saved_product and _saved_product not in product_options:
-        product_options.insert(0, _saved_product)
-    selected_product = st.selectbox(
-        "What do you normally eat?",
-        options=product_options,
-        help="Select the product you use at home.",
-        key="product_select",
-    )
-
-    st.markdown("## 📍 Destination")
-    city_options = load_city_list() or CITIES_FALLBACK
-    _saved_city = st.session_state.get("city_select")
-    if _saved_city and _saved_city not in city_options:
-        city_options.insert(0, _saved_city)
-    selected_city = st.selectbox(
-        "Which city are you travelling to?",
-        options=city_options,
-        key="city_select",
-    )
-
-    st.markdown("## 🥦 Diet Rules")
-    # Human-readable labels for each diet key
-    _DIET_LABELS = {
-        "vegetarian": "🌿 Vegetarian",
-        "vegan":      "🌱 Vegan",
-        "dairy_free": "🥛 Dairy-Free",
-        "gluten_free":"🌾 Gluten-Free",
-        "keto":       "⚡ Keto",
-        "low_sugar":  "🍬 Low-Sugar",
-    }
-    selected_diet_labels = st.pills(
-        "Diet Rules",
-        options=list(_DIET_LABELS.values()),
-        selection_mode="multi",
+    product_query = st.text_input(
+        "Search food",
+        placeholder="🔍 Search food (e.g., Almond Butter, Oats)...",
         label_visibility="collapsed",
-        key="diet_pills",
+        key="product_query",
     )
-    # Map selected display labels back to API keys
-    _LABEL_TO_KEY = {v: k for k, v in _DIET_LABELS.items()}
-    selected_diets = [_LABEL_TO_KEY[lbl] for lbl in selected_diet_labels]
+    product_query = (product_query or "").strip().lower()
 
-    st.markdown("## ⚠️ Allergens to Avoid")
-    selected_allergens = st.multiselect(
-        "Select allergens",
-        options=ALLERGEN_OPTIONS,
-        format_func=lambda x: {"soy": "🫘 Soy", "nuts": "🥜 Nuts", "dairy": "🥛 Dairy"}[x],
-        key="allergen_select",
+    if product_query:
+        product_matches = [p for p in products if product_query in p.lower()][:12]
+        if not product_matches:
+            st.caption("No foods match that search. Try another term.")
+        product_pairs = [
+            (_display_label(p, PRODUCT_DISPLAY_ALIASES, product_matches), p)
+            for p in product_matches
+        ]
+    else:
+        # Friendly labels ("Oats", "Whey Protein") map to the exact backend
+        # names ("Rolled Oats", "Whey Protein Powder") before any API call.
+        product_pairs = []
+        for label in POPULAR_PRODUCTS:
+            canonical = _canonical_value(label, PRODUCT_DISPLAY_ALIASES)
+            if canonical in products:
+                product_pairs.append((label, canonical))
+
+    if product_pairs:
+        product_display_options = [label for label, _ in product_pairs]
+        product_canonical_by_display = dict(product_pairs)
+        _current_product_display = _display_label(
+            st.session_state["selected_product"],
+            PRODUCT_DISPLAY_ALIASES,
+            product_display_options,
+        )
+        if _current_product_display not in product_display_options:
+            _current_product_display = None
+        product_pick = st.pills(
+            "Quick food picks",
+            options=product_display_options,
+            selection_mode="single",
+            default=_current_product_display,
+            label_visibility="collapsed",
+        )
+        if product_pick:
+            st.session_state["selected_product"] = product_canonical_by_display[
+                product_pick
+            ]
+
+    selected_product = st.session_state["selected_product"]
+    # Legacy aliases keep saved-match restore and older sessions in sync.
+    st.session_state["product_select"] = selected_product
+
+    st.markdown(
+        '<div class="search-card-title search-card-title--spaced">DESTINATION</div>',
+        unsafe_allow_html=True,
     )
-
-    st.markdown("## 🎯 Priority")
-    # Thin non-breaking space between the emoji and the label text gives the
-    # radio circle a little breathing room without touching any logic.
-    priority_label = st.radio(
-        "What matters most in the match?",
-        options=PRIORITY_KEYS,
-        format_func=lambda k: PRIORITY_LABELS[k].replace(" ", "\u00a0", 1),
-        index=2,   # default: balanced
-        key="priority_radio",
+    city_query = st.text_input(
+        "Search city",
+        placeholder="🔍 Search city (e.g., Delhi, Mumbai)...",
+        label_visibility="collapsed",
+        key="city_query",
     )
+    city_query = (city_query or "").strip().lower()
+    city_options = load_city_list() or CITIES_FALLBACK
 
-    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    if city_query:
+        city_matches = [c for c in city_options if city_query in c.lower()][:12]
+        for label, canonical in CITY_DISPLAY_ALIASES.items():
+            if (
+                city_query in label.lower()
+                and canonical in city_options
+                and canonical not in city_matches
+            ):
+                city_matches.append(canonical)
+        if not city_matches:
+            st.caption("No cities match that search. Try another term.")
+        city_pairs = [
+            (_display_label(c, CITY_DISPLAY_ALIASES, city_matches), c)
+            for c in city_matches
+        ]
+    else:
+        # "Greater Noida" is shown as a quick pick but maps to the nearest
+        # dataset city ("Delhi") so the matching backend still returns results.
+        city_pairs = []
+        for label in POPULAR_CITIES:
+            canonical = _canonical_value(label, CITY_DISPLAY_ALIASES)
+            if canonical in city_options:
+                city_pairs.append((label, canonical))
+
+    if city_pairs:
+        city_display_options = [label for label, _ in city_pairs]
+        city_canonical_by_display = dict(city_pairs)
+        _current_city_display = _display_label(
+            st.session_state["selected_city"],
+            CITY_DISPLAY_ALIASES,
+            city_display_options,
+        )
+        if _current_city_display not in city_display_options:
+            _current_city_display = None
+        city_pick = st.pills(
+            "Quick city picks",
+            options=city_display_options,
+            selection_mode="single",
+            default=_current_city_display,
+            label_visibility="collapsed",
+        )
+        if city_pick:
+            st.session_state["selected_city"] = city_canonical_by_display[city_pick]
+
+    selected_city = st.session_state["selected_city"]
+    st.session_state["city_select"] = selected_city
+
+    with st.expander("🥦 Filters — diet, allergens & priority", expanded=False):
+        selected_diet_labels = st.pills(
+            "Diet Rules",
+            options=list(DIET_LABELS.values()),
+            selection_mode="multi",
+            label_visibility="collapsed",
+            key="diet_pills",
+        )
+        selected_diet_labels = list(selected_diet_labels or [])
+        _label_to_key = {v: k for k, v in DIET_LABELS.items()}
+        selected_diets = [_label_to_key[lbl] for lbl in selected_diet_labels]
+
+        selected_allergens = st.multiselect(
+            "Allergens to avoid",
+            options=ALLERGEN_OPTIONS,
+            format_func=lambda x: {
+                "soy": "🫘 Soy", "nuts": "🥜 Nuts", "dairy": "🥛 Dairy"
+            }[x],
+            key="allergen_select",
+        )
+
+        priority_label = st.radio(
+            "What matters most in the match?",
+            options=PRIORITY_KEYS,
+            format_func=lambda k: PRIORITY_LABELS[k].replace(" ", "\u00a0", 1),
+            index=2,   # default: balanced
+            key="priority_radio",
+        )
+
     if st.button(
         "🔍 Find Alternatives",
         use_container_width=True,
@@ -3114,7 +3345,7 @@ if not find_btn:
         "in plain language.</p>"
         f'<div class="steps">{steps_html}</div>'
         '<div class="landing-cta"><span class="arrow">&larr;</span>'
-        "<span>Start in the sidebar, then hit <strong>Find Alternatives</strong>."
+        "<span>Use the search card above, then hit <strong>Find Alternatives</strong>."
         "</span></div>"
         f'<div class="landing-facts">{facts_html}</div>'
         "</div>",
@@ -3204,7 +3435,7 @@ if st.button("🏠 Back to home", key="back_to_home", help="Return to the start 
 # Built as one unindented string: a whitespace-only line would end the Markdown
 # HTML block and turn the closing tags into a code block.
 diet_text = (
-    f"&nbsp;·&nbsp; Diet: {', '.join(_DIET_LABELS[d] for d in selected_diets)}"
+    f"&nbsp;·&nbsp; Diet: {', '.join(DIET_LABELS[d] for d in selected_diets)}"
     if selected_diets else ""
 )
 allergen_text = (
