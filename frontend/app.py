@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 import numpy as np
 from PIL import Image
 import streamlit as st
+import streamlit.components.v1 as components
 import requests
 import pandas as pd
 from pathlib import Path
@@ -163,14 +164,17 @@ if st.session_state["supabase_user"] is None:
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    /* Hide Streamlit chrome, but NEVER the header itself: it hosts the
-       sidebar expand button needed to reopen a collapsed sidebar. */
-    #MainMenu, [data-testid="stToolbar"], footer,
-    .stDeployButton, [data-testid="stStatusWidget"] {
+    /* Hide ONLY the toolbar / deploy chrome. The stHeader must stay in the
+       DOM because it hosts the sidebar expand (>>) button. */
+    [data-testid="stToolbar"], .stDeployButton {
         display: none !important;
         visibility: hidden !important;
     }
-    header[data-testid="stHeader"] { background: transparent !important; }
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
 
     html, body, [class*="css"], .stApp {
         font-family: 'Inter', sans-serif !important;
@@ -1155,38 +1159,38 @@ st.markdown("""
 /* ── Google Fonts ── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
 
-/* ── Hide default Streamlit chrome ──
-   Do NOT hide the header itself — it carries the sidebar expand button. */
-#MainMenu, [data-testid="stToolbar"], footer,
-.stDeployButton, [data-testid="stDeployButton"],
-[data-testid="stStatusWidget"], #stStatusWidget,
-[data-testid="stAppDeployButton"] {
+/* ── Hide ONLY Streamlit's toolbar and deploy chrome ──────────────────
+   Never hide header[data-testid="stHeader"]: it carries the sidebar
+   collapse/expand controls. A transparent header keeps the look clean. */
+[data-testid="stToolbar"], .stDeployButton {
     display: none !important;
     visibility: hidden !important;
 }
-/* Keep the header present but invisible so ">>" can reopen the sidebar */
 header[data-testid="stHeader"] {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
 }
-/* Explicitly keep the sidebar expand/collapse controls visible */
-button[kind="header"],
-button[data-testid="baseButton-header"],
+/* Make the >> reopen control impossible to miss or cover. */
 button[data-testid="stExpandSidebarButton"],
-div[data-testid="collapsedControl"] {
-    display: block !important;
+button[data-testid="stSidebarCollapseButton"],
+button[data-testid="baseButton-header"],
+div[data-testid="collapsedControl"],
+div[data-testid="collapsedControl"] button {
+    display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
     color: #F0F6FC !important;
-    background: rgba(11, 15, 25, 0.85) !important;
+    background: rgba(11, 15, 25, 0.92) !important;
+    border: 1px solid rgba(52, 211, 153, 0.45) !important;
     border-radius: 10px !important;
+    pointer-events: auto !important;
+    z-index: 2147483647 !important;
 }
 div[data-testid="collapsedControl"] {
-    position: absolute;
-    top: 0.5rem;
-    left: 0.5rem;
-    z-index: 1000;
+    position: fixed !important;
+    top: 0.6rem !important;
+    left: 0.6rem !important;
 }
 /* Content sits cleanly at the top of the page with breathing room */
 section.main > div[data-testid="stMainBlockContainer"],
@@ -1835,6 +1839,35 @@ button[kind="primary"] p:hover {
     font-weight: 600;
 }</style>
 """, unsafe_allow_html=True)
+
+# Streamlit remembers a collapsed sidebar in browser storage and that can
+# override `initial_sidebar_state="expanded"` after a redeploy. Click the
+# built-in expand control once per browser session so ">>" is never the only
+# thing left on screen.
+components.html("""
+<script>
+(function () {
+  try {
+    if (sessionStorage.getItem("mm_sidebar_expanded")) { return; }
+    var doc = window.parent.document;
+    function expand() {
+      var btn = doc.querySelector('div[data-testid="collapsedControl"] button') ||
+                doc.querySelector('button[data-testid="stExpandSidebarButton"]');
+      if (!btn) { return false; }
+      btn.click();
+      return true;
+    }
+    if (!expand()) {
+      var tries = 0;
+      var timer = setInterval(function () {
+        if (expand() || ++tries > 40) { clearInterval(timer); }
+      }, 150);
+    }
+    sessionStorage.setItem("mm_sidebar_expanded", "1");
+  } catch (e) { /* cross-origin iframe: CSS rules above still apply */ }
+})();
+</script>
+""", height=0)
 
 
 # NOTE: Authentication CSS now lives INSIDE the logged-out block near the top
