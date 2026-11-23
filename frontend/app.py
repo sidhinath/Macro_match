@@ -3275,6 +3275,61 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
     flex: 0 0 46px !important;
 }
 
+/* ── Desktop / laptop only — larger, centered reading experience ── */
+/* Everything here is gated at 769px so mobile typography stays untouched. */
+@media (min-width: 769px) {
+    section.main > div[data-testid="stMainBlockContainer"],
+    .block-container {
+        max-width: 1120px !important;
+        padding-top: 3.2rem !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+
+    body,
+    .stMarkdown p,
+    .stTextInput label p,
+    .stNumberInput label p,
+    div[data-testid="stExpander"] summary p {
+        font-size: 16.5px !important;
+        line-height: 1.55 !important;
+    }
+
+    .stTextInput input,
+    .stNumberInput input {
+        font-size: 15.5px !important;
+        padding: 0.65rem 0.85rem !important;
+    }
+
+    div[data-testid="stPills"] button,
+    button[data-baseweb="pill"] {
+        font-size: 15.5px !important;
+        padding: 0.55rem 0.95rem !important;
+    }
+
+    .macro-pill,
+    .swap-macro-pill,
+    .macro-goal-badge {
+        font-size: 15.5px !important;
+        padding: 5px 11px !important;
+    }
+
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] button,
+    .sidebar-welcome .welcome-name,
+    .sidebar-welcome .welcome-email,
+    .sidebar-stats .stats-label,
+    .sidebar-stats .stats-tip {
+        font-size: 15.5px !important;
+    }
+
+    section.main .stMarkdown h3,
+    .swap-name {
+        font-size: 23px !important;
+    }
+}
+
 /* Lightweight mobile layout — no backdrop blur, tighter spacing. */
 @media (max-width: 768px) {
     /* Keep the fixed ☰ Menu button from covering the centered brand header. */
