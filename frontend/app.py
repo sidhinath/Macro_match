@@ -20,6 +20,7 @@ import numpy as np
 from PIL import Image
 import streamlit as st
 import streamlit.components.v1 as components
+from streamlit_searchbox import st_searchbox
 import requests
 import pandas as pd
 from pathlib import Path
@@ -163,6 +164,54 @@ _MOBILE_SIDEBAR_TOGGLE_JS = """
 })();
 </script>
 """
+
+# Dark theme for the streamlit-searchbox component. These values are passed
+# straight into its React/Select styles because the widget lives in an iframe.
+_SEARCHBOX_STYLE_OVERRIDES = {
+    "wrapper": {"width": "100%"},
+    "clear": {
+        "icon": "cross",
+        "clearable": "always",
+        "stroke": "#8B949E",
+        "width": 18,
+        "height": 18,
+    },
+    "dropdown": {"fill": "#8B949E", "width": 18, "height": 18},
+    "searchbox": {
+        "control": {
+            "backgroundColor": "#161B22",
+            "color": "#E6EDF3",
+            "border": "1px solid #30363D",
+            "borderRadius": "10px",
+            "minHeight": "46px",
+            "boxShadow": "none",
+            "&:hover": {"border": "1px solid #2EA043"},
+            "&:focus-within": {
+                "border": "1px solid #2EA043",
+                "boxShadow": "0 0 0 1px #2EA043, 0 0 14px rgba(46, 160, 67, 0.35)",
+            },
+        },
+        "menuList": {
+            "backgroundColor": "#0D1117",
+            "border": "1px solid #30363D",
+            "borderRadius": "10px",
+            "padding": "4px",
+            "boxShadow": "0 12px 28px rgba(0, 0, 0, 0.45)",
+        },
+        "option": {
+            "color": "#E6EDF3",
+            "backgroundColor": "#0D1117",
+            "fontSize": "16px",
+            "fontWeight": 500,
+            "padding": "10px 12px",
+            "borderRadius": "8px",
+            "highlightColor": "rgba(46, 160, 67, 0.45)",
+        },
+        "input": {"color": "#E6EDF3", "fontSize": "16px"},
+        "singleValue": {"color": "#E6EDF3", "fontSize": "16px"},
+        "placeholder": {"color": "#8B949E", "fontSize": "16px"},
+    },
+}
 
 # ─────────────────────────────────────────────
 # Page config — must be the FIRST st call
@@ -2277,6 +2326,12 @@ input, select, textarea, button, label,
     font-size: 0.95rem;
     color: var(--text-body);
 }
+iframe[title="streamlit_searchbox.searchbox"] {
+    width: 100% !important;
+    border: 0 !important;
+    background: transparent !important;
+    border-radius: 10px !important;
+}
 
 /* ── Headings ── */
 h1, h2, h3, .stHeading {
@@ -3446,6 +3501,37 @@ def cached_all_cities() -> list[str]:
     return sorted(set(load_city_list() or CITIES_FALLBACK))
 
 
+def search_foods(searchterm: str) -> list[str]:
+    """Instant food matches for st_searchbox, prefix matches before keywords."""
+    term = searchterm or ""
+    st.session_state["food_search_input"] = term
+    query = term.strip().lower()
+    foods = cached_all_foods()
+    if not query:
+        return [
+            _canonical_value(label, PRODUCT_DISPLAY_ALIASES)
+            for label in POPULAR_PRODUCTS
+            if _canonical_value(label, PRODUCT_DISPLAY_ALIASES) in foods
+        ]
+    return _ordered_suggestions(query, foods)[:8]
+
+
+def search_cities(searchterm: str) -> list[str]:
+    """Instant city matches for st_searchbox, including friendly aliases."""
+    term = searchterm or ""
+    st.session_state["city_search_input"] = term
+    query = term.strip().lower()
+    cities = cached_all_cities()
+    if not query:
+        defaults = []
+        for label in POPULAR_CITIES:
+            canonical = _canonical_value(label, CITY_DISPLAY_ALIASES)
+            if canonical in cities and canonical not in defaults:
+                defaults.append(canonical)
+        return defaults
+    return _ordered_city_suggestions(query, cities)[:8]
+
+
 @st.cache_data(ttl=60)
 def get_original_macros(product_name: str) -> dict | None:
     """Return the macro dict for the original product from local CSV."""
@@ -4012,59 +4098,60 @@ with st.sidebar:
 
 @st.fragment(key="search_controls")
 def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
-    """Isolated food/city autocomplete.
+    """Isolated real-time food/city autocomplete.
 
-    Widget interactions here rerun only this fragment. Typing "al" therefore
-    never re-executes the sidebar, Supabase queries, saved matches, or results.
-    The option lists are cached plain Python lists, so prefix matching is O(n)
-    over 30/14 items and effectively instant.
+    st_searchbox calls search_foods/search_cities on every keystroke and reruns
+    only this fragment, so the sidebar, Supabase queries, saved matches, and
+    results stay untouched while the dropdown updates instantly.
     """
     # ── Food ────────────────────────────────────────────────────────────
-    if "food_search_input" not in st.session_state:
-        st.session_state["food_search_input"] = ""
-    food_search_raw = st.text_input(
-        "Search food",
-        value=st.session_state["food_search_input"],
-        placeholder="🔍 Search food (e.g., Almond Butter, Oats)...",
-        label_visibility="collapsed",
-    )
-    # Keyless widget + mirrored custom key: a pill tap can repaint the box from
-    # this same fragment without hitting Streamlit's widget-key restriction.
-    st.session_state["food_search_input"] = food_search_raw or ""
-    food_query = st.session_state["food_search_input"].strip().lower()
-
     selected_product = _canonical_value(
         st.session_state["selected_product"], PRODUCT_DISPLAY_ALIASES
     )
     st.session_state["selected_product"] = selected_product
+    if "food_search_input" not in st.session_state:
+        st.session_state["food_search_input"] = selected_product
 
-    food_uses_defaults = (
-        not food_query
-        or food_query == selected_product.lower()
-        or food_query == st.session_state["selected_product"].lower()
-        or _query_represents_selection(
-            food_search_raw, selected_product, PRODUCT_DISPLAY_ALIASES
-        )
+    food_defaults = [
+        _canonical_value(label, PRODUCT_DISPLAY_ALIASES)
+        for label in POPULAR_PRODUCTS
+        if _canonical_value(label, PRODUCT_DISPLAY_ALIASES) in all_foods
+    ]
+    food_pick = st_searchbox(
+        search_foods,
+        placeholder="🔍 Type to search foods (e.g. Cashews, Chia Seeds)...",
+        default=None,
+        default_searchterm=st.session_state["food_search_input"] or selected_product,
+        default_options=food_defaults,
+        edit_after_submit="option",
+        clear_on_submit=False,
+        style_overrides=_SEARCHBOX_STYLE_OVERRIDES,
+        rerun_scope="fragment",
+        debounce=80,
+        key=f"food_searchbox_{selected_product}",
+    )
+    if food_pick:
+        picked_food = str(food_pick)
+        canonical_food = _canonical_value(picked_food, PRODUCT_DISPLAY_ALIASES)
+        if canonical_food != selected_product:
+            _sync_food_selection(canonical_food, picked_food)
+            st.rerun(scope="fragment")
+        st.session_state["food_search_input"] = picked_food
+
+    selected_product = st.session_state["selected_product"]
+    st.session_state["product_select"] = selected_product
+    st.markdown(
+        '<div class="selected-value">Selected food: '
+        f"<strong>{html.escape(selected_product)}</strong></div>",
+        unsafe_allow_html=True,
     )
 
-    if food_uses_defaults:
-        product_pairs = []
-        for label in POPULAR_PRODUCTS:
-            canonical = _canonical_value(label, PRODUCT_DISPLAY_ALIASES)
-            if canonical in all_foods:
-                product_pairs.append((label, canonical))
-    else:
-        food_suggestions = _ordered_suggestions(food_query, all_foods)[:8]
-        product_pairs = [
-            (_suggestion_label(food, PRODUCT_DISPLAY_ALIASES, all_foods), food)
-            for food in food_suggestions
-        ]
-        if not product_pairs:
-            st.caption(
-                f'No matching food found for "{food_query}". '
-                "Try Browse all available foods below."
-            )
-
+    # Six quick-tap favourites stay directly below the live searchbox.
+    product_pairs = [
+        (label, _canonical_value(label, PRODUCT_DISPLAY_ALIASES))
+        for label in POPULAR_PRODUCTS
+        if _canonical_value(label, PRODUCT_DISPLAY_ALIASES) in all_foods
+    ]
     if product_pairs:
         product_display_options = [label for label, _ in product_pairs]
         product_canonical_by_display = dict(product_pairs)
@@ -4076,7 +4163,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         if _current_product_display not in product_display_options:
             _current_product_display = None
         product_pick = st.pills(
-            "Matching foods" if not food_uses_defaults else "Quick food picks",
+            "Quick food picks",
             options=product_display_options,
             selection_mode="single",
             default=_current_product_display,
@@ -4087,16 +4174,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
             if picked_product != selected_product:
                 selected_product = picked_product
                 _sync_food_selection(selected_product, product_pick)
-                # Fragment-scoped rerun repaints the text box without touching
-                # the rest of the app.
                 st.rerun(scope="fragment")
-
-    st.session_state["product_select"] = selected_product
-    st.markdown(
-        '<div class="selected-value">Selected food: '
-        f"<strong>{html.escape(selected_product)}</strong></div>",
-        unsafe_allow_html=True,
-    )
 
     with st.expander(
         f"📋 Browse all available foods ({len(all_foods)} items)", expanded=False
@@ -4119,49 +4197,53 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         '<div class="search-card-title search-card-title--spaced">DESTINATION</div>',
         unsafe_allow_html=True,
     )
-    if "city_search_input" not in st.session_state:
-        st.session_state["city_search_input"] = ""
-    city_search_raw = st.text_input(
-        "Search city",
-        value=st.session_state["city_search_input"],
-        placeholder="🔍 Search city (e.g., Delhi, Mumbai)...",
-        label_visibility="collapsed",
-    )
-    st.session_state["city_search_input"] = city_search_raw or ""
-    city_query = st.session_state["city_search_input"].strip().lower()
-
     selected_city = _canonical_value(
         st.session_state["selected_city"], CITY_DISPLAY_ALIASES
     )
     st.session_state["selected_city"] = selected_city
+    if "city_search_input" not in st.session_state:
+        st.session_state["city_search_input"] = selected_city
 
-    city_uses_defaults = (
-        not city_query
-        or city_query == selected_city.lower()
-        or city_query == st.session_state["selected_city"].lower()
-        or _query_represents_selection(
-            city_search_raw, selected_city, CITY_DISPLAY_ALIASES
-        )
+    city_defaults = []
+    for label in POPULAR_CITIES:
+        canonical = _canonical_value(label, CITY_DISPLAY_ALIASES)
+        if canonical in all_cities and canonical not in city_defaults:
+            city_defaults.append(canonical)
+
+    city_pick = st_searchbox(
+        search_cities,
+        placeholder="🔍 Type to search cities (e.g. Delhi, Mumbai)...",
+        default=None,
+        default_searchterm=st.session_state["city_search_input"] or selected_city,
+        default_options=city_defaults,
+        edit_after_submit="option",
+        clear_on_submit=False,
+        style_overrides=_SEARCHBOX_STYLE_OVERRIDES,
+        rerun_scope="fragment",
+        debounce=80,
+        key=f"city_searchbox_{selected_city}",
+    )
+    if city_pick:
+        picked_city = str(city_pick)
+        canonical_city = _canonical_value(picked_city, CITY_DISPLAY_ALIASES)
+        if canonical_city != selected_city:
+            _sync_city_selection(canonical_city, picked_city)
+            st.rerun(scope="fragment")
+        st.session_state["city_search_input"] = picked_city
+
+    selected_city = st.session_state["selected_city"]
+    st.session_state["city_select"] = selected_city
+    st.markdown(
+        '<div class="selected-value">Selected city: '
+        f"<strong>{html.escape(selected_city)}</strong></div>",
+        unsafe_allow_html=True,
     )
 
-    if city_uses_defaults:
-        city_pairs = []
-        for label in POPULAR_CITIES:
-            canonical = _canonical_value(label, CITY_DISPLAY_ALIASES)
-            if canonical in all_cities:
-                city_pairs.append((label, canonical))
-    else:
-        city_suggestions = _ordered_city_suggestions(city_query, all_cities)[:8]
-        city_pairs = [
-            (_suggestion_label(city, CITY_DISPLAY_ALIASES, all_cities), city)
-            for city in city_suggestions
-        ]
-        if not city_pairs:
-            st.caption(
-                f'No matching city found for "{city_query}". '
-                "Try Browse all available cities below."
-            )
-
+    city_pairs = []
+    for label in POPULAR_CITIES:
+        canonical = _canonical_value(label, CITY_DISPLAY_ALIASES)
+        if canonical in all_cities:
+            city_pairs.append((label, canonical))
     if city_pairs:
         city_display_options = [label for label, _ in city_pairs]
         city_canonical_by_display = dict(city_pairs)
@@ -4173,7 +4255,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         if _current_city_display not in city_display_options:
             _current_city_display = None
         city_pick = st.pills(
-            "Matching cities" if not city_uses_defaults else "Quick city picks",
+            "Quick city picks",
             options=city_display_options,
             selection_mode="single",
             default=_current_city_display,
@@ -4185,13 +4267,6 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
                 selected_city = picked_city
                 _sync_city_selection(selected_city, city_pick)
                 st.rerun(scope="fragment")
-
-    st.session_state["city_select"] = selected_city
-    st.markdown(
-        '<div class="selected-value">Selected city: '
-        f"<strong>{html.escape(selected_city)}</strong></div>",
-        unsafe_allow_html=True,
-    )
 
     with st.expander(
         f"📍 Browse all available cities ({len(all_cities)} cities)", expanded=False
