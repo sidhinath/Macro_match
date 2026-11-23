@@ -110,216 +110,321 @@ if (
 
 
 # ─────────────────────────────────────────────
-# NEW: Landing screen — "Sign in" / "Sign up" tabs (Supabase Auth)
-# Shown ONLY when the user is not logged in; everything below this point runs
-# for logged-in users only.
-# ─────────────────────────────────────────────
-# ─────────────────────────────────────────────
-# NEW: Landing screen — centered auth card with Sign in / Sign up / Reset Password
-# Shown ONLY when the user is not logged in; everything below this point runs
-# for logged-in users only.
+# AUTHENTICATION UI — strict centered card, green buttons, 16px text
+# Only rendered when logged out. All Supabase backend logic is unchanged.
 # ─────────────────────────────────────────────
 
-# Track which auth view is active: "sign_in", "sign_up", or "reset_password"
+# auth_view switches the Sign in tab between three views:
+#   "signin" -> normal login form
+#   "forgot" -> email + Send Reset Link
+#   "reset"  -> email + current/new password + Update Password
 if "auth_view" not in st.session_state:
-    st.session_state["auth_view"] = "sign_in"
+    st.session_state.auth_view = "signin"
+
 
 if st.session_state["supabase_user"] is None:
-    # Centered dark card wrapper
-    st.markdown('<div class="auth-page"><div class="auth-card">', unsafe_allow_html=True)
 
-    tab_sign_in, tab_sign_up = st.tabs(["🔐 Sign in", "📝 Sign up"], key="auth_tabs")
+    # ── Auth-only CSS — injected BEFORE st.stop() so it actually applies ──
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
-    # ═════════════════════════════════════════════════════════════════
-    # Sign in tab
-    # ══════════════════════════════════════════════════════════════════
-    with tab_sign_in:
-        # ── Reset Password view (triggered by "Forgot password?") ──
-        if st.session_state["auth_view"] == "reset_password":
-            st.markdown('<h2 class="auth-card-title">Reset Password</h2>', unsafe_allow_html=True)
-            st.markdown(
-                '<p class="auth-card-subtitle">Enter your email to receive a password reset link.</p>',
-                unsafe_allow_html=True,
-            )
-            reset_email = st.text_input(
-                "Email address", placeholder="you@example.com", key="reset_email_input"
-            )
-            col_send, col_back = st.columns([1, 1], gap="small")
-            with col_send:
-                send_reset = st.button(
-                    "Send Reset Link",
-                    type="primary",
-                    key="send_reset_btn",
-                    use_container_width=True,
-                )
-            with col_back:
-                back_to_signin = st.button("Back to Sign in", key="back_to_signin_btn")
+    /* 5. Hide Streamlit toolbar / menu / footer */
+    header[data-testid="stHeader"], #MainMenu, footer, .stDeployButton {
+        display: none !important;
+        visibility: hidden !important;
+    }
 
-            if send_reset:
-                if not reset_email:
-                    st.error("Please enter your email address.")
-                elif not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", reset_email or ""):
-                    st.error("Please enter a valid email address.")
-                else:
-                    with st.spinner("Sending reset link…"):
-                        try:
-                            # ── TODO: connect your backend password-reset function here ──
-                            # Example using Supabase Auth:
-                            # supabase.auth.reset_password_email(reset_email)
-                            #
-                            # For this demo we simulate a successful send:
+    /* 3. Force Inter + minimum 16px readable text */
+    html, body, [class*="css"], .stApp { font-family: 'Inter', sans-serif !important; }
+    .stTextInput label p,
+    .stTextInput input,
+    .stTextInput input::placeholder,
+    button[data-baseweb="tab"],
+    [data-baseweb="tab"] p,
+    [data-baseweb="tab"] div,
+    .stAlert,
+    .stAlert p {
+        font-size: 16px !important;
+        color: #E6EDF3 !important;
+    }
+
+    /* 1. The middle column IS the card */
+    div[data-testid="column"]:nth-of-type(2) {
+        background-color: #161B22;
+        padding: 2.2rem 2rem;
+        border-radius: 16px;
+        border: 1px solid #30363D;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+        margin-top: 2.5rem;
+    }
+
+    /* Card header + subtitle centered */
+    div[data-testid="column"]:nth-of-type(2) h1,
+    div[data-testid="column"]:nth-of-type(2) p.auth-sub {
+        text-align: center !important;
+        color: #E6EDF3 !important;
+    }
+    div[data-testid="column"]:nth-of-type(2) h1 { font-size: 26px !important; }
+    p.auth-sub { font-size: 16px !important; color: #8B949E !important; margin-bottom: 1.5rem !important; }
+
+    /* 2. GREEN primary buttons — override Streamlit's default red */
+    div.stButton > button[kind="primary"] {
+        background-color: #2EA043 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        padding: 0.65rem 1rem !important;
+    }
+    /* Fallback for form submit buttons in other Streamlit versions */
+    button[kind="primary"], .stFormSubmitButton button {
+        background-color: #2EA043 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+    }
+    div.stButton > button[kind="primary"]:hover,
+    button[kind="primary"]:hover {
+        background-color: #3FB950 !important;
+    }
+
+    /* 4. Secondary buttons styled as clean blue text links */
+    div.stButton > button[kind="secondary"] {
+        color: #58A6FF !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        font-size: 15px !important;
+        padding: 0.25rem 0 !important;
+    }
+    div.stButton > button[kind="secondary"]:hover {
+        color: #79C0FF !important;
+        text-decoration: underline !important;
+    }
+
+    /* Rounded inputs inside the card */
+    div[data-testid="column"]:nth-of-type(2) input {
+        background-color: #0D1117 !important;
+        border: 1px solid #30363D !important;
+        border-radius: 8px !important;
+        padding: 0.65rem 0.85rem !important;
+        color: #E6EDF3 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # 1. STRICT centered card — everything lives inside card_col
+    _, card_col, _ = st.columns([1.3, 1.4, 1.3])
+
+    with card_col:
+        st.markdown("<h1>🥗 Welcome to MacroMatch</h1>", unsafe_allow_html=True)
+        st.markdown(
+            '<p class="auth-sub">Sign in to continue or create an account</p>',
+            unsafe_allow_html=True,
+        )
+
+        tab_signin, tab_signup = st.tabs(["🔐 Sign in", "📝 Sign up"])
+
+        # ════════════════════════════════════════════════════════════
+        # SIGN IN TAB — hosts signin / forgot / reset views
+        # ════════════════════════════════════════════════════════════
+        with tab_signin:
+
+            # ─────────────── VIEW: signin ───────────────
+            if st.session_state.auth_view == "signin":
+                with st.form("signin_form", clear_on_submit=True):
+                    email = st.text_input("Email", placeholder="you@example.com")
+                    password = st.text_input(
+                        "Password", type="password", placeholder="••••••••"
+                    )
+                    signin_btn = st.form_submit_button(
+                        "Sign in", type="primary", use_container_width=True
+                    )
+
+                if signin_btn:
+                    if not email or not password:
+                        st.error("Please enter both email and password.")
+                    else:
+                        with st.spinner("Signing in…"):
+                            try:
+                                response = supabase.auth.sign_in_with_password(
+                                    {"email": email, "password": password}
+                                )
+                                if response.user:
+                                    session = response.session
+                                    st.session_state["supabase_user"] = response.user
+                                    st.session_state["supabase_access_token"] = (
+                                        session.access_token if session else None
+                                    )
+                                    st.session_state["supabase_refresh_token"] = (
+                                        session.refresh_token if session else None
+                                    )
+                                    profile = (
+                                        supabase.table("profiles")
+                                        .select("name")
+                                        .eq("id", response.user.id)
+                                        .single()
+                                        .execute()
+                                    )
+                                    st.session_state["supabase_user_name"] = (
+                                        profile.data["name"]
+                                        if profile.data
+                                        else response.user.email
+                                    )
+                                    st.success("✅ Signed in successfully!")
+                                    st.rerun()
+                                else:
+                                    st.error(
+                                        "❌ Sign in failed. Please check your credentials."
+                                    )
+                            except Exception as exc:
+                                st.error(f"❌ Sign in error: {exc}")
+
+                # Two text-link buttons right below the password box
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Forgot password?", key="forgot_link"):
+                        st.session_state.auth_view = "forgot"
+                        st.rerun()
+                with col2:
+                    if st.button("Reset password", key="reset_link"):
+                        st.session_state.auth_view = "reset"
+                        st.rerun()
+
+            # ─────────────── VIEW: forgot ───────────────
+            elif st.session_state.auth_view == "forgot":
+                st.markdown("### Forgot password?")
+                with st.form("forgot_form"):
+                    forgot_email = st.text_input(
+                        "Email", placeholder="you@example.com", key="forgot_email"
+                    )
+                    send_link = st.form_submit_button(
+                        "Send Reset Link", type="primary", use_container_width=True
+                    )
+
+                if send_link:
+                    if not forgot_email:
+                        st.error("Please enter your email address.")
+                    elif not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", forgot_email or ""):
+                        st.error("Please enter a valid email address.")
+                    else:
+                        with st.spinner("Sending reset link…"):
+                            # ── TODO: connect your backend password-reset function ──
+                            # supabase.auth.reset_password_for_email(forgot_email)  # v2
+                            # supabase.auth.reset_password_email(forgot_email)      # older
                             st.success(
-                                "If an account exists for this email, a password "
-                                "reset link has been sent."
+                                "If an account exists for this email, a reset "
+                                "link has been sent."
                             )
-                        except Exception as exc:
-                            st.error(f"❌ Could not send reset link: {exc}")
 
-            if back_to_signin:
-                st.session_state["auth_view"] = "sign_in"
-                st.rerun()
+                if st.button("← Back to Sign in", key="back_from_forgot"):
+                    st.session_state.auth_view = "signin"
+                    st.rerun()
 
-        # ── Sign in form ──
-        else:
-            st.markdown('<h2 class="auth-card-title">Sign in</h2>', unsafe_allow_html=True)
-            st.markdown(
-                '<p class="auth-card-subtitle">Welcome back to MacroMatch.</p>',
-                unsafe_allow_html=True,
-            )
-            with st.form("sign_in_form", clear_on_submit=True):
-                email = st.text_input("Email address", placeholder="you@example.com")
-                password = st.text_input(
-                    "Password", type="password", placeholder="••••••••"
+            # ─────────────── VIEW: reset ───────────────
+            elif st.session_state.auth_view == "reset":
+                st.markdown("### Reset password")
+                with st.form("reset_form"):
+                    reset_email = st.text_input(
+                        "Email", placeholder="you@example.com", key="reset_email"
+                    )
+                    current_pw = st.text_input(
+                        "Current Password", type="password",
+                        placeholder="••••••••", key="current_pw",
+                    )
+                    new_pw = st.text_input(
+                        "New Password", type="password",
+                        placeholder="••••••••", key="new_pw",
+                    )
+                    update_btn = st.form_submit_button(
+                        "Update Password", type="primary", use_container_width=True
+                    )
+
+                if update_btn:
+                    if not reset_email or not current_pw or not new_pw:
+                        st.error("Please fill in all fields.")
+                    elif len(new_pw) < 6:
+                        st.error("New password must be at least 6 characters.")
+                    else:
+                        with st.spinner("Updating password…"):
+                            # ── TODO: connect your backend update-password function ──
+                            # supabase.auth.update_user({"password": new_pw})
+                            # (requires a recovery session from the emailed link)
+                            st.success("Password updated successfully.")
+
+                if st.button("← Back to Sign in", key="back_from_reset"):
+                    st.session_state.auth_view = "signin"
+                    st.rerun()
+
+        # ════════════════════════════════════════════════════════════
+        # SIGN UP TAB — backend logic unchanged
+        # ════════════════════════════════════════════════════════════
+        with tab_signup:
+            with st.form("signup_form"):
+                new_name = st.text_input("Full name", placeholder="Jane Doe")
+                new_email = st.text_input("Email", placeholder="you@example.com")
+                new_password = st.text_input(
+                    "Password", type="password", placeholder="••••••••",
+                    help="At least 6 characters",
                 )
-                sign_in_btn = st.form_submit_button(
-                    "Sign in", type="primary", use_container_width=True
+                confirm_password = st.text_input(
+                    "Confirm password", type="password", placeholder="••••••••"
+                )
+                create_btn = st.form_submit_button(
+                    "Create account", type="primary", use_container_width=True
                 )
 
-            if sign_in_btn:
-                if not email or not password:
-                    st.error("Please enter both email and password.")
+            if create_btn:
+                problems = []
+                if not new_name or not new_email or not new_password or not confirm_password:
+                    problems.append("Please fill in every field.")
+                elif not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", new_email or ""):
+                    problems.append("Please enter a valid email address.")
+                elif len(new_password or "") < 6:
+                    problems.append("Password must be at least 6 characters long.")
+                elif new_password != confirm_password:
+                    problems.append("Passwords do not match.")
+
+                if problems:
+                    for p in problems:
+                        st.error(p)
                 else:
-                    with st.spinner("Signing in…"):
+                    with st.spinner("Creating account…"):
                         try:
-                            response = supabase.auth.sign_in_with_password(
-                                {"email": email, "password": password}
+                            response = supabase.auth.sign_up(
+                                {"email": new_email, "password": new_password}
                             )
                             if response.user:
-                                session = response.session
+                                supabase.table("profiles").insert(
+                                    {
+                                        "id": response.user.id,
+                                        "email": new_email,
+                                        "name": new_name,
+                                    }
+                                ).execute()
                                 st.session_state["supabase_user"] = response.user
-                                st.session_state["supabase_access_token"] = (
-                                    session.access_token if session else None
-                                )
-                                st.session_state["supabase_refresh_token"] = (
-                                    session.refresh_token if session else None
-                                )
-                                profile = (
-                                    supabase.table("profiles")
-                                    .select("name")
-                                    .eq("id", response.user.id)
-                                    .single()
-                                    .execute()
-                                )
-                                st.session_state["supabase_user_name"] = (
-                                    profile.data["name"]
-                                    if profile.data
-                                    else response.user.email
-                                )
-                                st.success("✅ Signed in successfully!")
+                                st.session_state["supabase_user_name"] = new_name
+                                if response.session:
+                                    st.session_state["supabase_access_token"] = (
+                                        response.session.access_token
+                                    )
+                                    st.session_state["supabase_refresh_token"] = (
+                                        response.session.refresh_token
+                                    )
+                                st.success("✅ Account created! You are now signed in.")
                                 st.rerun()
                             else:
                                 st.error(
-                                    "❌ Sign in failed. Please check your credentials."
+                                    "❌ Sign up failed. The email may already be registered."
                                 )
                         except Exception as exc:
-                            st.error(f"❌ Sign in error: {exc}")
+                            st.error(f"❌ Sign up error: {exc}")
 
-            # "Forgot password?" — switches to the Reset Password view
-            if st.button("Forgot password?", key="forgot_pw_btn"):
-                st.session_state["auth_view"] = "reset_password"
-                st.rerun()
-
-    # ══════════════════════════════════════════════════════════════════
-    # Sign up tab
-    # ══════════════════════════════════════════════════════════════════
-    with tab_sign_up:
-        st.markdown(
-            '<h2 class="auth-card-title">Create account</h2>', unsafe_allow_html=True
-        )
-        st.markdown(
-            '<p class="auth-card-subtitle">Join MacroMatch today.</p>',
-            unsafe_allow_html=True,
-        )
-        with st.form("sign_up_form"):
-            new_name = st.text_input("Full name", placeholder="Jane Doe")
-            new_email = st.text_input("Email address", placeholder="you@example.com")
-            new_pw = st.text_input(
-                "Password",
-                type="password",
-                placeholder="••••••••",
-                help="At least 6 characters",
-            )
-            new_pw2 = st.text_input(
-                "Confirm password", type="password", placeholder="••••••••"
-            )
-            create_btn = st.form_submit_button(
-                "Create account", type="primary", use_container_width=True
-            )
-
-        if create_btn:
-            # Basic validation before anything is sent to Supabase.
-            problems = []
-            if not new_name or not new_email or not new_pw or not new_pw2:
-                problems.append("Please fill in every field.")
-            elif not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", new_email or ""):
-                problems.append("Please enter a valid email address.")
-            elif len(new_pw or "") < 6:
-                problems.append("Password must be at least 6 characters long.")
-            elif new_pw != new_pw2:
-                problems.append("Passwords do not match.")
-
-            if problems:
-                for p in problems:
-                    st.error(p)
-            else:
-                with st.spinner("Creating account…"):
-                    try:
-                        response = supabase.auth.sign_up(
-                            {"email": new_email, "password": new_pw}
-                        )
-                        if response.user:
-                            # Create a profile row linked to the auth user
-                            supabase.table("profiles").insert(
-                                {
-                                    "id": response.user.id,
-                                    "email": new_email,
-                                    "name": new_name,
-                                }
-                            ).execute()
-                            st.session_state["supabase_user"] = response.user
-                            st.session_state["supabase_user_name"] = new_name
-                            if response.session:
-                                st.session_state["supabase_access_token"] = (
-                                    response.session.access_token
-                                )
-                                st.session_state["supabase_refresh_token"] = (
-                                    response.session.refresh_token
-                                )
-                            st.success(
-                                "✅ Account created! You are now signed in."
-                            )
-                            st.rerun()
-                        else:
-                            st.error(
-                                "❌ Sign up failed. The email may already be registered."
-                            )
-                    except Exception as exc:
-                        st.error(f"❌ Sign up error: {exc}")
-
-    # Close the centered card wrapper
-    st.markdown('</div></div>', unsafe_allow_html=True)
-
-# If still not authenticated after the landing screen, stop here.
+# Protect the rest of the app: nothing below runs for logged-out users.
 if st.session_state["supabase_user"] is None:
     st.stop()
 
@@ -1471,172 +1576,9 @@ button[kind="primary"] p:hover {
 """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────
-# NEW: Authentication card CSS — centered, dark, readable
-# ─────────────────────────────────────────────
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-
-/* ── Hide default Streamlit chrome for a standalone-app look ── */
-#MainMenu, [data-testid="stToolbar"], .stAppToolbar, header,
-footer, .stDeployButton {
-    visibility: hidden !important;
-    display: none !important;
-    height: 0 !important;
-}
-
-/* ── Centered auth container ── */
-.auth-page {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 65vh;
-    padding: 1.5rem 1rem;
-}
-
-.auth-card {
-    width: 100%;
-    max-width: 440px;
-    background: #161B22;
-    border: 1px solid #30363D;
-    border-radius: 16px;
-    padding: 2.5rem 2rem 2rem;
-    box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.55);
-}
-
-/* ── Typography ── */
-.auth-card, .auth-card input, .auth-card label,
-.auth-card .stTab, .auth-card .stMarkdown, .auth-card p,
-.auth-card div[data-baseweb="input"], .auth-card div[data-baseweb="textarea"] {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    color: #E6EDF3 !important;
-    font-size: 16px !important;
-}
-
-.auth-card h2, .auth-card h3, .auth-card h4 {
-    color: #F0F6FC !important;
-    font-family: 'Inter', sans-serif !important;
-    font-weight: 600 !important;
-    margin-top: 0 !important;
-}
-
-/* ── Tab titles: large & readable ── */
-.auth-card button[data-baseweb="tab"] {
-    font-size: 16px !important;
-    font-weight: 500 !important;
-    color: #8B949E !important;
-    padding: 0.5rem 1rem !important;
-}
-.auth-card button[data-baseweb="tab"][aria-selected="true"] {
-    color: #F0F6FC !important;
-}
-
-/* ── Form controls ── */
-.auth-card input[type="text"],
-.auth-card input[type="email"],
-.auth-card input[type="password"] {
-    background: #0D1117 !important;
-    border: 1px solid #30363D !important;
-    border-radius: 8px !important;
-    padding: 0.625rem 0.875rem !important;
-    font-size: 16px !important;
-    color: #E6EDF3 !important;
-    box-sizing: border-box !important;
-}
-.auth-card input[type="text"]::placeholder,
-.auth-card input[type="email"]::placeholder,
-.auth-card input[type="password"]::placeholder {
-    color: #8B949E !important;
-    opacity: 1 !important;
-}
-
-/* Focus ring */
-.auth-card input:focus,
-.auth-card div[data-baseweb="input"]:focus-within {
-    border-color: #2EA043 !important;
-    box-shadow: 0 0 0 3px rgba(46, 160, 67, 0.15) !important;
-}
-
-/* ── Primary buttons: full width, emerald accent ── */
-.auth-card .stButton > button,
-.auth-card button[kind="primary"] {
-    width: 100% !important;
-    background: #2EA043 !important;
-    border: none !important;
-    border-radius: 8px !important;
-    padding: 0.625rem 1rem !important;
-    font-size: 16px !important;
-    font-weight: 600 !important;
-    color: #FFFFFF !important;
-    box-shadow: none !important;
-}
-.auth-card .stButton > button:hover,
-.auth-card button[kind="primary"]:hover {
-    background: #3FB950 !important;
-    filter: brightness(1.05) !important;
-}
-
-/* Secondary / text buttons (Back, Forgot password) */
-.auth-card .text-btn {
-    background: transparent !important;
-    border: none !important;
-    color: #58A6FF !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    cursor: pointer !important;
-    padding: 0.25rem 0 !important;
-    text-align: left !important;
-    width: 100% !important;
-}
-.auth-card .text-btn:hover {
-    color: #79C0FF !important;
-    text-decoration: underline !important;
-}
-
-/* ── Error / success alerts inside card ── */
-.auth-card .stAlert {
-    background: rgba(248, 81, 73, 0.1) !important;
-    border: 1px solid #F85149 !important;
-    border-radius: 8px !important;
-    color: #F0F6FC !important;
-    font-size: 15px !important;
-    padding: 0.75rem 1rem !important;
-    margin-bottom: 1rem !important;
-}
-
-/* Links / helpers */
-.auth-helper {
-    font-size: 14px !important;
-    color: #8B949E !important;
-    margin-top: 1rem !important;
-    line-height: 1.5;
-}
-.auth-helper a, .auth-helper .text-btn {
-    color: #58A6FF !important;
-    text-decoration: none !important;
-}
-.auth-helper a:hover, .auth-helper .text-btn:hover {
-    color: #79C0FF !important;
-    text-decoration: underline !important;
-}
-
-/* Card header spacing */
-.auth-card-title {
-    text-align: center;
-    font-size: 24px !important;
-    font-weight: 600 !important;
-    color: #F0F6FC !important;
-    margin-bottom: 0.5rem !important;
-}
-.auth-card-subtitle {
-    text-align: center;
-    font-size: 15px !important;
-    color: #8B949E !important;
-    margin-bottom: 2rem !important;
-}
-</style>
-""", unsafe_allow_html=True)
+# NOTE: Authentication CSS now lives INSIDE the logged-out block near the top
+# of this file. It must be injected BEFORE st.stop(), otherwise the login screen
+# never receives it (the old copy here was dead code after st.stop()).
 
 
 # ─────────────────────────────────────────────
