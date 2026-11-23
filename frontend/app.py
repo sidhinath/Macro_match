@@ -169,8 +169,9 @@ if st.session_state["supabase_user"] is None:
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    /* Hide only top-right chrome — never touch the sidebar toggle. */
-    [data-testid="stToolbarActions"], #MainMenu, footer {
+    /* Hide Streamlit chrome — never touch the sidebar toggle. */
+    [data-testid="stToolbarActions"], #MainMenu, footer,
+    .stDeployButton, [data-testid="stAppDeployButton"], [data-testid="manage-app-button"] {
         display: none !important;
     }
     /* Keep the control interactive, then apply the custom "☰ Menu" styling. */
@@ -1309,9 +1310,10 @@ st.markdown("""
 /* ── Google Fonts ── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
 
-/* ── Hide only top-right Streamlit chrome ─────────────────────────────
+/* ── Hide Streamlit chrome ─────────────────────────────────────────────
    Never target the Streamlit header or its sidebar toggle controls. */
-[data-testid="stToolbarActions"], #MainMenu, footer {
+[data-testid="stToolbarActions"], #MainMenu, footer,
+.stDeployButton, [data-testid="stAppDeployButton"], [data-testid="manage-app-button"] {
     display: none !important;
 }
 /* Keep the control interactive, then apply the custom "☰ Menu" styling. */
@@ -1386,9 +1388,9 @@ span[data-testid="collapsedControl"] button::after {
     white-space: nowrap !important;
     padding: 2px 4px !important;
 }
-/* Give the logo/heading section room below the top header bar */
+/* Tighter top spacing so "Your Regular Food" stays visible without scrolling */
 section.main > div[data-testid="stMainBlockContainer"],
-div.block-container { padding-top: 3.5rem !important; }
+div.block-container { padding-top: 1.8rem !important; }
 
 /* ── Base typography ── */
 html, body, [class*="css"] {
@@ -1590,7 +1592,7 @@ h1, h2, h3, .stHeading {
 /* ── Hero header ── */
 .hero-block {
     text-align: center;
-    padding: 0.9rem 1rem 0.6rem;
+    padding: 0.4rem 1rem 0.6rem;
 }
 .hero-brand {
     display: inline-flex;
