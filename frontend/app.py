@@ -1300,9 +1300,9 @@ span[data-testid="collapsedControl"] button::after {
     white-space: nowrap !important;
     padding: 2px 4px !important;
 }
-/* Content sits cleanly at the top of the page with breathing room */
+/* Give the logo/heading section room below the top header bar */
 section.main > div[data-testid="stMainBlockContainer"],
-div.block-container { padding-top: 1rem !important; }
+div.block-container { padding-top: 3.5rem !important; }
 
 /* ── Base typography ── */
 html, body, [class*="css"] {
