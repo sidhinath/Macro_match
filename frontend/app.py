@@ -3377,11 +3377,12 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28) !important;
 }
 .search-card-title {
-    font-size: 0.78rem !important;
-    font-weight: 800 !important;
-    letter-spacing: 0.14em !important;
-    color: #7EE2A8 !important;
-    margin: 0 0 0.6rem !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.04em !important;
+    line-height: 1.4 !important;
+    color: #4ADE80 !important;
+    margin: 0 0 8px !important;
 }
 .search-card-title--spaced {
     margin-top: 1.1rem !important;
@@ -3612,6 +3613,15 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
         margin-right: auto !important;
     }
 
+    .search-card-title {
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.04em !important;
+        line-height: 1.4 !important;
+        color: #4ADE80 !important;
+        margin-bottom: 8px !important;
+    }
+
     body,
     .stMarkdown p,
     .stTextInput label p,
@@ -3675,6 +3685,14 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
         padding: 0.85rem !important;
         border-radius: 14px !important;
+    }
+    .search-card-title {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.04em !important;
+        line-height: 1.4 !important;
+        color: #4ADE80 !important;
+        margin-bottom: 8px !important;
     }
     .hero-block {
         padding: 0.35rem 0.75rem 0.55rem !important;
