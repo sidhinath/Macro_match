@@ -72,6 +72,7 @@ def get_supabase_client() -> Client:
 supabase: Client = get_supabase_client()
 
 
+@st.cache_data(ttl=3600)
 def fetch_profile_name(user_id: str, fallback: str) -> str:
     """Look up a profile name, tolerating a missing `profiles` table (PGRST205)."""
     try:
@@ -131,6 +132,11 @@ def _ensure_supabase_session() -> None:
             st.session_state["supabase_user_name"] = None
             st.error(f"Supabase session expired — please sign in again: {exc}")
             return
+
+    # The user object is already in session state after the first load; skip
+    # the extra network round-trip on every subsequent widget click.
+    if st.session_state["supabase_user"] is not None:
+        return
 
     try:
         user_response = supabase.auth.get_user()
@@ -208,7 +214,7 @@ if st.session_state["supabase_user"] is None:
         border-radius: 10px !important;
         padding: 4px 12px !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-        transition: all 0.2s ease !important;
+        transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease !important;
     }
 
     [data-testid="stSidebarCollapsedControl"]:hover,
@@ -659,16 +665,18 @@ def save_match(user_id, product, city, diet_rules, allergens, priority, alternat
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
         ).execute()
+        get_saved_matches.clear()  # sidebar refresh on the automatic button rerun
         return True
     except Exception as e:
         st.error(f"Save failed: {e}")
         return False
 
 
+@st.cache_data(ttl=60)
 def get_saved_matches(user_id):
     """Return this user's rows from public.saved_matches, newest first.
 
-    No caching: the sidebar must always show the latest database state.
+    Cached for 60s; the cache is cleared only on save/delete.
     """
     _attach_session()  # RLS requires an authenticated PostgREST session
     try:
@@ -704,10 +712,16 @@ def delete_saved_match(match_id):
         supabase.table("saved_matches").delete().eq("id", match_id).eq(
             "user_id", str(CURRENT_USER_ID)
         ).execute()
+        get_saved_matches.clear()
         return True
     except Exception as e:
         st.error(f"Delete failed: {e}")
         return False
+
+
+def _delete_saved_match_callback(match_id):
+    """Widget callback: delete a row; the fragment redraws on the same click."""
+    delete_saved_match(match_id)
 
 
 def load_saved_match(match):
@@ -740,6 +754,7 @@ def load_saved_match(match):
     st.rerun()
 
 
+@st.fragment(key="saved_matches")
 def render_saved_matches(container):
     """Paint clickable saved-match rows with an optional delete button."""
     matches = get_saved_matches(CURRENT_USER_ID)
@@ -762,14 +777,14 @@ def render_saved_matches(container):
             ):
                 load_saved_match(match)
         with col2:
-            if st.button(
+            st.button(
                 "🗑️",
                 key=f"delete_match_{match['id']}",
+                on_click=_delete_saved_match_callback,
+                args=(match["id"],),
                 use_container_width=True,
                 help="Delete this saved match",
-            ):
-                if delete_saved_match(match["id"]):
-                    st.rerun()
+            )
 
 
 # ─────────────────────────────────────────────
@@ -1340,7 +1355,7 @@ button[data-testid="collapsedControl"],
     border-radius: 10px !important;
     padding: 4px 12px !important;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-    transition: all 0.2s ease !important;
+    transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease !important;
 }
 
 [data-testid="stSidebarCollapsedControl"]:hover,
@@ -1624,7 +1639,7 @@ button[kind="primary"] p {
     font-weight: 700 !important;
     letter-spacing: 0.3px !important;
     border-radius: 10px !important;
-    transition: all 0.2s ease !important;
+    transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease !important;
     box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
 }
 .stButton > button[kind="primary"]:hover,
@@ -1634,7 +1649,6 @@ button[kind="primary"] p:hover {
     background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
     color: #FFFFFF !important;
     transform: translateY(-1px) !important;
-    filter: brightness(1.08) !important;
     box-shadow: 0 6px 18px rgba(16, 185, 129, 0.5) !important;
 }
 
@@ -1652,7 +1666,7 @@ button[kind="primary"] p:hover {
     border-radius: var(--radius);
     padding: 1rem 1.25rem;
     margin-bottom: 1rem;
-    transition: all 0.2s ease;
+    transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
 }
 .result-card:hover {
     transform: translateY(-3px);
@@ -1844,7 +1858,7 @@ button[kind="primary"] p:hover {
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 0.75rem 0.7rem 0.8rem;
-    transition: all 0.2s ease;
+    transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
 }
 .step:hover {
     border-color: rgba(255, 255, 255, 0.18);
@@ -2061,7 +2075,7 @@ def fetch_product_list() -> list[str]:
         raise BackendUnavailable(API_BASE) from exc
 
 
-@st.cache_data
+@st.cache_data(ttl=60)
 def load_product_csv() -> pd.DataFrame:
     """Load products.csv to retrieve original product macros for comparison."""
     csv_path = Path(__file__).parent.parent / "data" / "products.csv"
@@ -2070,7 +2084,7 @@ def load_product_csv() -> pd.DataFrame:
     return df
 
 
-@st.cache_data
+@st.cache_data(ttl=60)
 def load_city_list() -> list[str]:
     """Destination cities derived from the dataset so the UI never drifts from the data."""
     try:
@@ -2090,6 +2104,7 @@ def load_city_list() -> list[str]:
     return sorted(cities, key=lambda name: (preferred.get(name, len(preferred)), name))
 
 
+@st.cache_data(ttl=60)
 def get_original_macros(product_name: str) -> dict | None:
     """Return the macro dict for the original product from local CSV."""
     df = load_product_csv()
@@ -2119,6 +2134,7 @@ def product_image(name: str) -> Path | None:
     return None
 
 
+@st.cache_data(ttl=60)
 def product_image_src(name: str) -> str | None:
     """Return a data-URI for embedding a product photo in custom HTML."""
     image = product_image(name)
@@ -2129,7 +2145,7 @@ def product_image_src(name: str) -> str | None:
     return f"data:{mime};base64,{encoded}"
 
 
-@st.cache_data
+@st.cache_data(ttl=60)
 def load_product_details() -> dict[str, dict]:
     """Every product row as a dict, with the city list parsed out.
 
