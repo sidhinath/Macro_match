@@ -3395,32 +3395,6 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
 .filters-expander-marker {
     display: none !important;
 }
-/* Step 3 badge lives inside the Filters expander header. */
-div[data-testid="stExpander"]:has(.filters-expander-marker) [data-testid="stExpanderHeader"] p,
-div[data-testid="stExpander"]:has(.filters-expander-marker) summary.streamlit-expanderHeader p {
-    font-size: 17px !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.04em !important;
-    color: #4ADE80 !important;
-}
-div[data-testid="stExpander"]:has(.filters-expander-marker) [data-testid="stExpanderHeader"] p::before,
-div[data-testid="stExpander"]:has(.filters-expander-marker) summary.streamlit-expanderHeader p::before {
-    content: "3";
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 26px;
-    height: 26px;
-    margin-right: 10px;
-    flex: 0 0 26px;
-    vertical-align: middle;
-    border-radius: 50%;
-    background-color: #2EA043;
-    color: #FFFFFF;
-    font-weight: 800;
-    font-size: 14px;
-    line-height: 1;
-}
 div[data-testid="stExpander"]:has(.filters-expander-marker) label[data-testid="stWidgetLabel"] p {
     font-weight: 700 !important;
     color: #E6EDF3 !important;
@@ -4775,6 +4749,10 @@ with st.container(border=True):
         _apply_default_diet()
         _apply_default_allergens()
 
+    st.markdown(
+        '<div style="display: flex; align-items: center; gap: 10px; margin: 16px 0 8px 0;"><span style="background-color: #2EA043; color: #FFFFFF; font-weight: 800; font-size: 14px; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">3</span><span style="color: #4ADE80; font-weight: 700; font-size: 17px; letter-spacing: 0.04em;">PREFERENCES — Customize your diet & macro priority</span></div>',
+        unsafe_allow_html=True,
+    )
     with st.expander("🥦 Filters — diet, allergens & priority", expanded=True):
         st.markdown(
             '<div class="filters-expander-marker" aria-hidden="true"></div>',
