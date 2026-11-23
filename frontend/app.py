@@ -572,6 +572,19 @@ def get_saved_matches(user_id):
     except Exception:
         return []
 
+
+def render_saved_matches(container):
+    """Paint the sidebar saved-match list; can be re-called right after a save."""
+    matches = get_saved_matches(CURRENT_USER_ID)
+    if not matches:
+        container.caption("No saved matches yet — save a result below.")
+        return
+    lines = [
+        f"- {m['product']} → {m['city']} · {m['priority']}" for m in matches
+    ]
+    container.markdown("\n".join(lines))
+
+
 # ─────────────────────────────────────────────
 # Constants
 # ─────────────────────────────────────────────
@@ -2186,12 +2199,10 @@ with st.sidebar:
 
     # ─── NEW: per-user saved matches history (Supabase, user_id-keyed) ──
     with st.expander("🕘 My saved matches", expanded=False):
-        _matches = get_saved_matches(CURRENT_USER_ID)
-        if not _matches:
-            st.caption("No saved matches yet — save a result below.")
-        else:
-            for _m in _matches:
-                st.caption(f"{_m['product']} → {_m['city']} · {_m['priority']}")
+        # Placeholder lets us refresh this list from the Save button later in
+        # the same rerun (the sidebar is rendered before the main body).
+        saved_matches_slot = st.empty()
+        render_saved_matches(saved_matches_slot)
 
     st.markdown("## 🛒 Your Product")
     try:
@@ -2428,6 +2439,9 @@ if st.button("💾 Save this match to my history", key="save_match_to_history"):
         alternatives,
     ):
         st.success("Saved to your history — only your own account can see it.")
+        # Refresh the sidebar immediately without a full rerun (which would
+        # discard the current results view).
+        render_saved_matches(saved_matches_slot)
 
 # ── Result cards ──────────────────────────────
 
