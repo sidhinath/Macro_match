@@ -5159,6 +5159,116 @@ div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div
         color: #FFFFFF !important;
     }
 }
+
+/* 1. Rich emerald gradient & larger bold text for all sidebar buttons */
+section[data-testid="stSidebar"] div[data-testid="stButton"] button {
+    background: linear-gradient(135deg, rgba(46, 160, 67, 0.26) 0%, rgba(15, 58, 37, 0.65) 100%) !important;
+    border: 1.5px solid #3FB950 !important;
+    border-radius: 14px !important;
+    padding: 13px 16px !important;
+    min-height: 50px !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 10px rgba(63, 185, 80, 0.15) !important;
+    transition: all 0.15s ease !important;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stButton"] button p,
+section[data-testid="stSidebar"] div[data-testid="stButton"] button span {
+    font-size: 17px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+    letter-spacing: 0.02em !important;
+}
+
+/* 2. Top User Profile button: brighter pill shape with emerald glow */
+section[data-testid="stSidebar"] div[data-testid="stButton"]:first-of-type button {
+    background: linear-gradient(135deg, #217A3E 0%, #134725 100%) !important;
+    border: 1.5px solid #4ADE80 !important;
+    border-radius: 999px !important;
+    box-shadow: 0 0 18px rgba(74, 222, 128, 0.3) !important;
+}
+
+/* 3. Matching subtle emerald border on sidebar expanders (Saved matches, Daily Macro Target, Default Diet & Allergens) */
+section[data-testid="stSidebar"] div[data-testid="stExpander"] details {
+    background: linear-gradient(135deg, rgba(46, 160, 67, 0.10), rgba(22, 27, 34, 0.95)) !important;
+    border: 1px solid rgba(63, 185, 80, 0.5) !important;
+    border-radius: 12px !important;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stExpander"] summary p {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+}
+
+/* 4. Distinct soft-crimson Sign Out button inside the expanded profile card */
+section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="profile_card_signout"] {
+    background: linear-gradient(135deg, rgba(248, 81, 73, 0.25), rgba(110, 28, 28, 0.55)) !important;
+    border: 1.5px solid rgba(248, 81, 73, 0.75) !important;
+    box-shadow: none !important;
+}
+
+@media (hover: hover) {
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
+        background: linear-gradient(135deg, rgba(46, 160, 67, 0.42) 0%, rgba(22, 92, 56, 0.75) 100%) !important;
+        border-color: #4ADE80 !important;
+        transform: translateY(-1px) !important;
+    }
+}
+
+/* Reinforce the upgraded values over the earlier widget-specific rules, whose
+   :has() selectors otherwise win the cascade with higher specificity. */
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    background: linear-gradient(135deg, #217A3E 0%, #134725 100%) !important;
+    border: 1.5px solid #4ADE80 !important;
+    border-radius: 999px !important;
+    padding: 13px 16px !important;
+    min-height: 50px !important;
+    box-shadow: 0 0 18px rgba(74, 222, 128, 0.3) !important;
+    font-size: 17px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+}
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-signout-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    background: linear-gradient(135deg, rgba(248, 81, 73, 0.25), rgba(110, 28, 28, 0.55)) !important;
+    border: 1.5px solid rgba(248, 81, 73, 0.75) !important;
+    border-radius: 14px !important;
+    padding: 13px 16px !important;
+    min-height: 50px !important;
+    box-shadow: none !important;
+    font-size: 17px !important;
+    font-weight: 700 !important;
+    color: #FFA198 !important;
+}
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    background: linear-gradient(135deg, rgba(46, 160, 67, 0.26) 0%, rgba(15, 58, 37, 0.65) 100%) !important;
+    border: 1.5px solid #3FB950 !important;
+    border-radius: 14px !important;
+    padding: 13px 16px !important;
+    min-height: 50px !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 10px rgba(63, 185, 80, 0.15) !important;
+    font-size: 17px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+}
+@media (hover: hover) {
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+        background: linear-gradient(135deg, rgba(46, 160, 67, 0.42) 0%, rgba(22, 92, 56, 0.75) 100%) !important;
+        border-color: #4ADE80 !important;
+        transform: translateY(-1px) !important;
+    }
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+        background: linear-gradient(135deg, #217A3E 0%, #134725 100%) !important;
+    }
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-signout-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+        background: linear-gradient(135deg, rgba(248, 81, 73, 0.35), rgba(110, 28, 28, 0.65)) !important;
+        border-color: rgba(248, 81, 73, 0.9) !important;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
