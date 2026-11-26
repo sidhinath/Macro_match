@@ -32,10 +32,11 @@ from supabase import create_client, Client  # >>> NEW: Supabase client for Auth 
 # Load .env (local dev). On Streamlit Community Cloud, use the app's Secrets instead.
 load_dotenv()
 
-# Zero-height component that installs mobile sidebar gestures once per session.
-# It listens on window.parent.document so a swipe from anywhere closes the
-# sidebar, and it also closes the sidebar after any card "Select" tap.
-# "View Details" uses the dedicated collapse component below instead.
+# Zero-height component that installs mobile sidebar swipe gestures once per
+# session. Button taps must never close the sidebar in the same tick: that can
+# cancel the widget's Streamlit event. Navigation callbacks only set the
+# close_mobile_sidebar flag; the deferred script below does the actual click
+# after the destination view has rendered.
 _MOBILE_SIDEBAR_TOGGLE_JS = """
 <script>
 (function () {
@@ -143,44 +144,33 @@ _MOBILE_SIDEBAR_TOGGLE_JS = """
                              { passive: true, capture: true });
     }
 
-    // Wishlist / catalogue Select buttons are Streamlit widgets that
-    // trigger a full rerun; a delegated parent-document listener is the
-    // reliable place to collapse the mobile sidebar right after the tap.
-    // View Details uses the dedicated details-view collapse component instead.
-    if (!host.__mmGuideSelectBound) {
-        host.__mmGuideSelectBound = true;
-        host.__mmGuideSelectHandler = function (event) {
-            if (host.innerWidth > MOBILE_MAX_WIDTH) { return; }
-            var target = event.target && event.target.closest
-                ? event.target.closest('button') : null;
-            if (!target) { return; }
-            var label = (target.textContent || '').trim();
-            if (label !== 'Select') { return; }
-            var sidebar = doc.querySelector('[data-testid="stSidebar"]');
-            if (!sidebar || !sidebar.contains(target)) { return; }
-            // Retry once only if Streamlit has not swapped in the collapse
-            // control yet; a successful click must never be repeated.
-            if (!collapseSidebar()) {
-                host.setTimeout(collapseSidebar, 80);
-            }
-        };
-        doc.addEventListener('click', host.__mmGuideSelectHandler, false);
-    }
 })();
 </script>
 """
 
-# Fired once on the rerun that opens a Product Details page. The guide tap
-# listener above is intentionally limited to "Select" so it cannot double-fire.
-_MOBILE_DETAILS_COLLAPSE_JS = """
+# Fired only from _render_deferred_components(), at the very bottom of the
+# rerun and after the destination view is on screen. Nothing here runs in the
+# same tick as the originating button tap, so Streamlit's widget event always
+# finishes first. Never clicks the collapsed-control (that would re-open it).
+_MOBILE_SIDEBAR_CLOSE_JS = """
 <script>
-if (window.parent.innerWidth <= 768) {
-    const btn = window.parent.document.querySelector(
-        '[data-testid="stSidebarCollapseButton"] button, ' +
-        '[data-testid="stSidebar"] button[kind="header"]'
-    );
-    if (btn) btn.click();
-}
+(function () {
+    if (window.parent.innerWidth > 768) { return; }
+    var doc = window.parent.document;
+    var sidebar = doc.querySelector('[data-testid="stSidebar"]');
+    if (!sidebar) { return; }
+    var style = (doc.defaultView || window).getComputedStyle(sidebar);
+    var rect = sidebar.getBoundingClientRect();
+    if (style.display === 'none' || style.visibility === 'hidden' || rect.width === 0) {
+        return;
+    }
+    var collapseButton = doc.querySelector('[data-testid="stSidebarCollapseButton"] button');
+    if (collapseButton) {
+        collapseButton.click();
+        return;
+    }
+    doc.querySelector('[data-testid="stSidebar"] button[kind="header"]')?.click();
+})();
 </script>
 """
 
@@ -188,6 +178,32 @@ if (window.parent.innerWidth <= 768) {
 # ``touch-action: manipulation`` removes the mobile 300 ms double-tap zoom wait,
 # and the mobile media query drops GPU-heavy blur/transitions on low-end phones.
 _TOUCH_FIRST_CSS = """
+/* Zero-height JS helper iframes are invisible but still cover parts of the
+   page; they must never swallow a finger tap aimed at a button underneath.
+   The searchbox is a real visible component, so restore it explicitly. */
+/* Streamlit 1.67 puts stIFrame on the iframe itself and titles components.html
+   frames "st.iframe"; both are zero-height helpers in this app. */
+div[data-testid="stIFrame"],
+iframe[height="0"],
+iframe[data-testid="stIFrame"],
+iframe[title="st.iframe"] {
+    pointer-events: none !important;
+}
+iframe[title="streamlit_searchbox.searchbox"],
+div[data-testid="stIFrame"]:has(iframe[title="streamlit_searchbox.searchbox"]),
+iframe[data-testid="stIFrame"][title="streamlit_searchbox.searchbox"] {
+    pointer-events: auto !important;
+}
+
+/* Every visible button stays above decorative layers and reacts on the first
+   tap instead of waiting for a sticky hover state. */
+button {
+    position: relative;
+    z-index: 10;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+}
+
 button,
 [data-baseweb="tab"],
 div[data-testid="stCheckbox"] label {
@@ -278,6 +294,9 @@ st.markdown(f"<style>{_TOUCH_FIRST_CSS}</style>", unsafe_allow_html=True)
 
 # Publish the viewport width into the URL so Python callbacks can pick the
 # right catalogue page size (4 cards on phones, 6 on desktop) from the tap.
+# No synthetic popstate is dispatched: navigation is driven only by nav_stack,
+# so typing or tapping never triggers a second background rerun. The value is
+# picked up on the next ordinary widget rerun.
 _VIEWPORT_DETECT_JS = """
 <script>
 (function () {
@@ -289,10 +308,6 @@ _VIEWPORT_DETECT_JS = """
             if (url.searchParams.get("mm_mobile") !== mobile) {
                 url.searchParams.set("mm_mobile", mobile);
                 win.history.replaceState(win.history.state, "", url.toString());
-                // Streamlit syncs st.query_params from the parent URL on popstate.
-                win.dispatchEvent(
-                    new PopStateEvent("popstate", { state: win.history.state })
-                );
             }
         } catch (e) { /* non-browser preview: keep the desktop default */ }
     }
@@ -795,135 +810,26 @@ _PWA_COPY_LINK_JS = """
 </script>
 """.replace("__MM_APP_URL__", json.dumps(INSTALL_APP_URL))
 
-# Browser-history bridge for the Python nav_stack. Streamlit already listens to
-# parent popstate events and reruns with the new query string; writing the stack
-# depth into ``?step=`` is enough to make the phone's Back button step through
-# views instead of leaving the app. A sentinel entry keeps Back inside the app
-# even when the user is already on Home.
-_NAV_HISTORY_SYNC_JS = """
-<script>
-(function () {
-    var DEPTH = __MM_NAV_DEPTH__;
-
-    function parentWindow() {
-        try {
-            return (window.parent && window.parent.document) ? window.parent : window;
-        } catch (e) {
-            return window;
-        }
-    }
-
-    function historyState() {
-        return { navDepth: DEPTH, mmNav: true };
-    }
-
-    var parent = parentWindow();
-    var win = parent;
-    var current = typeof parent.__mmNavDepth === 'number' ? parent.__mmNavDepth : null;
-
-    function writeState(mode) {
-        var url;
-        try {
-            url = new URL(win.location.href);
-            url.searchParams.set('step', String(DEPTH));
-            if (mode === 'push') {
-                win.history.pushState(historyState(), '', url.toString());
-            } else {
-                win.history.replaceState(historyState(), '', url.toString());
-            }
-        } catch (e) {
-            // Keep the in-memory depth even if URL APIs are unavailable.
-        }
-        parent.__mmNavDepth = DEPTH;
-    }
-
-    if (current === null) {
-        writeState('replace');
-        // One extra Home entry means the first hardware Back press cannot exit.
-        try {
-            win.history.pushState(historyState(), '', win.location.href);
-        } catch (e) { /* keep the single entry */ }
-        parent.__mmNavDepth = DEPTH;
-    } else if (DEPTH > current) {
-        writeState('push');
-    } else if (DEPTH < current) {
-        var urlStep = NaN;
-        try {
-            urlStep = parseInt(new URL(win.location.href).searchParams.get('step'), 10);
-        } catch (e) { /* fall through and rewind */ }
-
-        // A hardware Back press already moved the browser URL to DEPTH and
-        // Python followed it. Only rewind when the visible Back pill popped the
-        // stack while the URL is still deeper, otherwise we would step back a
-        // second time and skip a page.
-        if (isNaN(urlStep) || urlStep > DEPTH) {
-            try {
-                win.history.go(DEPTH - current);
-            } catch (e) { /* replace below still keeps the URL consistent */ }
-            try {
-                var url = new URL(win.location.href);
-                if (url.searchParams.get('step') !== String(DEPTH)) {
-                    url.searchParams.set('step', String(DEPTH));
-                    win.history.replaceState(historyState(), '', url.toString());
-                }
-            } catch (e) { /* no-op */ }
-        }
-        parent.__mmNavDepth = DEPTH;
-    } else {
-        try {
-            var currentUrl = new URL(win.location.href);
-            var needsWrite = (
-                currentUrl.searchParams.get('step') !== String(DEPTH) ||
-                !win.history.state ||
-                win.history.state.navDepth !== DEPTH
-            );
-            if (needsWrite) { writeState('replace'); }
-        } catch (e) { /* no-op */ }
-        parent.__mmNavDepth = DEPTH;
-    }
-})();
-</script>
-"""
-
-
-def _nav_history_sync_js(depth: int) -> str:
-    """Fill the current stack depth into the browser-history bridge."""
-    return _NAV_HISTORY_SYNC_JS.replace("__MM_NAV_DEPTH__", json.dumps(max(1, depth)))
-
+# Navigation is intentionally driven only by st.session_state.nav_stack. An
+# earlier pushState/popstate bridge caused extra background reruns and could
+# swallow taps on mobile, so it has been removed rather than patched.
 
 # All zero-height JS components are rendered in one deferred block at the very
 # end of the script (or immediately before an early stop). Keeping them out of
 # the page body prevents blank vertical gaps above the top-right back button.
-_DEFERRED_COLLAPSE_FLAGS = (
-    "_collapse_sidebar_for_details",
-    "_collapse_sidebar_for_wishlist",
-    "_collapse_sidebar_for_catalogue",
-    "_collapse_sidebar_for_install",
-    "_collapse_sidebar_for_nav",
-)
+# Written only inside on_click callbacks, then consumed at the very bottom of
+# the following rerun. One flag replaces the old per-view collapse flags so a
+# sidebar tap can never close the sidebar in the same tick as its own event.
 
 
 def _render_deferred_components() -> None:
     """Render every parent-document JS helper after the visible page content."""
-    if "nav_stack" in st.session_state:
-        components.html(
-            _nav_history_sync_js(len(st.session_state["nav_stack"])),
-            height=0,
-            scrolling=False,
-        )
-
     components.html(_VIEWPORT_DETECT_JS, height=0, scrolling=False)
 
     if _PWA_HEAD_INJECTION_JS:
         components.html(_PWA_HEAD_INJECTION_JS, height=0, scrolling=False)
 
     components.html(_MOBILE_SIDEBAR_TOGGLE_JS, height=0, scrolling=False)
-
-    collapse_requested = [
-        st.session_state.pop(flag, False) for flag in _DEFERRED_COLLAPSE_FLAGS
-    ]
-    if any(collapse_requested):
-        components.html(_MOBILE_DETAILS_COLLAPSE_JS, height=0, scrolling=False)
 
     if st.session_state.get("show_install_page", False) and _PWA_INSTALL_BUTTON_JS:
         components.html(_PWA_INSTALL_BUTTON_JS, height=0, scrolling=False)
@@ -933,6 +839,11 @@ def _render_deferred_components() -> None:
 
     if st.session_state.pop("_install_copy_requested", False) and _PWA_COPY_LINK_JS:
         components.html(_PWA_COPY_LINK_JS, height=0, scrolling=False)
+
+    # Always the last component: the new view is already rendered and the
+    # originating button's Streamlit event has finished before this click runs.
+    if st.session_state.pop("close_mobile_sidebar", False):
+        components.html(_MOBILE_SIDEBAR_CLOSE_JS, height=0, scrolling=False)
 
 
 def _stop_after_deferred_components() -> None:
@@ -1881,10 +1792,12 @@ header[data-testid="stHeader"] {
         """, unsafe_allow_html=True)
 
         st.markdown('<div class="auth-google-slot"></div>', unsafe_allow_html=True)
-        if st.button(
-            "Continue with Google", key="google_signin", use_container_width=True
-        ):
-            _begin_google_sign_in()
+        st.button(
+            "Continue with Google",
+            key="google_signin",
+            use_container_width=True,
+            on_click=_begin_google_sign_in,
+        )
         st.markdown(
             '<div class="auth-divider"><span>OR</span></div>',
             unsafe_allow_html=True,
@@ -2393,7 +2306,6 @@ def load_saved_match(match):
     navigate_to({"view": "swaps"})
 
 
-@st.fragment(key="saved_matches")
 def render_saved_matches(container):
     """Paint clickable saved-match rows with an optional delete button."""
     matches = get_saved_matches(CURRENT_USER_ID)
@@ -2531,16 +2443,13 @@ st.session_state.setdefault("show_ai_help", False)
 st.session_state.setdefault("ai_chat_history", [])
 # The wishlist owns the whole main screen when opened from the sidebar button.
 st.session_state.setdefault("show_wishlist_page", False)
-st.session_state.setdefault("_collapse_sidebar_for_wishlist", False)
 # Dedicated catalogue page: six cards at a time on desktop, four on phones.
 CATALOGUE_PAGE_SIZE = 6
 st.session_state.setdefault("show_all_products_page", False)
-st.session_state.setdefault("_collapse_sidebar_for_catalogue", False)
 st.session_state.setdefault("catalogue_visible_count", CATALOGUE_PAGE_SIZE)
 st.session_state.setdefault("catalogue_initial_count", CATALOGUE_PAGE_SIZE)
 # Dedicated PWA install page opened from the sidebar button.
 st.session_state.setdefault("show_install_page", False)
-st.session_state.setdefault("_collapse_sidebar_for_install", False)
 # Sidebar profile pill expands the elevated glass card in place.
 st.session_state.setdefault("show_user_profile", False)
 # Home is clean by default; Find Alternatives switches to the ranked swaps
@@ -2548,8 +2457,8 @@ st.session_state.setdefault("show_user_profile", False)
 if "show_swaps_results" not in st.session_state:
     st.session_state["show_swaps_results"] = False
 st.session_state.setdefault("inspect_product", None)
-# Set by View Details / wishlist-name taps and consumed on the details rerun.
-st.session_state.setdefault("_collapse_sidebar_for_details", False)
+# Set in navigation callbacks, consumed after the new view has rendered.
+st.session_state.setdefault("close_mobile_sidebar", False)
 if "daily_protein_goal" not in st.session_state:
     st.session_state["daily_protein_goal"] = 120
 if "daily_calorie_goal" not in st.session_state:
@@ -2588,43 +2497,25 @@ def _apply_view_state(view: dict) -> None:
 
 
 def navigate_to(view_dict: dict) -> None:
-    """Push a view onto the stack and show it, collapsing the mobile sidebar."""
+    """Push a view onto the stack and queue a deferred mobile sidebar close."""
     stack = st.session_state.setdefault("nav_stack", [{"view": "home"}])
     entry = dict(view_dict)
     if stack[-1] != entry:
         stack.append(entry)
-        # The deferred JS only collapses when the viewport is <= 768px.
-        st.session_state["_collapse_sidebar_for_nav"] = True
+    # The deferred JS checks the viewport and only clicks when the new view is
+    # already rendered, so the originating tap's event is never interrupted.
+    st.session_state.close_mobile_sidebar = True
     _apply_view_state(stack[-1])
 
 
 def navigate_back() -> None:
-    """Pop one screen, returning to the exact page the user came from."""
+    """Pop one screen and queue a deferred mobile sidebar close."""
     stack = st.session_state.setdefault("nav_stack", [{"view": "home"}])
     if len(stack) > 1:
         stack.pop()
+    st.session_state.close_mobile_sidebar = True
     _apply_view_state(stack[-1])
 
-
-def _sync_nav_stack_from_query() -> None:
-    """Apply a browser Back gesture reported by Streamlit's popstate rerun.
-
-    The deferred JS writes the current stack depth into ``?step=``. Streamlit
-    reruns on history navigation and gives us the URL's new depth here, so we
-    never need a second widget click that could race the popstate rerun.
-    """
-    raw_step = st.query_params.get("step")
-    try:
-        target_depth = int(str(raw_step))
-    except (TypeError, ValueError):
-        return
-    stack = st.session_state.setdefault("nav_stack", [{"view": "home"}])
-    if 1 <= target_depth < len(stack):
-        del stack[target_depth:]
-        _apply_view_state(stack[-1])
-
-
-_sync_nav_stack_from_query()
 
 # Auth has already been enforced above, so it is safe to hydrate the signed-in
 # user's saved targets/preferences before any dashboard widgets are created.
@@ -2724,6 +2615,32 @@ def _save_user_metadata(updates: dict, success_message: str) -> None:
         st.success(success_message)
     except Exception as exc:
         st.error(f"Could not save your settings: {exc}")
+
+
+def _save_macro_target_callback() -> None:
+    """Save the daily goals in the button's single callback pass."""
+    _save_user_metadata(
+        {
+            "daily_protein_goal": int(st.session_state["daily_protein_goal"]),
+            "daily_calorie_goal": int(st.session_state["daily_calorie_goal"]),
+        },
+        "Target saved!",
+    )
+
+
+def _save_preferences_callback() -> None:
+    """Apply and persist the sidebar defaults in one callback pass."""
+    _apply_default_diet()
+    _apply_default_allergens()
+    _save_user_metadata(
+        {
+            "default_diet": st.session_state["default_diet_select"],
+            "default_allergens": list(
+                st.session_state.get("default_allergens_select") or []
+            ),
+        },
+        "Preferences saved!",
+    )
 
 
 def _toggle_wishlist_callback(product_name: str) -> None:
@@ -2952,16 +2869,12 @@ def select_food_callback(widget_key: str) -> None:
     display_label = str(picked)
     canonical = _canonical_value(display_label, PRODUCT_DISPLAY_ALIASES)
     selection_changed = canonical != st.session_state.get("selected_product")
-    was_showing_results = st.session_state.get("show_swaps_results", False)
     # The canonical catalogue name drives the selected badge and the visible
     # search text, so they can never disagree after a pill tap.
     _sync_food_selection(canonical)
     st.session_state["food_box_ver"] = st.session_state.get("food_box_ver", 0) + 1
     if selection_changed:
         _reset_swaps_view()
-        # The outer results view needs a full pass; home taps stay fragment-only.
-        if was_showing_results:
-            st.rerun()
 
 
 def select_food_value_callback(product: str) -> None:
@@ -7576,19 +7489,13 @@ with st.sidebar:
             step=100,
             key="daily_calorie_goal",
         )
-        if st.button(
+        st.button(
             "💾 Save Target",
             type="primary",
             use_container_width=True,
             key="save_macro_target",
-        ):
-            _save_user_metadata(
-                {
-                    "daily_protein_goal": int(st.session_state["daily_protein_goal"]),
-                    "daily_calorie_goal": int(st.session_state["daily_calorie_goal"]),
-                },
-                "Target saved!",
-            )
+            on_click=_save_macro_target_callback,
+        )
 
     # ─── Reusable filter defaults ──────────────────────────────────────
     with st.expander("⚙️ Default Diet & Allergens", expanded=False):
@@ -7607,25 +7514,15 @@ with st.sidebar:
             key="default_allergens_select",
             on_change=_apply_default_allergens,
         )
-        if st.button(
+        # The callback applies the saved defaults as well as persisting them,
+        # so the main filters show them on the same rerun the tap produces.
+        st.button(
             "💾 Save Preferences",
             type="primary",
             use_container_width=True,
             key="save_preferences",
-        ):
-            # Apply immediately as well as persisting, so the main filters show
-            # the saved defaults on this same rerun.
-            _apply_default_diet()
-            _apply_default_allergens()
-            _save_user_metadata(
-                {
-                    "default_diet": st.session_state["default_diet_select"],
-                    "default_allergens": list(
-                        st.session_state.get("default_allergens_select") or []
-                    ),
-                },
-                "Preferences saved!",
-            )
+            on_click=_save_preferences_callback,
+        )
 
     # ─── Mobile install launcher (full page lives on the main screen) ───
     st.markdown(
@@ -7725,13 +7622,11 @@ if show_product_details:
     _stop_after_deferred_components()
 
 
-@st.fragment(key="search_controls")
 def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
-    """Isolated real-time food/city autocomplete.
+    """Food/city autocomplete rendered in the normal full-page run.
 
-    st_searchbox calls search_foods/search_cities on every keystroke and reruns
-    only this fragment, so the sidebar, Supabase queries, saved matches, and
-    results stay untouched while the dropdown updates instantly.
+    No @st.fragment here: a fragment-scoped rerun could leave the main view flag
+    stale, so a pill, searchbox or button selection always reruns the whole app.
     """
     # ── Food ────────────────────────────────────────────────────────────
     selected_product = _canonical_value(
@@ -7755,7 +7650,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         edit_after_submit="option",
         clear_on_submit=False,
         style_overrides=_SEARCHBOX_STYLE_OVERRIDES,
-        rerun_scope="fragment",
+        rerun_scope="app",
         debounce=80,
         reset_function=_reset_food_search_input,
         key=f"food_search_{st.session_state['food_box_ver']}",
@@ -7767,11 +7662,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
             st.session_state["selected_product"] = canonical_food
             if canonical_food != selected_product:
                 _sync_food_selection(canonical_food, selected_food)
-                # A full pass is only needed to dismiss the outer swaps view;
-                # on home the fragment rerun triggered by st_searchbox is enough.
-                if st.session_state.get("show_swaps_results"):
-                    _reset_swaps_view()
-                    st.rerun()
+                _reset_swaps_view()
 
     selected_product = st.session_state["selected_product"]
     st.session_state["product_select"] = selected_product
@@ -7855,7 +7746,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         edit_after_submit="option",
         clear_on_submit=False,
         style_overrides=_SEARCHBOX_STYLE_OVERRIDES,
-        rerun_scope="fragment",
+        rerun_scope="app",
         debounce=80,
         reset_function=_reset_city_search_input,
         key=f"city_search_{st.session_state['city_box_ver']}",
