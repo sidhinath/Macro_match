@@ -5392,27 +5392,74 @@ div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div
     }
 }
 
-/* 1. Clean, left-aligned menu rows. No chip borders, no heavy fills — the
-   drawer groups them with muted section labels instead. */
+/* 1. Force ALL sidebar buttons to left-align their inner flex container & text */
 section[data-testid="stSidebar"] div[data-testid="stButton"] button {
+    display: flex !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    text-align: left !important;
+    width: 100% !important;
     background: transparent !important;
     border: none !important;
     border-radius: 10px !important;
     padding: 10px 14px !important;
-    min-height: 0 !important;
-    box-shadow: none !important;
-    justify-content: flex-start !important;
-    text-align: left !important;
-    transition: none !important;
+    min-height: 42px !important;
 }
 
-section[data-testid="stSidebar"] div[data-testid="stButton"] button p,
-section[data-testid="stSidebar"] div[data-testid="stButton"] button span {
+section[data-testid="stSidebar"] div[data-testid="stButton"] button > div,
+section[data-testid="stSidebar"] div[data-testid="stButton"] button p {
+    width: 100% !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
     font-size: 16px !important;
     font-weight: 600 !important;
     color: #E6EDF3 !important;
-    letter-spacing: 0 !important;
-    text-align: left !important;
+    margin: 0 !important;
+}
+
+/* 2. Top Profile Card Button: clean dark card with border & two-line look */
+section[data-testid="stSidebar"] div[data-testid="stButton"]:first-of-type button {
+    background-color: #161B22 !important;
+    border: 1px solid #30363D !important;
+    border-radius: 14px !important;
+    padding: 12px 14px !important;
+    margin-bottom: 6px !important;
+}
+
+/* 3. Highlight the active "Home" button (or active nav item) with emerald tint & left bar */
+section[data-testid="stSidebar"] div[data-testid="stButton"]:nth-of-type(2) button {
+    background: rgba(46, 160, 67, 0.16) !important;
+    border-left: 3px solid #3FB950 !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stButton"]:nth-of-type(2) button p {
+    color: #6EE798 !important;
+    font-weight: 700 !important;
+}
+
+/* 4. Bottom "🤖 AI Diet & Product Help" Button: glowing green pill CTA (centered text) */
+section[data-testid="stSidebar"] div[data-testid="stButton"]:last-of-type button {
+    background: linear-gradient(135deg, #2EA043 0%, #34D399 100%) !important;
+    border: none !important;
+    border-radius: 999px !important;
+    padding: 13px 18px !important;
+    margin-top: 14px !important;
+    justify-content: center !important;
+    box-shadow: 0 4px 18px rgba(52, 211, 153, 0.35) !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stButton"]:last-of-type button > div,
+section[data-testid="stSidebar"] div[data-testid="stButton"]:last-of-type button p {
+    text-align: center !important;
+    justify-content: center !important;
+    color: #051B11 !important;
+    font-size: 17px !important;
+    font-weight: 800 !important;
+}
+
+/* 5. Hover highlight on sidebar menu items */
+@media (hover: hover) {
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
+        background-color: rgba(255, 255, 255, 0.06) !important;
+    }
 }
 
 /* 2. Preference expanders are menu rows too: transparent, left-aligned and
@@ -5462,9 +5509,6 @@ section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="profile
 }
 
 @media (hover: hover) {
-    section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
-        background: rgba(46, 160, 67, 0.10) !important;
-    }
     section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="profile_card_signout"]:hover {
         background-color: rgba(248, 81, 73, 0.2) !important;
         border-color: rgba(248, 81, 73, 0.8) !important;
@@ -5505,7 +5549,7 @@ html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[ke
     background-color: #161B22 !important;
     border: 1px solid #30363D !important;
     border-radius: 14px !important;
-    padding: 12px 16px !important;
+    padding: 12px 14px !important;
     min-height: 62px !important;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
     justify-content: flex-start !important;
