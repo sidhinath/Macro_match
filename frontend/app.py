@@ -2297,10 +2297,8 @@ def load_saved_match(match):
     st.session_state["selected_city"] = city
     st.session_state["food_search_input"] = product
     st.session_state["city_search_input"] = city
-    # A restored match is a programmatic selection, so remount both searchbox
-    # widgets with the restored text instead of reusing any half-typed state.
-    st.session_state["food_box_ver"] = st.session_state.get("food_box_ver", 0) + 1
-    st.session_state["city_box_ver"] = st.session_state.get("city_box_ver", 0) + 1
+    # Searchboxes keep fixed keys, so a restored match updates the live widgets
+    # in place without destroying and recreating their iframes.
     # Legacy aliases kept so older saved-state keys stay in sync.
     st.session_state["product_select"] = product
     st.session_state["city_select"] = city
@@ -2445,12 +2443,7 @@ if "food_search_input" not in st.session_state:
     st.session_state["food_search_input"] = ""
 if "city_search_input" not in st.session_state:
     st.session_state["city_search_input"] = ""
-# Bumped only by explicit selections (pills, guide, saved match) to remount a
-# searchbox. Typing never changes these, so the input cannot snap back.
-if "food_box_ver" not in st.session_state:
-    st.session_state["food_box_ver"] = 0
-if "city_box_ver" not in st.session_state:
-    st.session_state["city_box_ver"] = 0
+# Both searchboxes use fixed keys; no version counter is needed to remount them.
 # Changing these label suffixes remounts the browse expanders, defeating the
 # browser's cached open state so every pick reliably closes the list.
 st.session_state.setdefault("food_browse_ver", 0)
@@ -2896,7 +2889,6 @@ def select_food_callback(widget_key: str) -> None:
     # The canonical catalogue name drives the selected badge and the visible
     # search text, so they can never disagree after a pill tap.
     _sync_food_selection(canonical)
-    st.session_state["food_box_ver"] = st.session_state.get("food_box_ver", 0) + 1
     if selection_changed:
         _reset_swaps_view()
 
@@ -2907,7 +2899,6 @@ def select_food_value_callback(product: str) -> None:
         return
     _sync_food_selection(product, product)
     _reset_swaps_view()
-    st.session_state["food_box_ver"] = st.session_state.get("food_box_ver", 0) + 1
 
 
 def inspect_food_value_callback(product: str) -> None:
@@ -2927,2636 +2918,2674 @@ def select_city_callback(widget_key: str) -> None:
     display_label = str(picked)
     canonical = _canonical_value(display_label, CITY_DISPLAY_ALIASES)
     _sync_city_selection(canonical)
-    st.session_state["city_box_ver"] = st.session_state.get("city_box_ver", 0) + 1
-
-
-PRODUCT_EMOJI = {
-    "Whey Protein Powder": "🥤",
-    "Pea Protein Powder": "🥤",
-    "Soya Chunks (TVP)": "🫘",
-    "Tofu (Firm)": "🧊",
-    "Tempeh": "🫘",
-    "Edamame": "🫛",
-    "Paneer": "🧀",
-    "Greek Yogurt": "🥣",
-    "Cottage Cheese (Low Fat)": "🧀",
-    "Masoor Dal (Red Lentils)": "🫘",
-    "Chana Dal": "🫘",
-    "Moong Dal": "🫘",
-    "Chickpeas (Kabuli Chana)": "🫘",
-    "Rajma (Kidney Beans)": "🫘",
-    "Rolled Oats": "🌾",
-    "Quinoa": "🌾",
-    "Brown Rice": "🍚",
-    "Peanut Butter": "🥜",
-    "Almond Butter": "🥜",
-    "Almonds": "🌰",
-    "Cashews": "🌰",
-    "Walnuts": "🌰",
-    "Chia Seeds": "🌱",
-    "Flaxseeds": "🌾",
-    "Pumpkin Seeds": "🎃",
-    "Sunflower Seeds": "🌻",
-    "Soy Milk": "🥛",
-    "Almond Milk": "🥛",
-    "Oat Milk": "🥛",
-    "Coconut Milk (Canned)": "🥥",
-}
-
-
-# ─────────────────────────────────────────────────────────────
-# How-to-use / serving tips for each product
-# ─────────────────────────────────────────────────────────────
-PRODUCT_HOW_TO_USE = {
-    "Whey Protein Powder": {
-        "serving": "1–2 scoops (25–50 g)",
-        "tips": [
-            "🥤 Post-workout shake: Mix 1 scoop with 200–250 ml cold water or milk.",
-            "🫙 Add to Greek yogurt or oatmeal for a protein boost.",
-            "🧁 Use in protein pancakes, muffins, or energy balls.",
-        ],
-        "best_time": "Within 30 min after workout",
-    },
-    "Pea Protein Powder": {
-        "serving": "1–2 scoops (25–40 g)",
-        "tips": [
-            "🥤 Blend with plant milk, banana, and nut butter for a vegan shake.",
-            "🍲 Stir into soups or curries to increase protein without changing taste much.",
-            "🧁 Works well in baked goods like protein cookies or bars.",
-        ],
-        "best_time": "Post-workout or as a meal supplement",
-    },
-    "Soya Chunks (TVP)": {
-        "serving": "30–50 g dry (doubles when soaked)",
-        "tips": [
-            "💧 Soak in hot water for 15–20 min, then squeeze out water before cooking.",
-            "🍛 Use in curries, bhurji, biryani, or pulao.",
-            "🥗 Marinate and grill for a high-protein snack.",
-        ],
-        "best_time": "Lunch or dinner as main protein source",
-    },
-    "Tofu (Firm)": {
-        "serving": "100–150 g per serving",
-        "tips": [
-            "🔪 Press firmly for 15–20 min to remove extra moisture before cooking.",
-            "🍳 Pan-fry or bake at 200°C for 20 min for crispy texture.",
-            "🍛 Add to stir-fries, curries, or scramble like eggs with turmeric.",
-        ],
-        "best_time": "Lunch or dinner",
-    },
-    "Tempeh": {
-        "serving": "80–100 g per serving",
-        "tips": [
-            "🔪 Slice thin and marinate in soy sauce + garlic for 30 min.",
-            "🍳 Stir-fry, bake, or grill until golden brown.",
-            "🌯 Use in wraps, sandwiches, or rice bowls.",
-        ],
-        "best_time": "Lunch or dinner",
-    },
-    "Edamame": {
-        "serving": "1 cup (155 g) shelled",
-        "tips": [
-            "♨️ Boil in salted water for 5 min or microwave from frozen.",
-            "🧂 Sprinkle with sea salt and eat straight from the pod.",
-            "🥗 Toss into salads, grain bowls, or fried rice.",
-        ],
-        "best_time": "Snack or side dish anytime",
-    },
-    "Paneer": {
-        "serving": "80–100 g per serving",
-        "tips": [
-            "🍳 Cube and sauté in oil until golden, then add to curries.",
-            "🔥 Grill as paneer tikka with spices and yogurt marinade.",
-            "🥗 Crumble into salads or bhurji with vegetables.",
-        ],
-        "best_time": "Lunch or dinner",
-    },
-    "Greek Yogurt": {
-        "serving": "150–200 g",
-        "tips": [
-            "🍓 Top with berries, honey, and granola for a quick breakfast.",
-            "🥣 Use as a base for smoothie bowls or dips (like tzatziki).",
-            "🍲 Use as a healthy substitute for cream in curries and marinades.",
-        ],
-        "best_time": "Breakfast or post-workout snack",
-    },
-    "Cottage Cheese (Low Fat)": {
-        "serving": "100–150 g",
-        "tips": [
-            "🥗 Eat plain with fruit or mix with herbs and salt as a dip.",
-            "🥞 Blend into pancake batter or scrambled eggs for added protein.",
-            "🫙 Top on toast or crackers for a quick high-protein snack.",
-        ],
-        "best_time": "Breakfast, snack, or pre-sleep (slow-digesting protein)",
-    },
-    "Masoor Dal (Red Lentils)": {
-        "serving": "50–75 g dry (makes ~1 cup cooked)",
-        "tips": [
-            "💧 No soaking needed — rinse and cook directly in 2–3x water.",
-            "🍲 Cook as simple dal tadka with cumin, turmeric, and tomatoes.",
-            "🫙 Make dal soup or add to khichdi for a balanced meal.",
-        ],
-        "best_time": "Lunch or dinner",
-    },
-    "Chana Dal": {
-        "serving": "50–75 g dry",
-        "tips": [
-            "💧 Soak 1–2 hours before cooking for faster, creamier results.",
-            "🍲 Cook as dal or use in chana dal khichdi with rice.",
-            "🥘 Use in stuffed parathas or as a base for snack like dalmoth.",
-        ],
-        "best_time": "Lunch or dinner",
-    },
-    "Moong Dal": {
-        "serving": "50–75 g dry",
-        "tips": [
-            "💧 Soak split moong for 30 min; whole moong for 4–6 hours.",
-            "🍲 Make classic moong dal, khichdi, or moong dal soup.",
-            "🫘 Sprout whole moong for a raw, nutrient-dense salad topping.",
-        ],
-        "best_time": "Any meal; sprouted as breakfast",
-    },
-    "Chickpeas (Kabuli Chana)": {
-        "serving": "80–100 g cooked (~35 g dry)",
-        "tips": [
-            "💧 Soak overnight (8–10 hrs) and pressure cook for 2–3 whistles.",
-            "🍛 Use in chole curry, chaat, or hummus.",
-            "🫙 Roast with spices at 200°C for crispy high-protein snack.",
-        ],
-        "best_time": "Lunch or dinner",
-    },
-    "Rajma (Kidney Beans)": {
-        "serving": "80–100 g cooked (~40 g dry)",
-        "tips": [
-            "💧 Must soak 8–12 hours and boil thoroughly — never eat raw.",
-            "🍛 Classic rajma chawal: cook in tomato-onion masala.",
-            "🌯 Use in burritos, wraps, or bean salads.",
-        ],
-        "best_time": "Lunch or dinner",
-    },
-    "Rolled Oats": {
-        "serving": "40–50 g dry",
-        "tips": [
-            "🥣 Overnight oats: Mix with milk/curd and refrigerate overnight.",
-            "🍳 Cook with water or milk for 3–5 min; top with fruits and nuts.",
-            "🧁 Use in homemade granola bars, protein muffins, or chilla.",
-        ],
-        "best_time": "Breakfast or pre-workout",
-    },
-    "Quinoa": {
-        "serving": "45–60 g dry (makes ~1 cup cooked)",
-        "tips": [
-            "💧 Rinse well before cooking to remove bitterness (saponins).",
-            "🍚 Cook in 2x water for 15 min; fluff with fork — use like rice.",
-            "🥗 Use in grain bowls, stuffed peppers, or quinoa upma.",
-        ],
-        "best_time": "Lunch or dinner",
-    },
-    "Brown Rice": {
-        "serving": "50–75 g dry (makes ~1 cup cooked)",
-        "tips": [
-            "💧 Soak 30 min for fluffier texture; cook in 2–2.5x water.",
-            "🍚 Use as a base for dal, sabzi, or protein bowls.",
-            "🥗 Make brown rice salad with veggies and lemon dressing.",
-        ],
-        "best_time": "Lunch or dinner",
-    },
-    "Peanut Butter": {
-        "serving": "1–2 tbsp (15–30 g)",
-        "tips": [
-            "🍞 Spread on whole grain toast with banana slices.",
-            "🥤 Blend into smoothies or protein shakes for healthy fats.",
-            "🍎 Dip apple, celery, or rice cakes for a balanced snack.",
-        ],
-        "best_time": "Breakfast or pre-workout snack",
-    },
-    "Almond Butter": {
-        "serving": "1–2 tbsp (15–30 g)",
-        "tips": [
-            "🍞 Spread on toast, roti, or rice cakes for a nutritious snack.",
-            "🥤 Add to smoothies, overnight oats, or protein shakes.",
-            "🍎 Pair with fruit slices (apple, banana) for a balanced snack.",
-        ],
-        "best_time": "Morning snack or pre-workout",
-    },
-    "Almonds": {
-        "serving": "20–30 g (a small handful, ~20 nuts)",
-        "tips": [
-            "🌰 Eat raw or dry-roasted as a quick snack between meals.",
-            "🥣 Chop and sprinkle on oatmeal, yogurt, or salads.",
-            "💧 Soak overnight for easier digestion and better nutrient absorption.",
-        ],
-        "best_time": "Morning (soaked) or mid-day snack",
-    },
-    "Cashews": {
-        "serving": "20–30 g",
-        "tips": [
-            "🌰 Eat raw as a snack or mix into trail mix.",
-            "🫙 Blend soaked cashews with water to make creamy cashew milk/cream.",
-            "🍛 Use in curries like paneer makhani or korma for richness.",
-        ],
-        "best_time": "Snack or as cooking ingredient",
-    },
-    "Walnuts": {
-        "serving": "20–28 g (4–7 halves)",
-        "tips": [
-            "🌰 Eat raw — best consumed as-is to preserve omega-3 content.",
-            "🥗 Chop and add to salads, oatmeal, or baked goods.",
-            "💧 Soak overnight to reduce bitterness and improve digestibility.",
-        ],
-        "best_time": "Morning (empty stomach if soaked) or afternoon snack",
-    },
-    "Chia Seeds": {
-        "serving": "1–2 tbsp (10–20 g)",
-        "tips": [
-            "💧 Soak in 3x liquid for 15–30 min to form a gel — do not eat dry.",
-            "🥣 Make chia pudding with milk/yogurt overnight; top with fruits.",
-            "🥤 Add soaked chia to smoothies, juices, or lemonade.",
-        ],
-        "best_time": "Breakfast or pre-sleep snack",
-    },
-    "Flaxseeds": {
-        "serving": "1–2 tbsp (10–15 g)",
-        "tips": [
-            "⚠️ Grind before eating — whole seeds pass undigested.",
-            "🍞 Add ground flax to roti dough, oatmeal, or smoothies.",
-            "🥣 Mix with water (1 tbsp + 3 tbsp water) as an egg replacer.",
-        ],
-        "best_time": "Morning with breakfast",
-    },
-    "Pumpkin Seeds": {
-        "serving": "20–30 g",
-        "tips": [
-            "🌰 Eat raw or lightly roasted with a pinch of salt.",
-            "🥗 Sprinkle on salads, soups, or yogurt for crunch.",
-            "🧁 Add to granola, trail mix, or homemade energy bars.",
-        ],
-        "best_time": "Snack anytime",
-    },
-    "Sunflower Seeds": {
-        "serving": "20–30 g",
-        "tips": [
-            "🌻 Eat hulled seeds raw or roasted as a snack.",
-            "🥗 Add to salads, stir-fries, or baked goods.",
-            "🫙 Blend into sunflower seed butter as a nut-free alternative.",
-        ],
-        "best_time": "Snack or topping",
-    },
-    "Soy Milk": {
-        "serving": "200–250 ml",
-        "tips": [
-            "☕ Use as a 1:1 replacement for dairy milk in tea, coffee, or cereal.",
-            "🥤 Blend into smoothies or protein shakes.",
-            "🍳 Use in cooking — soups, curries, pancake batter.",
-        ],
-        "best_time": "Anytime — with breakfast or as a snack drink",
-    },
-    "Almond Milk": {
-        "serving": "200–250 ml",
-        "tips": [
-            "☕ Add to coffee, tea, or pour over cereal and oats.",
-            "🥤 Use as a smoothie base instead of dairy milk.",
-            "🍳 Use in baking, pancake batter, or creamy soups.",
-        ],
-        "best_time": "Breakfast or anytime",
-    },
-    "Oat Milk": {
-        "serving": "200–250 ml",
-        "tips": [
-            "☕ Best for coffee — it froths well and complements mild bitterness.",
-            "🥣 Pour over muesli or use in overnight oats.",
-            "🍳 Use in cooking and baking as a dairy-milk substitute.",
-        ],
-        "best_time": "Morning or with meals",
-    },
-    "Coconut Milk (Canned)": {
-        "serving": "50–100 ml (shake/stir before opening)",
-        "tips": [
-            "🍛 Use full-fat in curries, dals, or rice dishes for creaminess.",
-            "🥥 Refrigerate overnight — the cream rises; use cream for desserts.",
-            "🥤 Dilute 1:1 with water for a lighter cooking or smoothie base.",
-        ],
-        "best_time": "With meals; great in post-workout curry bowls",
-    },
-}
-
-# ─────────────────────────────────────────────────────────────
-# Local / regional Indian names for each product
-# ─────────────────────────────────────────────────────────────
-PRODUCT_LOCAL_NAMES: dict[str, str] = {
-    "Whey Protein Powder":       "Whey Protein / व्हे प्रोटीन पाउडर",
-    "Pea Protein Powder":        "Matar Protein / मटर प्रोटीन पाउडर",
-    "Soya Chunks (TVP)":         "Soya Badi / सोया बड़ी",
-    "Tofu (Firm)":               "Tofu / टोफू",
-    "Tempeh":                    "Tempeh / टेम्पेह",
-    "Edamame":                   "Edamame / हरी सोयाबीन",
-    "Paneer":                    "Paneer / पनीर",
-    "Greek Yogurt":              "Greek Dahi / ग्रीक दही",
-    "Cottage Cheese (Low Fat)":  "Chenna / छेना",
-    "Masoor Dal (Red Lentils)":  "Masoor Dal / मसूर दाल",
-    "Chana Dal":                 "Chana Dal / चना दाल",
-    "Moong Dal":                 "Moong Dal / मूंग दाल",
-    "Chickpeas (Kabuli Chana)":  "Kabuli Chana / काबुली चना",
-    "Rajma (Kidney Beans)":      "Rajma / राजमा",
-    "Rolled Oats":               "Jai / जई (Oats)",
-    "Quinoa":                    "Quinoa / क्विनोआ",
-    "Brown Rice":                "Bhoora Chawal / भूरे चावल",
-    "Peanut Butter":             "Mungfali Makhan / मूंगफली का मक्खन",
-    "Almond Butter":             "Badam Makhan / बादाम का मक्खन",
-    "Almonds":                   "Badam / बादाम",
-    "Cashews":                   "Kaju / काजू",
-    "Walnuts":                   "Akhrot / अखरोट",
-    "Chia Seeds":                "Chia Beej / चिया बीज",
-    "Flaxseeds":                 "Alsi / अलसी",
-    "Pumpkin Seeds":             "Kaddu ke Beej / कद्दू के बीज",
-    "Sunflower Seeds":           "Surajmukhi ke Beej / सूरजमुखी के बीज",
-    "Soy Milk":                  "Soya Doodh / सोया दूध",
-    "Almond Milk":               "Badam Doodh / बादाम दूध",
-    "Oat Milk":                  "Oat Doodh / ओट दूध",
-    "Coconut Milk (Canned)":     "Nariyal ka Doodh / नारियल का दूध",
-}
-
-# ─────────────────────────────────────────────────────────────
-# Safety / Consumption Precautions
-# ─────────────────────────────────────────────────────────────
-PRODUCT_CAUTIONS: dict[str, str | None] = {
-    "Whey Protein Powder":       "Contains dairy (lactose) — not suitable for lactose-intolerant individuals. Excessive intake may stress kidneys; stay within recommended dosage.",
-    "Pea Protein Powder":        None,
-    "Soya Chunks (TVP)":         "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
-    "Tofu (Firm)":               "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
-    "Tempeh":                    "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
-    "Edamame":                   "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
-    "Paneer":                    "Contains dairy — avoid if lactose intolerant or dairy-allergic.",
-    "Greek Yogurt":              "Contains dairy — avoid if lactose intolerant or dairy-allergic.",
-    "Cottage Cheese (Low Fat)":  "Contains dairy — avoid if lactose intolerant or dairy-allergic.",
-    "Masoor Dal (Red Lentils)":  "High in FODMAPs — may cause bloating in those with IBS. Soak and cook thoroughly for better digestibility.",
-    "Chana Dal":                 "High in FODMAPs — may cause bloating in those with IBS. Soak and cook thoroughly for better digestibility.",
-    "Moong Dal":                 "High in FODMAPs — may cause bloating in those with IBS. Soak and cook thoroughly for better digestibility.",
-    "Chickpeas (Kabuli Chana)":  "High in FODMAPs — may cause bloating in those with IBS. Soak and cook thoroughly for better digestibility.",
-    "Rajma (Kidney Beans)":      "Raw or undercooked kidney beans contain toxic lectins. Always soak 8–12 hours and boil thoroughly — never eat raw.",
-    "Rolled Oats":               "Contains oats — may not be suitable for those with severe gluten intolerance unless certified gluten-free.",
-    "Quinoa":                    "Rinse thoroughly to remove saponins which can irritate digestion. Those with oxalate kidney stones should moderate intake.",
-    "Brown Rice":                None,
-    "Peanut Butter":             "Contains peanuts — avoid with peanut or groundnut allergy.",
-    "Almond Butter":             "Contains tree nuts — avoid if you have a tree-nut allergy.",
-    "Almonds":                   "Contains tree nuts — avoid if you have a tree-nut allergy.",
-    "Cashews":                   "Contains tree nuts — avoid if you have a tree-nut allergy. High in oxalates — moderate intake if prone to kidney stones.",
-    "Walnuts":                   "Contains tree nuts — avoid if you have a tree-nut allergy.",
-    "Chia Seeds":                "Always soak before consuming — dry chia seeds can swell in the throat. Drink plenty of water throughout the day.",
-    "Flaxseeds":                 "May interact with blood thinners (warfarin) and blood-pressure medication. Avoid in large amounts during pregnancy.",
-    "Pumpkin Seeds":             None,
-    "Sunflower Seeds":           None,
-    "Soy Milk":                  "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
-    "Almond Milk":               None,
-    "Oat Milk":                  "Made from oats — not suitable for those with severe gluten intolerance or coeliac disease unless certified gluten-free.",
-    "Coconut Milk (Canned)":     "High in saturated fat — consume in moderation if managing cholesterol or cardiovascular health.",
-}
 
 
 class BackendUnavailable(Exception):
     """Raised when GET /products cannot reach the API."""
 
 
-PRIORITY_LABELS = {
-    "protein":  "🥩 Protein-first — match protein content most closely",
-    "low_carb": "🌿 Low Carb — match carbohydrate content most closely",
-    "balanced": "⚖️ Balanced — equal weight across all macros",
-}
-PRIORITY_KEYS = list(PRIORITY_LABELS.keys())
+@st.cache_data(show_spinner=False)
+def get_food_guide_data() -> dict[str, object]:
+    """Cached 30-product nutrition and practical guide lookup tables."""
+    PRODUCT_EMOJI = {
+        "Whey Protein Powder": "🥤",
+        "Pea Protein Powder": "🥤",
+        "Soya Chunks (TVP)": "🫘",
+        "Tofu (Firm)": "🧊",
+        "Tempeh": "🫘",
+        "Edamame": "🫛",
+        "Paneer": "🧀",
+        "Greek Yogurt": "🥣",
+        "Cottage Cheese (Low Fat)": "🧀",
+        "Masoor Dal (Red Lentils)": "🫘",
+        "Chana Dal": "🫘",
+        "Moong Dal": "🫘",
+        "Chickpeas (Kabuli Chana)": "🫘",
+        "Rajma (Kidney Beans)": "🫘",
+        "Rolled Oats": "🌾",
+        "Quinoa": "🌾",
+        "Brown Rice": "🍚",
+        "Peanut Butter": "🥜",
+        "Almond Butter": "🥜",
+        "Almonds": "🌰",
+        "Cashews": "🌰",
+        "Walnuts": "🌰",
+        "Chia Seeds": "🌱",
+        "Flaxseeds": "🌾",
+        "Pumpkin Seeds": "🎃",
+        "Sunflower Seeds": "🌻",
+        "Soy Milk": "🥛",
+        "Almond Milk": "🥛",
+        "Oat Milk": "🥛",
+        "Coconut Milk (Canned)": "🥥",
+    }
 
-RANK_COLORS = ["#2EA043", "#60A5FA", "#94A3B8"]   # emerald, blue, slate
-RANK_LABELS = ["#1 Best Match", "#2 Runner Up", "#3 Option"]
 
-# ── Canonical serving sizes in grams (used for Per-Serving toggle) ──────────
-PRODUCT_SERVING_G: dict[str, int] = {
-    "Whey Protein Powder":        25,
-    "Pea Protein Powder":         25,
-    "Soya Chunks (TVP)":          30,
-    "Tofu (Firm)":               100,
-    "Tempeh":                     80,
-    "Edamame":                   155,
-    "Paneer":                     80,
-    "Greek Yogurt":              150,
-    "Cottage Cheese (Low Fat)":  100,
-    "Masoor Dal (Red Lentils)":   50,
-    "Chana Dal":                  50,
-    "Moong Dal":                  50,
-    "Chickpeas (Kabuli Chana)":   80,
-    "Rajma (Kidney Beans)":       80,
-    "Rolled Oats":                40,
-    "Quinoa":                     45,
-    "Brown Rice":                 50,
-    "Peanut Butter":              15,
-    "Almond Butter":              15,
-    "Almonds":                    20,
-    "Cashews":                    20,
-    "Walnuts":                    20,
-    "Chia Seeds":                 10,
-    "Flaxseeds":                  10,
-    "Pumpkin Seeds":              20,
-    "Sunflower Seeds":            20,
-    "Soy Milk":                  200,
-    "Almond Milk":               200,
-    "Oat Milk":                  200,
-    "Coconut Milk (Canned)":      50,
-}
+    # ─────────────────────────────────────────────────────────────
+    # How-to-use / serving tips for each product
+    # ─────────────────────────────────────────────────────────────
+    PRODUCT_HOW_TO_USE = {
+        "Whey Protein Powder": {
+            "serving": "1–2 scoops (25–50 g)",
+            "tips": [
+                "🥤 Post-workout shake: Mix 1 scoop with 200–250 ml cold water or milk.",
+                "🫙 Add to Greek yogurt or oatmeal for a protein boost.",
+                "🧁 Use in protein pancakes, muffins, or energy balls.",
+            ],
+            "best_time": "Within 30 min after workout",
+        },
+        "Pea Protein Powder": {
+            "serving": "1–2 scoops (25–40 g)",
+            "tips": [
+                "🥤 Blend with plant milk, banana, and nut butter for a vegan shake.",
+                "🍲 Stir into soups or curries to increase protein without changing taste much.",
+                "🧁 Works well in baked goods like protein cookies or bars.",
+            ],
+            "best_time": "Post-workout or as a meal supplement",
+        },
+        "Soya Chunks (TVP)": {
+            "serving": "30–50 g dry (doubles when soaked)",
+            "tips": [
+                "💧 Soak in hot water for 15–20 min, then squeeze out water before cooking.",
+                "🍛 Use in curries, bhurji, biryani, or pulao.",
+                "🥗 Marinate and grill for a high-protein snack.",
+            ],
+            "best_time": "Lunch or dinner as main protein source",
+        },
+        "Tofu (Firm)": {
+            "serving": "100–150 g per serving",
+            "tips": [
+                "🔪 Press firmly for 15–20 min to remove extra moisture before cooking.",
+                "🍳 Pan-fry or bake at 200°C for 20 min for crispy texture.",
+                "🍛 Add to stir-fries, curries, or scramble like eggs with turmeric.",
+            ],
+            "best_time": "Lunch or dinner",
+        },
+        "Tempeh": {
+            "serving": "80–100 g per serving",
+            "tips": [
+                "🔪 Slice thin and marinate in soy sauce + garlic for 30 min.",
+                "🍳 Stir-fry, bake, or grill until golden brown.",
+                "🌯 Use in wraps, sandwiches, or rice bowls.",
+            ],
+            "best_time": "Lunch or dinner",
+        },
+        "Edamame": {
+            "serving": "1 cup (155 g) shelled",
+            "tips": [
+                "♨️ Boil in salted water for 5 min or microwave from frozen.",
+                "🧂 Sprinkle with sea salt and eat straight from the pod.",
+                "🥗 Toss into salads, grain bowls, or fried rice.",
+            ],
+            "best_time": "Snack or side dish anytime",
+        },
+        "Paneer": {
+            "serving": "80–100 g per serving",
+            "tips": [
+                "🍳 Cube and sauté in oil until golden, then add to curries.",
+                "🔥 Grill as paneer tikka with spices and yogurt marinade.",
+                "🥗 Crumble into salads or bhurji with vegetables.",
+            ],
+            "best_time": "Lunch or dinner",
+        },
+        "Greek Yogurt": {
+            "serving": "150–200 g",
+            "tips": [
+                "🍓 Top with berries, honey, and granola for a quick breakfast.",
+                "🥣 Use as a base for smoothie bowls or dips (like tzatziki).",
+                "🍲 Use as a healthy substitute for cream in curries and marinades.",
+            ],
+            "best_time": "Breakfast or post-workout snack",
+        },
+        "Cottage Cheese (Low Fat)": {
+            "serving": "100–150 g",
+            "tips": [
+                "🥗 Eat plain with fruit or mix with herbs and salt as a dip.",
+                "🥞 Blend into pancake batter or scrambled eggs for added protein.",
+                "🫙 Top on toast or crackers for a quick high-protein snack.",
+            ],
+            "best_time": "Breakfast, snack, or pre-sleep (slow-digesting protein)",
+        },
+        "Masoor Dal (Red Lentils)": {
+            "serving": "50–75 g dry (makes ~1 cup cooked)",
+            "tips": [
+                "💧 No soaking needed — rinse and cook directly in 2–3x water.",
+                "🍲 Cook as simple dal tadka with cumin, turmeric, and tomatoes.",
+                "🫙 Make dal soup or add to khichdi for a balanced meal.",
+            ],
+            "best_time": "Lunch or dinner",
+        },
+        "Chana Dal": {
+            "serving": "50–75 g dry",
+            "tips": [
+                "💧 Soak 1–2 hours before cooking for faster, creamier results.",
+                "🍲 Cook as dal or use in chana dal khichdi with rice.",
+                "🥘 Use in stuffed parathas or as a base for snack like dalmoth.",
+            ],
+            "best_time": "Lunch or dinner",
+        },
+        "Moong Dal": {
+            "serving": "50–75 g dry",
+            "tips": [
+                "💧 Soak split moong for 30 min; whole moong for 4–6 hours.",
+                "🍲 Make classic moong dal, khichdi, or moong dal soup.",
+                "🫘 Sprout whole moong for a raw, nutrient-dense salad topping.",
+            ],
+            "best_time": "Any meal; sprouted as breakfast",
+        },
+        "Chickpeas (Kabuli Chana)": {
+            "serving": "80–100 g cooked (~35 g dry)",
+            "tips": [
+                "💧 Soak overnight (8–10 hrs) and pressure cook for 2–3 whistles.",
+                "🍛 Use in chole curry, chaat, or hummus.",
+                "🫙 Roast with spices at 200°C for crispy high-protein snack.",
+            ],
+            "best_time": "Lunch or dinner",
+        },
+        "Rajma (Kidney Beans)": {
+            "serving": "80–100 g cooked (~40 g dry)",
+            "tips": [
+                "💧 Must soak 8–12 hours and boil thoroughly — never eat raw.",
+                "🍛 Classic rajma chawal: cook in tomato-onion masala.",
+                "🌯 Use in burritos, wraps, or bean salads.",
+            ],
+            "best_time": "Lunch or dinner",
+        },
+        "Rolled Oats": {
+            "serving": "40–50 g dry",
+            "tips": [
+                "🥣 Overnight oats: Mix with milk/curd and refrigerate overnight.",
+                "🍳 Cook with water or milk for 3–5 min; top with fruits and nuts.",
+                "🧁 Use in homemade granola bars, protein muffins, or chilla.",
+            ],
+            "best_time": "Breakfast or pre-workout",
+        },
+        "Quinoa": {
+            "serving": "45–60 g dry (makes ~1 cup cooked)",
+            "tips": [
+                "💧 Rinse well before cooking to remove bitterness (saponins).",
+                "🍚 Cook in 2x water for 15 min; fluff with fork — use like rice.",
+                "🥗 Use in grain bowls, stuffed peppers, or quinoa upma.",
+            ],
+            "best_time": "Lunch or dinner",
+        },
+        "Brown Rice": {
+            "serving": "50–75 g dry (makes ~1 cup cooked)",
+            "tips": [
+                "💧 Soak 30 min for fluffier texture; cook in 2–2.5x water.",
+                "🍚 Use as a base for dal, sabzi, or protein bowls.",
+                "🥗 Make brown rice salad with veggies and lemon dressing.",
+            ],
+            "best_time": "Lunch or dinner",
+        },
+        "Peanut Butter": {
+            "serving": "1–2 tbsp (15–30 g)",
+            "tips": [
+                "🍞 Spread on whole grain toast with banana slices.",
+                "🥤 Blend into smoothies or protein shakes for healthy fats.",
+                "🍎 Dip apple, celery, or rice cakes for a balanced snack.",
+            ],
+            "best_time": "Breakfast or pre-workout snack",
+        },
+        "Almond Butter": {
+            "serving": "1–2 tbsp (15–30 g)",
+            "tips": [
+                "🍞 Spread on toast, roti, or rice cakes for a nutritious snack.",
+                "🥤 Add to smoothies, overnight oats, or protein shakes.",
+                "🍎 Pair with fruit slices (apple, banana) for a balanced snack.",
+            ],
+            "best_time": "Morning snack or pre-workout",
+        },
+        "Almonds": {
+            "serving": "20–30 g (a small handful, ~20 nuts)",
+            "tips": [
+                "🌰 Eat raw or dry-roasted as a quick snack between meals.",
+                "🥣 Chop and sprinkle on oatmeal, yogurt, or salads.",
+                "💧 Soak overnight for easier digestion and better nutrient absorption.",
+            ],
+            "best_time": "Morning (soaked) or mid-day snack",
+        },
+        "Cashews": {
+            "serving": "20–30 g",
+            "tips": [
+                "🌰 Eat raw as a snack or mix into trail mix.",
+                "🫙 Blend soaked cashews with water to make creamy cashew milk/cream.",
+                "🍛 Use in curries like paneer makhani or korma for richness.",
+            ],
+            "best_time": "Snack or as cooking ingredient",
+        },
+        "Walnuts": {
+            "serving": "20–28 g (4–7 halves)",
+            "tips": [
+                "🌰 Eat raw — best consumed as-is to preserve omega-3 content.",
+                "🥗 Chop and add to salads, oatmeal, or baked goods.",
+                "💧 Soak overnight to reduce bitterness and improve digestibility.",
+            ],
+            "best_time": "Morning (empty stomach if soaked) or afternoon snack",
+        },
+        "Chia Seeds": {
+            "serving": "1–2 tbsp (10–20 g)",
+            "tips": [
+                "💧 Soak in 3x liquid for 15–30 min to form a gel — do not eat dry.",
+                "🥣 Make chia pudding with milk/yogurt overnight; top with fruits.",
+                "🥤 Add soaked chia to smoothies, juices, or lemonade.",
+            ],
+            "best_time": "Breakfast or pre-sleep snack",
+        },
+        "Flaxseeds": {
+            "serving": "1–2 tbsp (10–15 g)",
+            "tips": [
+                "⚠️ Grind before eating — whole seeds pass undigested.",
+                "🍞 Add ground flax to roti dough, oatmeal, or smoothies.",
+                "🥣 Mix with water (1 tbsp + 3 tbsp water) as an egg replacer.",
+            ],
+            "best_time": "Morning with breakfast",
+        },
+        "Pumpkin Seeds": {
+            "serving": "20–30 g",
+            "tips": [
+                "🌰 Eat raw or lightly roasted with a pinch of salt.",
+                "🥗 Sprinkle on salads, soups, or yogurt for crunch.",
+                "🧁 Add to granola, trail mix, or homemade energy bars.",
+            ],
+            "best_time": "Snack anytime",
+        },
+        "Sunflower Seeds": {
+            "serving": "20–30 g",
+            "tips": [
+                "🌻 Eat hulled seeds raw or roasted as a snack.",
+                "🥗 Add to salads, stir-fries, or baked goods.",
+                "🫙 Blend into sunflower seed butter as a nut-free alternative.",
+            ],
+            "best_time": "Snack or topping",
+        },
+        "Soy Milk": {
+            "serving": "200–250 ml",
+            "tips": [
+                "☕ Use as a 1:1 replacement for dairy milk in tea, coffee, or cereal.",
+                "🥤 Blend into smoothies or protein shakes.",
+                "🍳 Use in cooking — soups, curries, pancake batter.",
+            ],
+            "best_time": "Anytime — with breakfast or as a snack drink",
+        },
+        "Almond Milk": {
+            "serving": "200–250 ml",
+            "tips": [
+                "☕ Add to coffee, tea, or pour over cereal and oats.",
+                "🥤 Use as a smoothie base instead of dairy milk.",
+                "🍳 Use in baking, pancake batter, or creamy soups.",
+            ],
+            "best_time": "Breakfast or anytime",
+        },
+        "Oat Milk": {
+            "serving": "200–250 ml",
+            "tips": [
+                "☕ Best for coffee — it froths well and complements mild bitterness.",
+                "🥣 Pour over muesli or use in overnight oats.",
+                "🍳 Use in cooking and baking as a dairy-milk substitute.",
+            ],
+            "best_time": "Morning or with meals",
+        },
+        "Coconut Milk (Canned)": {
+            "serving": "50–100 ml (shake/stir before opening)",
+            "tips": [
+                "🍛 Use full-fat in curries, dals, or rice dishes for creaminess.",
+                "🥥 Refrigerate overnight — the cream rises; use cream for desserts.",
+                "🥤 Dilute 1:1 with water for a lighter cooking or smoothie base.",
+            ],
+            "best_time": "With meals; great in post-workout curry bowls",
+        },
+    }
 
-# ─────────────────────────────────────────────────────────────
-# Rich product overview copy (used by the dedicated details page)
-# ─────────────────────────────────────────────────────────────
-PRODUCT_ABOUT: dict[str, str] = {
-    "Whey Protein Powder": "A fast-digesting dairy protein made from milk during cheese-making. It is rich in complete protein and useful after training or when you need an easy protein top-up; best for active people who tolerate dairy.",
-    "Pea Protein Powder": "A plant protein made from yellow peas, with a solid amino-acid profile and no dairy or soy. It blends easily into shakes and cooking; best for vegan/vegetarian users or anyone avoiding dairy.",
-    "Soya Chunks (TVP)": "Defatted soy flour textured into a chewy, shelf-stable meat substitute. It delivers high protein with very little fat and absorbs flavours well; best for budget-friendly vegetarian high-protein meals.",
-    "Tofu (Firm)": "A firm soy-bean curd that is mild, versatile and high in complete plant protein. It also supplies calcium when set with calcium salts; best for vegan/vegetarian bowls, curries and grills.",
-    "Tempeh": "Fermented soybeans pressed into a firm cake; fermentation makes it easier to digest and gives a nutty flavour. It offers protein plus fibre; best for people wanting a hearty plant protein.",
-    "Edamame": "Young soybeans eaten fresh, with protein, fibre and a mild, fresh taste. They make a simple snack or side; best for plant-based eaters and lunchboxes.",
-    "Paneer": "Fresh Indian cheese with a mild flavour and a firm texture that holds up in curries. It provides protein and calcium; best for vegetarians who tolerate dairy and want filling meals.",
-    "Greek Yogurt": "Strained yogurt with a thicker texture and more protein than regular curd. It supports breakfast and snack protein goals; best for people who enjoy dairy and want a quick, creamy option.",
-    "Cottage Cheese (Low Fat)": "Fresh low-fat curds with slow-digesting casein protein. It is light yet filling and works sweet or savoury; best for breakfast, snacks or a pre-sleep protein option.",
-    "Masoor Dal (Red Lentils)": "Split red lentils that cook quickly and turn soft and creamy. They supply plant protein and fibre at a low cost; best for everyday dal, soups and khichdi.",
-    "Chana Dal": "Split chickpeas with a nutty flavour and firm bite. They offer plant protein and fibre; best for people who enjoy traditional dals and want a slower-digesting pulse.",
-    "Moong Dal": "Small, mild lentils that cook fast and are easy to digest when soaked. They provide plant protein and fibre; best for light meals, khichdi and sprouted salads.",
-    "Chickpeas (Kabuli Chana)": "Round legumes with a nutty taste and firm texture. They combine plant protein with fibre for steady energy; best for curries, salads and hummus-style dishes.",
-    "Rajma (Kidney Beans)": "Kidney-shaped beans with a hearty texture and earthy flavour. They are rich in plant protein and fibre; best for filling rice bowls and wraps when cooked thoroughly.",
-    "Rolled Oats": "Whole oat flakes that cook into a creamy, fibre-rich cereal. They provide slow-release carbohydrate and useful protein for breakfast; best for morning meals and pre-workout fuel.",
-    "Quinoa": "A gluten-free grain-like seed with a light, fluffy texture. It offers complete plant protein and fibre; best for grain bowls, salads and rice swaps.",
-    "Brown Rice": "Wholegrain rice with the bran intact, giving a nuttier taste and more fibre than white rice. It gives steady energy; best as a base for dal, sabzi and protein bowls.",
-    "Peanut Butter": "A creamy or crunchy paste of roasted groundnuts, dense in energy, healthy fats and some protein. Best in small portions for snacks, toast and smoothies.",
-    "Almond Butter": "A nut butter made from almonds, with healthy fats, vitamin E and a mild sweetness. It is energy-dense; best for toast, fruit dips and smoothies in measured servings.",
-    "Almonds": "Whole tree nuts with healthy fats, fibre, vitamin E and a satisfying crunch. They are portable and energy-dense; best as a measured snack or topping.",
-    "Cashews": "Creamy tree nuts that blend into rich sauces and dairy-free creams. They provide healthy fats and minerals; best for curries, trail mixes and creamy smoothies in small portions.",
-    "Walnuts": "Tree nuts known for their omega-3 alpha-linolenic acid and rich flavour. They pair well with sweet and savoury dishes; best as a small snack or a salad/breakfast topping.",
-    "Chia Seeds": "Tiny seeds that form a gel when soaked, adding fibre and healthy fats. They are very energy-dense; best for puddings, soaked drinks and smoothies, never eaten dry.",
-    "Flaxseeds": "Small seeds rich in fibre and plant omega-3, best used ground. They add a mild nutty note; best for people adding fibre to oats, roti dough or smoothies.",
-    "Pumpkin Seeds": "Flat green seeds with a crisp texture and decent protein and minerals. They are easy to sprinkle; best for snacks, salads and trail mixes.",
-    "Sunflower Seeds": "Small hulled seeds with a mild nutty flavour and healthy fats. They are a nut-free crunchy option; best for toppings, snacks and seed butters.",
-    "Soy Milk": "A plant milk made from soybeans, usually fortified with calcium and vitamin D. It has a neutral taste and useful protein; best for vegan/vegetarian drinks, cereal and cooking.",
-    "Almond Milk": "A light plant milk made from almonds, usually lower in calories than dairy milk. It works well in drinks and cereal; best for people wanting a nutty, dairy-free option.",
-    "Oat Milk": "A creamy plant milk made from oats, naturally slightly sweet. It froths well for coffee and cooks well; best for dairy-free drinks, cereal and baking.",
-    "Coconut Milk (Canned)": "Rich canned coconut milk with a pronounced coconut flavour and high saturated fat. It adds creaminess to curries and desserts; best for occasional cooking use in small amounts.",
-}
+    # ─────────────────────────────────────────────────────────────
+    # Local / regional Indian names for each product
+    # ─────────────────────────────────────────────────────────────
+    PRODUCT_LOCAL_NAMES: dict[str, str] = {
+        "Whey Protein Powder":       "Whey Protein / व्हे प्रोटीन पाउडर",
+        "Pea Protein Powder":        "Matar Protein / मटर प्रोटीन पाउडर",
+        "Soya Chunks (TVP)":         "Soya Badi / सोया बड़ी",
+        "Tofu (Firm)":               "Tofu / टोफू",
+        "Tempeh":                    "Tempeh / टेम्पेह",
+        "Edamame":                   "Edamame / हरी सोयाबीन",
+        "Paneer":                    "Paneer / पनीर",
+        "Greek Yogurt":              "Greek Dahi / ग्रीक दही",
+        "Cottage Cheese (Low Fat)":  "Chenna / छेना",
+        "Masoor Dal (Red Lentils)":  "Masoor Dal / मसूर दाल",
+        "Chana Dal":                 "Chana Dal / चना दाल",
+        "Moong Dal":                 "Moong Dal / मूंग दाल",
+        "Chickpeas (Kabuli Chana)":  "Kabuli Chana / काबुली चना",
+        "Rajma (Kidney Beans)":      "Rajma / राजमा",
+        "Rolled Oats":               "Jai / जई (Oats)",
+        "Quinoa":                    "Quinoa / क्विनोआ",
+        "Brown Rice":                "Bhoora Chawal / भूरे चावल",
+        "Peanut Butter":             "Mungfali Makhan / मूंगफली का मक्खन",
+        "Almond Butter":             "Badam Makhan / बादाम का मक्खन",
+        "Almonds":                   "Badam / बादाम",
+        "Cashews":                   "Kaju / काजू",
+        "Walnuts":                   "Akhrot / अखरोट",
+        "Chia Seeds":                "Chia Beej / चिया बीज",
+        "Flaxseeds":                 "Alsi / अलसी",
+        "Pumpkin Seeds":             "Kaddu ke Beej / कद्दू के बीज",
+        "Sunflower Seeds":           "Surajmukhi ke Beej / सूरजमुखी के बीज",
+        "Soy Milk":                  "Soya Doodh / सोया दूध",
+        "Almond Milk":               "Badam Doodh / बादाम दूध",
+        "Oat Milk":                  "Oat Doodh / ओट दूध",
+        "Coconut Milk (Canned)":     "Nariyal ka Doodh / नारियल का दूध",
+    }
 
-PRODUCT_STORAGE: dict[str, str] = {
-    "Whey Protein Powder": "Keep sealed in a cool, dry place; scoop with a dry spoon and close the lid after each use.",
-    "Pea Protein Powder": "Keep sealed in a cool, dry place; use a dry scoop and avoid moisture entering the pouch.",
-    "Soya Chunks (TVP)": "Store dry in an airtight jar; once soaked, refrigerate and cook within a day.",
-    "Tofu (Firm)": "Keep refrigerated in its liquid; after opening, store submerged in fresh water and use within 2–3 days.",
-    "Tempeh": "Refrigerate and use within a few days; it also freezes well when tightly wrapped.",
-    "Edamame": "Freeze if not using fresh; refrigerate cooked pods for up to 2 days.",
-    "Paneer": "Refrigerate in an airtight box, use within 3–4 days, or freeze in cubes.",
-    "Greek Yogurt": "Keep chilled, use a clean spoon every time, and avoid long spells at room temperature.",
-    "Cottage Cheese (Low Fat)": "Keep chilled and consume soon after opening; drain excess liquid before cooking.",
-    "Masoor Dal (Red Lentils)": "Store dry in an airtight jar away from moisture; rinse before cooking.",
-    "Chana Dal": "Store dry in an airtight jar; soak before cooking for a creamier texture.",
-    "Moong Dal": "Store dry and airtight; rinse well and soak when the recipe calls for it.",
-    "Chickpeas (Kabuli Chana)": "Keep dried chickpeas airtight; cooked chickpeas refrigerate 3–4 days or freeze in portions.",
-    "Rajma (Kidney Beans)": "Keep dried beans airtight; cooked beans refrigerate 3–4 days or freeze in portions.",
-    "Rolled Oats": "Keep in a sealed container away from moisture; discard if it smells rancid.",
-    "Quinoa": "Store dry in an airtight jar; cooked quinoa keeps 3–4 days refrigerated.",
-    "Brown Rice": "Store dry in an airtight jar; cooked rice should be refrigerated promptly and eaten within 3–4 days.",
-    "Peanut Butter": "Store sealed; natural oil separation is normal—stir well. Refrigeration after opening extends freshness.",
-    "Almond Butter": "Store sealed; stir if oils separate. Refrigerate after opening for longer freshness.",
-    "Almonds": "Keep in an airtight container in a cool, dark place or fridge to prevent rancidity.",
-    "Cashews": "Keep airtight and away from heat; refrigeration helps prevent rancidity.",
-    "Walnuts": "Store airtight in the fridge or freezer because their oils go rancid quickly.",
-    "Chia Seeds": "Keep dry and sealed; soaked chia should be refrigerated and used within a day or two.",
-    "Flaxseeds": "Store whole seeds airtight; grind just before use and refrigerate ground flax.",
-    "Pumpkin Seeds": "Keep airtight in a cool, dark place or fridge to protect the oils.",
-    "Sunflower Seeds": "Store airtight and cool; roasted seeds are best used soon after opening.",
-    "Soy Milk": "Refrigerate after opening, shake the carton, and use within 4–5 days.",
-    "Almond Milk": "Refrigerate after opening, shake before pouring, and finish within 4–5 days.",
-    "Oat Milk": "Refrigerate after opening and use within 4–5 days; shake well before pouring.",
-    "Coconut Milk (Canned)": "Store unopened in a cool cupboard; once opened, refrigerate in a non-metal container and use within 3–4 days.",
-}
+    # ─────────────────────────────────────────────────────────────
+    # Safety / Consumption Precautions
+    # ─────────────────────────────────────────────────────────────
+    PRODUCT_CAUTIONS: dict[str, str | None] = {
+        "Whey Protein Powder":       "Contains dairy (lactose) — not suitable for lactose-intolerant individuals. Excessive intake may stress kidneys; stay within recommended dosage.",
+        "Pea Protein Powder":        None,
+        "Soya Chunks (TVP)":         "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
+        "Tofu (Firm)":               "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
+        "Tempeh":                    "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
+        "Edamame":                   "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
+        "Paneer":                    "Contains dairy — avoid if lactose intolerant or dairy-allergic.",
+        "Greek Yogurt":              "Contains dairy — avoid if lactose intolerant or dairy-allergic.",
+        "Cottage Cheese (Low Fat)":  "Contains dairy — avoid if lactose intolerant or dairy-allergic.",
+        "Masoor Dal (Red Lentils)":  "High in FODMAPs — may cause bloating in those with IBS. Soak and cook thoroughly for better digestibility.",
+        "Chana Dal":                 "High in FODMAPs — may cause bloating in those with IBS. Soak and cook thoroughly for better digestibility.",
+        "Moong Dal":                 "High in FODMAPs — may cause bloating in those with IBS. Soak and cook thoroughly for better digestibility.",
+        "Chickpeas (Kabuli Chana)":  "High in FODMAPs — may cause bloating in those with IBS. Soak and cook thoroughly for better digestibility.",
+        "Rajma (Kidney Beans)":      "Raw or undercooked kidney beans contain toxic lectins. Always soak 8–12 hours and boil thoroughly — never eat raw.",
+        "Rolled Oats":               "Contains oats — may not be suitable for those with severe gluten intolerance unless certified gluten-free.",
+        "Quinoa":                    "Rinse thoroughly to remove saponins which can irritate digestion. Those with oxalate kidney stones should moderate intake.",
+        "Brown Rice":                None,
+        "Peanut Butter":             "Contains peanuts — avoid with peanut or groundnut allergy.",
+        "Almond Butter":             "Contains tree nuts — avoid if you have a tree-nut allergy.",
+        "Almonds":                   "Contains tree nuts — avoid if you have a tree-nut allergy.",
+        "Cashews":                   "Contains tree nuts — avoid if you have a tree-nut allergy. High in oxalates — moderate intake if prone to kidney stones.",
+        "Walnuts":                   "Contains tree nuts — avoid if you have a tree-nut allergy.",
+        "Chia Seeds":                "Always soak before consuming — dry chia seeds can swell in the throat. Drink plenty of water throughout the day.",
+        "Flaxseeds":                 "May interact with blood thinners (warfarin) and blood-pressure medication. Avoid in large amounts during pregnancy.",
+        "Pumpkin Seeds":             None,
+        "Sunflower Seeds":           None,
+        "Soy Milk":                  "Contains soy — avoid with soy allergies. Those with thyroid disorders should consult a doctor before high intake.",
+        "Almond Milk":               None,
+        "Oat Milk":                  "Made from oats — not suitable for those with severe gluten intolerance or coeliac disease unless certified gluten-free.",
+        "Coconut Milk (Canned)":     "High in saturated fat — consume in moderation if managing cholesterol or cardiovascular health.",
+    }
 
-PRODUCT_PAIRINGS: dict[str, str] = {
-    "Whey Protein Powder": "Pair with banana, oats or Greek yogurt for a fuller recovery snack.",
-    "Pea Protein Powder": "Pair with banana, oat milk or a small handful of nuts.",
-    "Soya Chunks (TVP)": "Pair with brown rice, wholegrain roti and plenty of vegetables.",
-    "Tofu (Firm)": "Pair with brown rice, quinoa, sesame and crunchy vegetables.",
-    "Tempeh": "Pair with brown rice, leafy greens and a light soy-ginger glaze.",
-    "Edamame": "Pair with brown rice, citrus, sea salt or a light soy dip.",
-    "Paneer": "Pair with wholegrain roti, brown rice or a large vegetable side.",
-    "Greek Yogurt": "Pair with berries, oats, chia seeds or a drizzle of honey.",
-    "Cottage Cheese (Low Fat)": "Pair with fruit, wholegrain toast, herbs or cracked pepper.",
-    "Masoor Dal (Red Lentils)": "Pair with brown rice, quinoa, roti or a vegetable side.",
-    "Chana Dal": "Pair with brown rice, roti or a cucumber and lemon side.",
-    "Moong Dal": "Pair with brown rice, quinoa or sprouted vegetables.",
-    "Chickpeas (Kabuli Chana)": "Pair with quinoa, rice, cucumber and lemon-tahini style dressing.",
-    "Rajma (Kidney Beans)": "Pair with brown rice, quinoa or a wholegrain wrap.",
-    "Rolled Oats": "Pair with Greek yogurt, berries, seeds or a spoon of nut butter.",
-    "Quinoa": "Pair with roasted vegetables, chickpeas, tofu or fresh herbs.",
-    "Brown Rice": "Pair with dal, paneer, tofu, beans or stir-fried vegetables.",
-    "Peanut Butter": "Pair with fruit slices, wholegrain toast or oatmeal.",
-    "Almond Butter": "Pair with apple, banana, toast or overnight oats.",
-    "Almonds": "Pair with fruit, yogurt or a small handful of seeds.",
-    "Cashews": "Pair with fruit, yogurt, oats or a light trail mix.",
-    "Walnuts": "Pair with yogurt, oats, berries or a leafy salad.",
-    "Chia Seeds": "Pair with milk, yogurt, oats or a soaked smoothie.",
-    "Flaxseeds": "Pair with oatmeal, roti dough, yogurt or smoothies.",
-    "Pumpkin Seeds": "Pair with yogurt, oats, salads or trail mix.",
-    "Sunflower Seeds": "Pair with salads, oatmeal, yogurt or seed butter.",
-    "Soy Milk": "Pair with coffee, cereal, oats or a fruit smoothie.",
-    "Almond Milk": "Pair with coffee, tea, cereal or a smoothie.",
-    "Oat Milk": "Pair with coffee, muesli, overnight oats or baking.",
-    "Coconut Milk (Canned)": "Pair with vegetables, tofu, beans and rice; keep portions modest.",
-}
+
+    PRIORITY_LABELS = {
+        "protein":  "🥩 Protein-first — match protein content most closely",
+        "low_carb": "🌿 Low Carb — match carbohydrate content most closely",
+        "balanced": "⚖️ Balanced — equal weight across all macros",
+    }
+    PRIORITY_KEYS = list(PRIORITY_LABELS.keys())
+
+    RANK_COLORS = ["#2EA043", "#60A5FA", "#94A3B8"]   # emerald, blue, slate
+    RANK_LABELS = ["#1 Best Match", "#2 Runner Up", "#3 Option"]
+
+    # ── Canonical serving sizes in grams (used for Per-Serving toggle) ──────────
+    PRODUCT_SERVING_G: dict[str, int] = {
+        "Whey Protein Powder":        25,
+        "Pea Protein Powder":         25,
+        "Soya Chunks (TVP)":          30,
+        "Tofu (Firm)":               100,
+        "Tempeh":                     80,
+        "Edamame":                   155,
+        "Paneer":                     80,
+        "Greek Yogurt":              150,
+        "Cottage Cheese (Low Fat)":  100,
+        "Masoor Dal (Red Lentils)":   50,
+        "Chana Dal":                  50,
+        "Moong Dal":                  50,
+        "Chickpeas (Kabuli Chana)":   80,
+        "Rajma (Kidney Beans)":       80,
+        "Rolled Oats":                40,
+        "Quinoa":                     45,
+        "Brown Rice":                 50,
+        "Peanut Butter":              15,
+        "Almond Butter":              15,
+        "Almonds":                    20,
+        "Cashews":                    20,
+        "Walnuts":                    20,
+        "Chia Seeds":                 10,
+        "Flaxseeds":                  10,
+        "Pumpkin Seeds":              20,
+        "Sunflower Seeds":            20,
+        "Soy Milk":                  200,
+        "Almond Milk":               200,
+        "Oat Milk":                  200,
+        "Coconut Milk (Canned)":      50,
+    }
+
+    # ─────────────────────────────────────────────────────────────
+    # Rich product overview copy (used by the dedicated details page)
+    # ─────────────────────────────────────────────────────────────
+    PRODUCT_ABOUT: dict[str, str] = {
+        "Whey Protein Powder": "A fast-digesting dairy protein made from milk during cheese-making. It is rich in complete protein and useful after training or when you need an easy protein top-up; best for active people who tolerate dairy.",
+        "Pea Protein Powder": "A plant protein made from yellow peas, with a solid amino-acid profile and no dairy or soy. It blends easily into shakes and cooking; best for vegan/vegetarian users or anyone avoiding dairy.",
+        "Soya Chunks (TVP)": "Defatted soy flour textured into a chewy, shelf-stable meat substitute. It delivers high protein with very little fat and absorbs flavours well; best for budget-friendly vegetarian high-protein meals.",
+        "Tofu (Firm)": "A firm soy-bean curd that is mild, versatile and high in complete plant protein. It also supplies calcium when set with calcium salts; best for vegan/vegetarian bowls, curries and grills.",
+        "Tempeh": "Fermented soybeans pressed into a firm cake; fermentation makes it easier to digest and gives a nutty flavour. It offers protein plus fibre; best for people wanting a hearty plant protein.",
+        "Edamame": "Young soybeans eaten fresh, with protein, fibre and a mild, fresh taste. They make a simple snack or side; best for plant-based eaters and lunchboxes.",
+        "Paneer": "Fresh Indian cheese with a mild flavour and a firm texture that holds up in curries. It provides protein and calcium; best for vegetarians who tolerate dairy and want filling meals.",
+        "Greek Yogurt": "Strained yogurt with a thicker texture and more protein than regular curd. It supports breakfast and snack protein goals; best for people who enjoy dairy and want a quick, creamy option.",
+        "Cottage Cheese (Low Fat)": "Fresh low-fat curds with slow-digesting casein protein. It is light yet filling and works sweet or savoury; best for breakfast, snacks or a pre-sleep protein option.",
+        "Masoor Dal (Red Lentils)": "Split red lentils that cook quickly and turn soft and creamy. They supply plant protein and fibre at a low cost; best for everyday dal, soups and khichdi.",
+        "Chana Dal": "Split chickpeas with a nutty flavour and firm bite. They offer plant protein and fibre; best for people who enjoy traditional dals and want a slower-digesting pulse.",
+        "Moong Dal": "Small, mild lentils that cook fast and are easy to digest when soaked. They provide plant protein and fibre; best for light meals, khichdi and sprouted salads.",
+        "Chickpeas (Kabuli Chana)": "Round legumes with a nutty taste and firm texture. They combine plant protein with fibre for steady energy; best for curries, salads and hummus-style dishes.",
+        "Rajma (Kidney Beans)": "Kidney-shaped beans with a hearty texture and earthy flavour. They are rich in plant protein and fibre; best for filling rice bowls and wraps when cooked thoroughly.",
+        "Rolled Oats": "Whole oat flakes that cook into a creamy, fibre-rich cereal. They provide slow-release carbohydrate and useful protein for breakfast; best for morning meals and pre-workout fuel.",
+        "Quinoa": "A gluten-free grain-like seed with a light, fluffy texture. It offers complete plant protein and fibre; best for grain bowls, salads and rice swaps.",
+        "Brown Rice": "Wholegrain rice with the bran intact, giving a nuttier taste and more fibre than white rice. It gives steady energy; best as a base for dal, sabzi and protein bowls.",
+        "Peanut Butter": "A creamy or crunchy paste of roasted groundnuts, dense in energy, healthy fats and some protein. Best in small portions for snacks, toast and smoothies.",
+        "Almond Butter": "A nut butter made from almonds, with healthy fats, vitamin E and a mild sweetness. It is energy-dense; best for toast, fruit dips and smoothies in measured servings.",
+        "Almonds": "Whole tree nuts with healthy fats, fibre, vitamin E and a satisfying crunch. They are portable and energy-dense; best as a measured snack or topping.",
+        "Cashews": "Creamy tree nuts that blend into rich sauces and dairy-free creams. They provide healthy fats and minerals; best for curries, trail mixes and creamy smoothies in small portions.",
+        "Walnuts": "Tree nuts known for their omega-3 alpha-linolenic acid and rich flavour. They pair well with sweet and savoury dishes; best as a small snack or a salad/breakfast topping.",
+        "Chia Seeds": "Tiny seeds that form a gel when soaked, adding fibre and healthy fats. They are very energy-dense; best for puddings, soaked drinks and smoothies, never eaten dry.",
+        "Flaxseeds": "Small seeds rich in fibre and plant omega-3, best used ground. They add a mild nutty note; best for people adding fibre to oats, roti dough or smoothies.",
+        "Pumpkin Seeds": "Flat green seeds with a crisp texture and decent protein and minerals. They are easy to sprinkle; best for snacks, salads and trail mixes.",
+        "Sunflower Seeds": "Small hulled seeds with a mild nutty flavour and healthy fats. They are a nut-free crunchy option; best for toppings, snacks and seed butters.",
+        "Soy Milk": "A plant milk made from soybeans, usually fortified with calcium and vitamin D. It has a neutral taste and useful protein; best for vegan/vegetarian drinks, cereal and cooking.",
+        "Almond Milk": "A light plant milk made from almonds, usually lower in calories than dairy milk. It works well in drinks and cereal; best for people wanting a nutty, dairy-free option.",
+        "Oat Milk": "A creamy plant milk made from oats, naturally slightly sweet. It froths well for coffee and cooks well; best for dairy-free drinks, cereal and baking.",
+        "Coconut Milk (Canned)": "Rich canned coconut milk with a pronounced coconut flavour and high saturated fat. It adds creaminess to curries and desserts; best for occasional cooking use in small amounts.",
+    }
+
+    PRODUCT_STORAGE: dict[str, str] = {
+        "Whey Protein Powder": "Keep sealed in a cool, dry place; scoop with a dry spoon and close the lid after each use.",
+        "Pea Protein Powder": "Keep sealed in a cool, dry place; use a dry scoop and avoid moisture entering the pouch.",
+        "Soya Chunks (TVP)": "Store dry in an airtight jar; once soaked, refrigerate and cook within a day.",
+        "Tofu (Firm)": "Keep refrigerated in its liquid; after opening, store submerged in fresh water and use within 2–3 days.",
+        "Tempeh": "Refrigerate and use within a few days; it also freezes well when tightly wrapped.",
+        "Edamame": "Freeze if not using fresh; refrigerate cooked pods for up to 2 days.",
+        "Paneer": "Refrigerate in an airtight box, use within 3–4 days, or freeze in cubes.",
+        "Greek Yogurt": "Keep chilled, use a clean spoon every time, and avoid long spells at room temperature.",
+        "Cottage Cheese (Low Fat)": "Keep chilled and consume soon after opening; drain excess liquid before cooking.",
+        "Masoor Dal (Red Lentils)": "Store dry in an airtight jar away from moisture; rinse before cooking.",
+        "Chana Dal": "Store dry in an airtight jar; soak before cooking for a creamier texture.",
+        "Moong Dal": "Store dry and airtight; rinse well and soak when the recipe calls for it.",
+        "Chickpeas (Kabuli Chana)": "Keep dried chickpeas airtight; cooked chickpeas refrigerate 3–4 days or freeze in portions.",
+        "Rajma (Kidney Beans)": "Keep dried beans airtight; cooked beans refrigerate 3–4 days or freeze in portions.",
+        "Rolled Oats": "Keep in a sealed container away from moisture; discard if it smells rancid.",
+        "Quinoa": "Store dry in an airtight jar; cooked quinoa keeps 3–4 days refrigerated.",
+        "Brown Rice": "Store dry in an airtight jar; cooked rice should be refrigerated promptly and eaten within 3–4 days.",
+        "Peanut Butter": "Store sealed; natural oil separation is normal—stir well. Refrigeration after opening extends freshness.",
+        "Almond Butter": "Store sealed; stir if oils separate. Refrigerate after opening for longer freshness.",
+        "Almonds": "Keep in an airtight container in a cool, dark place or fridge to prevent rancidity.",
+        "Cashews": "Keep airtight and away from heat; refrigeration helps prevent rancidity.",
+        "Walnuts": "Store airtight in the fridge or freezer because their oils go rancid quickly.",
+        "Chia Seeds": "Keep dry and sealed; soaked chia should be refrigerated and used within a day or two.",
+        "Flaxseeds": "Store whole seeds airtight; grind just before use and refrigerate ground flax.",
+        "Pumpkin Seeds": "Keep airtight in a cool, dark place or fridge to protect the oils.",
+        "Sunflower Seeds": "Store airtight and cool; roasted seeds are best used soon after opening.",
+        "Soy Milk": "Refrigerate after opening, shake the carton, and use within 4–5 days.",
+        "Almond Milk": "Refrigerate after opening, shake before pouring, and finish within 4–5 days.",
+        "Oat Milk": "Refrigerate after opening and use within 4–5 days; shake well before pouring.",
+        "Coconut Milk (Canned)": "Store unopened in a cool cupboard; once opened, refrigerate in a non-metal container and use within 3–4 days.",
+    }
+
+    PRODUCT_PAIRINGS: dict[str, str] = {
+        "Whey Protein Powder": "Pair with banana, oats or Greek yogurt for a fuller recovery snack.",
+        "Pea Protein Powder": "Pair with banana, oat milk or a small handful of nuts.",
+        "Soya Chunks (TVP)": "Pair with brown rice, wholegrain roti and plenty of vegetables.",
+        "Tofu (Firm)": "Pair with brown rice, quinoa, sesame and crunchy vegetables.",
+        "Tempeh": "Pair with brown rice, leafy greens and a light soy-ginger glaze.",
+        "Edamame": "Pair with brown rice, citrus, sea salt or a light soy dip.",
+        "Paneer": "Pair with wholegrain roti, brown rice or a large vegetable side.",
+        "Greek Yogurt": "Pair with berries, oats, chia seeds or a drizzle of honey.",
+        "Cottage Cheese (Low Fat)": "Pair with fruit, wholegrain toast, herbs or cracked pepper.",
+        "Masoor Dal (Red Lentils)": "Pair with brown rice, quinoa, roti or a vegetable side.",
+        "Chana Dal": "Pair with brown rice, roti or a cucumber and lemon side.",
+        "Moong Dal": "Pair with brown rice, quinoa or sprouted vegetables.",
+        "Chickpeas (Kabuli Chana)": "Pair with quinoa, rice, cucumber and lemon-tahini style dressing.",
+        "Rajma (Kidney Beans)": "Pair with brown rice, quinoa or a wholegrain wrap.",
+        "Rolled Oats": "Pair with Greek yogurt, berries, seeds or a spoon of nut butter.",
+        "Quinoa": "Pair with roasted vegetables, chickpeas, tofu or fresh herbs.",
+        "Brown Rice": "Pair with dal, paneer, tofu, beans or stir-fried vegetables.",
+        "Peanut Butter": "Pair with fruit slices, wholegrain toast or oatmeal.",
+        "Almond Butter": "Pair with apple, banana, toast or overnight oats.",
+        "Almonds": "Pair with fruit, yogurt or a small handful of seeds.",
+        "Cashews": "Pair with fruit, yogurt, oats or a light trail mix.",
+        "Walnuts": "Pair with yogurt, oats, berries or a leafy salad.",
+        "Chia Seeds": "Pair with milk, yogurt, oats or a soaked smoothie.",
+        "Flaxseeds": "Pair with oatmeal, roti dough, yogurt or smoothies.",
+        "Pumpkin Seeds": "Pair with yogurt, oats, salads or trail mix.",
+        "Sunflower Seeds": "Pair with salads, oatmeal, yogurt or seed butter.",
+        "Soy Milk": "Pair with coffee, cereal, oats or a fruit smoothie.",
+        "Almond Milk": "Pair with coffee, tea, cereal or a smoothie.",
+        "Oat Milk": "Pair with coffee, muesli, overnight oats or baking.",
+        "Coconut Milk (Canned)": "Pair with vegetables, tofu, beans and rice; keep portions modest.",
+    }
+    return {
+        "PRODUCT_EMOJI": PRODUCT_EMOJI,
+        "PRODUCT_HOW_TO_USE": PRODUCT_HOW_TO_USE,
+        "PRODUCT_LOCAL_NAMES": PRODUCT_LOCAL_NAMES,
+        "PRODUCT_CAUTIONS": PRODUCT_CAUTIONS,
+        "PRODUCT_SERVING_G": PRODUCT_SERVING_G,
+        "PRODUCT_ABOUT": PRODUCT_ABOUT,
+        "PRODUCT_STORAGE": PRODUCT_STORAGE,
+        "PRODUCT_PAIRINGS": PRODUCT_PAIRINGS,
+        "PRIORITY_LABELS": PRIORITY_LABELS,
+        "PRIORITY_KEYS": PRIORITY_KEYS,
+        "RANK_COLORS": RANK_COLORS,
+        "RANK_LABELS": RANK_LABELS,
+    }
+
+
+_FOOD_GUIDE_DATA = get_food_guide_data()
+PRODUCT_EMOJI = _FOOD_GUIDE_DATA["PRODUCT_EMOJI"]
+PRODUCT_HOW_TO_USE = _FOOD_GUIDE_DATA["PRODUCT_HOW_TO_USE"]
+PRODUCT_LOCAL_NAMES = _FOOD_GUIDE_DATA["PRODUCT_LOCAL_NAMES"]
+PRODUCT_CAUTIONS = _FOOD_GUIDE_DATA["PRODUCT_CAUTIONS"]
+PRODUCT_SERVING_G = _FOOD_GUIDE_DATA["PRODUCT_SERVING_G"]
+PRODUCT_ABOUT = _FOOD_GUIDE_DATA["PRODUCT_ABOUT"]
+PRODUCT_STORAGE = _FOOD_GUIDE_DATA["PRODUCT_STORAGE"]
+PRODUCT_PAIRINGS = _FOOD_GUIDE_DATA["PRODUCT_PAIRINGS"]
+PRIORITY_LABELS = _FOOD_GUIDE_DATA["PRIORITY_LABELS"]
+PRIORITY_KEYS = _FOOD_GUIDE_DATA["PRIORITY_KEYS"]
+RANK_COLORS = _FOOD_GUIDE_DATA["RANK_COLORS"]
+RANK_LABELS = _FOOD_GUIDE_DATA["RANK_LABELS"]
+
+
 
 
 # ─────────────────────────────────────────────
 # Custom CSS — sleek, modern, consumer-grade dark-mode SaaS look
 # ─────────────────────────────────────────────
-st.markdown("""
-<style>
-/* ── Design tokens ── */
-:root {
-    --bg-obsidian: #0B0F19;
-    --bg-sidebar: #111827;
-    --bg-card: #151C2C;
-    --border: rgba(255, 255, 255, 0.08);
-    --border-hover: rgba(52, 211, 153, 0.35);
-    --accent-mint: #34D399;
-    --accent-mint-text: #0B0F19;
-    --text-heading: #F8FAFC;
-    --text-body: #E2E8F0;
-    --text-muted: #94A3B8;
-    --radius: 14px;
-}
-
-/* ── Google Fonts ── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
-
-/* ── Hide Streamlit chrome and flatten the header ──────────────────────
-   Never hide the sidebar toggle controls. */
-[data-testid="stToolbarActions"], #MainMenu, footer,
-.stDeployButton, [data-testid="stAppDeployButton"], [data-testid="manage-app-button"] {
-    display: none !important;
-}
-
-/* Hide the bottom-right Streamlit viewer badge and creator profile avatar for all visitors */
-[data-testid="stStatusWidget"],
-[data-testid="manage-app-button"],
-.stDeployButton,
-[class*="viewerBadge"],
-[class*="StatusWidget"],
-div[class*="_container_"][class*="_viewerBadge_"],
-a[href*="streamlit.io/cloud"] {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-}
-
-/* Keep the Streamlit top header transparent and compact without pushing content down */
-header[data-testid="stHeader"] {
-    background: transparent !important;
-    height: 2.6rem !important;
-    min-height: 2.6rem !important;
-}
-/* Keep the control interactive, then apply the custom "☰ Menu" styling. */
-[data-testid="stSidebarCollapsedControl"],
-[data-testid="collapsedControl"] {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    width: auto !important;
-    min-width: 0 !important;
-    height: auto !important;
-}
-/* Streamlit may render a fixed-size icon button: let it grow for the label. */
-button[data-testid="stSidebarCollapsedControl"],
-button[data-testid="collapsedControl"],
-[data-testid="stSidebarCollapsedControl"] button,
-[data-testid="collapsedControl"] button {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: auto !important;
-    height: auto !important;
-    min-width: 0 !important;
-}
-/* Only a nested button loses its own box; the outer control keeps the pill. */
-[data-testid="stSidebarCollapsedControl"] button,
-[data-testid="collapsedControl"] button {
-    padding: 2px 4px !important;
-    background: transparent !important;
-    border: none !important;
-}
-[data-testid="stSidebarCollapsedControl"],
-[data-testid="collapsedControl"] {
-    position: fixed !important;
-    top: 16px !important;
-    left: 16px !important;
-    z-index: 999999 !important;
-    background-color: #161B22 !important;
-    border: 1px solid #30363D !important;
-    border-radius: 10px !important;
-    padding: 4px 12px !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-    transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease !important;
-}
-
-@media (hover: hover) {
-    [data-testid="stSidebarCollapsedControl"]:hover,
-    [data-testid="collapsedControl"]:hover {
-        background-color: #21262D !important;
-        border-color: #2EA043 !important;
+@st.cache_data(show_spinner=False)
+def get_global_css() -> str:
+    """Cached dashboard stylesheet; emitted once instead of per button tap."""
+    return """
+    <style>
+    /* ── Design tokens ── */
+    :root {
+        --bg-obsidian: #0B0F19;
+        --bg-sidebar: #111827;
+        --bg-card: #151C2C;
+        --border: rgba(255, 255, 255, 0.08);
+        --border-hover: rgba(52, 211, 153, 0.35);
+        --accent-mint: #34D399;
+        --accent-mint-text: #0B0F19;
+        --text-heading: #F8FAFC;
+        --text-body: #E2E8F0;
+        --text-muted: #94A3B8;
+        --radius: 14px;
     }
-}
 
-/* Highlight BOTH the collapse (<<) and expand (>>) sidebar buttons identically */
-[data-testid="stSidebarCollapseButton"] button,
-[data-testid="stSidebarHeader"] button,
-section[data-testid="stSidebar"] button[kind="header"],
-[data-testid="stExpandSidebarButton"],
-[data-testid="stSidebarCollapsedControl"] button,
-[data-testid="collapsedControl"] button,
-header[data-testid="stHeader"] button[kind="header"] {
-    background-color: rgba(46, 160, 67, 0.16) !important;
-    border: 1px solid rgba(46, 160, 67, 0.65) !important;
-    border-radius: 8px !important;
-    padding: 4px 8px !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
-    transition: none !important;
-}
+    /* ── Google Fonts ── */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
 
-/* Give the collapsed-sidebar expand control (>>) a little breathing room below
-   the browser chrome on both mobile and desktop. */
-[data-testid="stExpandSidebarButton"],
-[data-testid="stSidebarCollapsedControl"] button,
-[data-testid="collapsedControl"] button,
-header[data-testid="stHeader"] button[kind="header"] {
-    margin-top: 10px !important;
-    margin-left: 6px !important;
-}
-
-[data-testid="stSidebarCollapseButton"] button svg,
-[data-testid="stSidebarHeader"] button svg,
-section[data-testid="stSidebar"] button[kind="header"] svg,
-[data-testid="stExpandSidebarButton"] svg,
-[data-testid="stSidebarCollapsedControl"] button svg,
-[data-testid="collapsedControl"] button svg,
-header[data-testid="stHeader"] button[kind="header"] svg {
-    fill: #6EE798 !important;
-    color: #6EE798 !important;
-    width: 18px !important;
-    height: 18px !important;
-}
-
-@media (hover: hover) {
-    [data-testid="stSidebarCollapseButton"] button:hover,
-    [data-testid="stSidebarHeader"] button:hover,
-    section[data-testid="stSidebar"] button[kind="header"]:hover,
-    [data-testid="stExpandSidebarButton"]:hover,
-    [data-testid="stSidebarCollapsedControl"] button:hover,
-    [data-testid="collapsedControl"] button:hover,
-    header[data-testid="stHeader"] button[kind="header"]:hover {
-        background-color: rgba(46, 160, 67, 0.3) !important;
-        border-color: #3FB950 !important;
+    /* ── Hide Streamlit chrome and flatten the header ──────────────────────
+       Never hide the sidebar toggle controls. */
+    [data-testid="stToolbarActions"], #MainMenu, footer,
+    .stDeployButton, [data-testid="stAppDeployButton"], [data-testid="manage-app-button"] {
+        display: none !important;
     }
-}
 
-/* Hide the native chevron in BOTH DOM shapes. */
-[data-testid="stSidebarCollapsedControl"] svg,
-[data-testid="collapsedControl"] svg {
-    display: none !important;
-}
+    /* Hide the bottom-right Streamlit viewer badge and creator profile avatar for all visitors */
+    [data-testid="stStatusWidget"],
+    [data-testid="manage-app-button"],
+    .stDeployButton,
+    [class*="viewerBadge"],
+    [class*="StatusWidget"],
+    div[class*="_container_"][class*="_viewerBadge_"],
+    a[href*="streamlit.io/cloud"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
 
-/* Label works whether the testid is on the button itself or on a
-   wrapper around it. Tag-qualified selectors avoid a duplicate label. */
-button[data-testid="stSidebarCollapsedControl"]::after,
-button[data-testid="collapsedControl"]::after,
-div[data-testid="stSidebarCollapsedControl"] button::after,
-div[data-testid="collapsedControl"] button::after,
-span[data-testid="stSidebarCollapsedControl"] button::after,
-span[data-testid="collapsedControl"] button::after {
-    content: "☰  Menu";
-    color: #E6EDF3 !important;
-    font-family: 'Inter', sans-serif !important;
-    font-size: 15px !important;
-    font-weight: 600 !important;
-    white-space: nowrap !important;
-    padding: 2px 4px !important;
-}
-/* Remove excessive blank top space on both mobile and desktop */
-.block-container,
-[data-testid="stAppViewBlockContainer"],
-.main .block-container,
-section.main > div[data-testid="stMainBlockContainer"] {
-    padding-top: 1.2rem !important;
-    margin-top: 0 !important;
-}
+    /* Keep the Streamlit top header transparent and compact without pushing content down */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        height: 2.6rem !important;
+        min-height: 2.6rem !important;
+    }
+    /* Keep the control interactive, then apply the custom "☰ Menu" styling. */
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"] {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+        height: auto !important;
+    }
+    /* Streamlit may render a fixed-size icon button: let it grow for the label. */
+    button[data-testid="stSidebarCollapsedControl"],
+    button[data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"] button,
+    [data-testid="collapsedControl"] button {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: auto !important;
+        height: auto !important;
+        min-width: 0 !important;
+    }
+    /* Only a nested button loses its own box; the outer control keeps the pill. */
+    [data-testid="stSidebarCollapsedControl"] button,
+    [data-testid="collapsedControl"] button {
+        padding: 2px 4px !important;
+        background: transparent !important;
+        border: none !important;
+    }
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"] {
+        position: fixed !important;
+        top: 16px !important;
+        left: 16px !important;
+        z-index: 999999 !important;
+        background-color: #161B22 !important;
+        border: 1px solid #30363D !important;
+        border-radius: 10px !important;
+        padding: 4px 12px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+        transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease !important;
+    }
 
-@media (max-width: 768px) {
+    @media (hover: hover) {
+        [data-testid="stSidebarCollapsedControl"]:hover,
+        [data-testid="collapsedControl"]:hover {
+            background-color: #21262D !important;
+            border-color: #2EA043 !important;
+        }
+    }
+
+    /* Highlight BOTH the collapse (<<) and expand (>>) sidebar buttons identically */
+    [data-testid="stSidebarCollapseButton"] button,
+    [data-testid="stSidebarHeader"] button,
+    section[data-testid="stSidebar"] button[kind="header"],
+    [data-testid="stExpandSidebarButton"],
+    [data-testid="stSidebarCollapsedControl"] button,
+    [data-testid="collapsedControl"] button,
+    header[data-testid="stHeader"] button[kind="header"] {
+        background-color: rgba(46, 160, 67, 0.16) !important;
+        border: 1px solid rgba(46, 160, 67, 0.65) !important;
+        border-radius: 8px !important;
+        padding: 4px 8px !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+        transition: none !important;
+    }
+
+    /* Give the collapsed-sidebar expand control (>>) a little breathing room below
+       the browser chrome on both mobile and desktop. */
+    [data-testid="stExpandSidebarButton"],
+    [data-testid="stSidebarCollapsedControl"] button,
+    [data-testid="collapsedControl"] button,
+    header[data-testid="stHeader"] button[kind="header"] {
+        margin-top: 10px !important;
+        margin-left: 6px !important;
+    }
+
+    [data-testid="stSidebarCollapseButton"] button svg,
+    [data-testid="stSidebarHeader"] button svg,
+    section[data-testid="stSidebar"] button[kind="header"] svg,
+    [data-testid="stExpandSidebarButton"] svg,
+    [data-testid="stSidebarCollapsedControl"] button svg,
+    [data-testid="collapsedControl"] button svg,
+    header[data-testid="stHeader"] button[kind="header"] svg {
+        fill: #6EE798 !important;
+        color: #6EE798 !important;
+        width: 18px !important;
+        height: 18px !important;
+    }
+
+    @media (hover: hover) {
+        [data-testid="stSidebarCollapseButton"] button:hover,
+        [data-testid="stSidebarHeader"] button:hover,
+        section[data-testid="stSidebar"] button[kind="header"]:hover,
+        [data-testid="stExpandSidebarButton"]:hover,
+        [data-testid="stSidebarCollapsedControl"] button:hover,
+        [data-testid="collapsedControl"] button:hover,
+        header[data-testid="stHeader"] button[kind="header"]:hover {
+            background-color: rgba(46, 160, 67, 0.3) !important;
+            border-color: #3FB950 !important;
+        }
+    }
+
+    /* Hide the native chevron in BOTH DOM shapes. */
+    [data-testid="stSidebarCollapsedControl"] svg,
+    [data-testid="collapsedControl"] svg {
+        display: none !important;
+    }
+
+    /* Label works whether the testid is on the button itself or on a
+       wrapper around it. Tag-qualified selectors avoid a duplicate label. */
+    button[data-testid="stSidebarCollapsedControl"]::after,
+    button[data-testid="collapsedControl"]::after,
+    div[data-testid="stSidebarCollapsedControl"] button::after,
+    div[data-testid="collapsedControl"] button::after,
+    span[data-testid="stSidebarCollapsedControl"] button::after,
+    span[data-testid="collapsedControl"] button::after {
+        content: "☰  Menu";
+        color: #E6EDF3 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        white-space: nowrap !important;
+        padding: 2px 4px !important;
+    }
+    /* Remove excessive blank top space on both mobile and desktop */
     .block-container,
     [data-testid="stAppViewBlockContainer"],
     .main .block-container,
     section.main > div[data-testid="stMainBlockContainer"] {
-        padding-top: 0.75rem !important;
+        padding-top: 1.2rem !important;
+        margin-top: 0 !important;
     }
-}
 
-/* ── Base typography ── */
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.95rem;
-    line-height: 1.5;
-    color: var(--text-body);
-}
-/* Sidebar inputs, buttons, and labels */
-input, select, textarea, button, label,
-.stSelectbox, .stTextInput, .stNumberInput, .stMultiselect,
-.stRadio, .stCheckbox, .stSlider, .stDateInput, .stTimeInput,
-.stButton button, .stDownloadButton button {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.95rem;
-    color: var(--text-body);
-}
-iframe[title="streamlit_searchbox.searchbox"] {
-    width: 100% !important;
-    border: 0 !important;
-    background: transparent !important;
-    border-radius: 10px !important;
-}
+    @media (max-width: 768px) {
+        .block-container,
+        [data-testid="stAppViewBlockContainer"],
+        .main .block-container,
+        section.main > div[data-testid="stMainBlockContainer"] {
+            padding-top: 0.75rem !important;
+        }
+    }
 
-/* ── Headings ── */
-h1, h2, h3, .stHeading {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    color: var(--text-heading);
-}
+    /* ── Base typography ── */
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        color: var(--text-body);
+    }
+    /* Sidebar inputs, buttons, and labels */
+    input, select, textarea, button, label,
+    .stSelectbox, .stTextInput, .stNumberInput, .stMultiselect,
+    .stRadio, .stCheckbox, .stSlider, .stDateInput, .stTimeInput,
+    .stButton button, .stDownloadButton button {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.95rem;
+        color: var(--text-body);
+    }
+    iframe[title="streamlit_searchbox.searchbox"] {
+        width: 100% !important;
+        border: 0 !important;
+        background: transparent !important;
+        border-radius: 10px !important;
+    }
 
-/* ── Tabular numbers for clean metric alignment ── */
-[data-testid="stMetricContainer"],
-[data-testid="stMetricValue"],
-[data-testid="stMetricDelta"],
-[data-testid="stMetricLabel"],
-.stMetric {
-    font-variant-numeric: tabular-nums;
-}
+    /* ── Headings ── */
+    h1, h2, h3, .stHeading {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        color: var(--text-heading);
+    }
 
-/* ── App background ── */
-.stApp {
-    background: var(--bg-obsidian);
-    color: var(--text-body);
-}
+    /* ── Tabular numbers for clean metric alignment ── */
+    [data-testid="stMetricContainer"],
+    [data-testid="stMetricValue"],
+    [data-testid="stMetricDelta"],
+    [data-testid="stMetricLabel"],
+    .stMetric {
+        font-variant-numeric: tabular-nums;
+    }
 
-/* ── Sidebar ── */
-[data-testid="stSidebar"] {
-    background: var(--bg-sidebar);
-    border-right: 1px solid var(--border);
-}
-[data-testid="stSidebar"] .stMarkdown h2 {
-    color: var(--text-body);
-    font-size: 0.875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    margin-bottom: 0.25rem;
-    font-weight: 600;
-    display: inline-block;
-    padding: 0.2rem 0.7rem;
-    border-radius: 999px;
-    background: rgba(52, 211, 153, 0.12);
-    border: 1px solid rgba(52, 211, 153, 0.3);
-}
+    /* ── App background ── */
+    .stApp {
+        background: var(--bg-obsidian);
+        color: var(--text-body);
+    }
 
-/* Sidebar widget labels — crisp white, 14px–15px */
-[data-testid="stSidebar"] label {
-    color: var(--text-heading) !important;
-    font-size: 0.9rem !important;
-    font-weight: 600 !important;
-}
+    /* ── Sidebar ── */
+    [data-testid="stSidebar"] {
+        background: var(--bg-sidebar);
+        border-right: 1px solid var(--border);
+    }
+    [data-testid="stSidebar"] .stMarkdown h2 {
+        color: var(--text-body);
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        margin-bottom: 0.25rem;
+        font-weight: 600;
+        display: inline-block;
+        padding: 0.2rem 0.7rem;
+        border-radius: 999px;
+        background: rgba(52, 211, 153, 0.12);
+        border: 1px solid rgba(52, 211, 153, 0.3);
+    }
 
-/* Sidebar checkbox / radio options — crisp white, 14px–15px */
-[data-testid="stSidebar"] .stCheckbox > label > div,
-[data-testid="stSidebar"] .stCheckbox > label > span,
-[data-testid="stSidebar"] .stRadio > label > div,
-[data-testid="stSidebar"] .stRadio > label > span {
-    color: var(--text-heading) !important;
-    font-size: 0.9rem !important;
-    font-weight: 500 !important;
-}
+    /* Sidebar widget labels — crisp white, 14px–15px */
+    [data-testid="stSidebar"] label {
+        color: var(--text-heading) !important;
+        font-size: 0.9rem !important;
+        font-weight: 600 !important;
+    }
 
-/* Sidebar form elements — cleaner borders & rounded corners */
-[data-testid="stSidebar"] .stSelectbox > div > div,
-[data-testid="stSidebar"] .stTextInput > div > div,
-[data-testid="stSidebar"] .stNumberInput > div > div,
-[data-testid="stSidebar"] .stMultiselect > div > div {
-    background: rgba(15, 23, 42, 0.4);
-    border: 1px solid var(--border) !important;
-    border-radius: 10px !important;
-}
-[data-testid="stSidebar"] .stCheckbox > label,
-[data-testid="stSidebar"] .stRadio > label {
-    font-family: 'Inter', sans-serif;
-}
+    /* Sidebar checkbox / radio options — crisp white, 14px–15px */
+    [data-testid="stSidebar"] .stCheckbox > label > div,
+    [data-testid="stSidebar"] .stCheckbox > label > span,
+    [data-testid="stSidebar"] .stRadio > label > div,
+    [data-testid="stSidebar"] .stRadio > label > span {
+        color: var(--text-heading) !important;
+        font-size: 0.9rem !important;
+        font-weight: 500 !important;
+    }
 
-/* ── Sidebar logo pill ── */
-.sidebar-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.9rem 0.9rem 1.1rem 0.9rem;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 1.25rem;
-    max-width: 100%;
-}
-.sidebar-header .sidebar-logo {
-    height: 2.4rem;
-    width: auto;
-    flex-shrink: 0;
-    border-radius: 10px;
-    background: transparent !important;
-    padding: 0;
-    box-shadow: none;
-}
-/* Light pill behind the dark logo so it stays crisp on the dark UI */
-.logo-pill {
-    background-color: #F0F6FC;
-    padding: 6px 10px;
-    border-radius: 12px;
-    display: inline-flex;
-    align-items: center;
-    flex-shrink: 0;
-}
-.logo-pill img { display: block; }
-.sidebar-header .sidebar-text {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-.sidebar-header .sidebar-title {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 1.2rem;
-    font-weight: 800;
-    color: #f1f5f9;
-    margin: 0 0 0.1rem;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
-}
-.sidebar-header .sidebar-tagline {
-    font-size: 0.875rem;
-    color: var(--text-body);
-    margin: 0;
-    font-weight: 400;
-    line-height: 1.1;
-}
+    /* Sidebar form elements — cleaner borders & rounded corners */
+    [data-testid="stSidebar"] .stSelectbox > div > div,
+    [data-testid="stSidebar"] .stTextInput > div > div,
+    [data-testid="stSidebar"] .stNumberInput > div > div,
+    [data-testid="stSidebar"] .stMultiselect > div > div {
+        background: rgba(15, 23, 42, 0.4);
+        border: 1px solid var(--border) !important;
+        border-radius: 10px !important;
+    }
+    [data-testid="stSidebar"] .stCheckbox > label,
+    [data-testid="stSidebar"] .stRadio > label {
+        font-family: 'Inter', sans-serif;
+    }
 
-/* ── Sidebar welcome card ── */
-.sidebar-welcome {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(5, 150, 105, 0.08));
-    border: 1px solid rgba(52, 211, 153, 0.32);
-    border-radius: 12px;
-    padding: 0.75rem 0.9rem;
-    margin: 0.25rem 0 0.85rem;
-}
-.sidebar-welcome .welcome-name {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--text-heading);
-    line-height: 1.25;
-}
-.sidebar-welcome .welcome-email {
-    font-size: 0.75rem;
-    color: #9BA1A6;
-    margin-top: 0.15rem;
-    line-height: 1.25;
-    text-decoration: none !important;
-    word-break: break-all;
-}
-.sidebar-welcome a {
-    color: inherit !important;
-    text-decoration: none !important;
-}
-@media (hover: hover) {
-    .sidebar-welcome a:hover {
+    /* ── Sidebar logo pill ── */
+    .sidebar-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.9rem 0.9rem 1.1rem 0.9rem;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 1.25rem;
+        max-width: 100%;
+    }
+    .sidebar-header .sidebar-logo {
+        height: 2.4rem;
+        width: auto;
+        flex-shrink: 0;
+        border-radius: 10px;
+        background: transparent !important;
+        padding: 0;
+        box-shadow: none;
+    }
+    /* Light pill behind the dark logo so it stays crisp on the dark UI */
+    .logo-pill {
+        background-color: #F0F6FC;
+        padding: 6px 10px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        flex-shrink: 0;
+    }
+    .logo-pill img { display: block; }
+    .sidebar-header .sidebar-text {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .sidebar-header .sidebar-title {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: #f1f5f9;
+        margin: 0 0 0.1rem;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+    }
+    .sidebar-header .sidebar-tagline {
+        font-size: 0.875rem;
+        color: var(--text-body);
+        margin: 0;
+        font-weight: 400;
+        line-height: 1.1;
+    }
+
+    /* ── Sidebar welcome card ── */
+    .sidebar-welcome {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(5, 150, 105, 0.08));
+        border: 1px solid rgba(52, 211, 153, 0.32);
+        border-radius: 12px;
+        padding: 0.75rem 0.9rem;
+        margin: 0.25rem 0 0.85rem;
+    }
+    .sidebar-welcome .welcome-name {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text-heading);
+        line-height: 1.25;
+    }
+    .sidebar-welcome .welcome-email {
+        font-size: 0.75rem;
+        color: #9BA1A6;
+        margin-top: 0.15rem;
+        line-height: 1.25;
+        text-decoration: none !important;
+        word-break: break-all;
+    }
+    .sidebar-welcome a {
         color: inherit !important;
         text-decoration: none !important;
     }
-}
-/* Consistent spacing / clean borders for sidebar sections */
-[data-testid="stSidebar"] .stMarkdown h2 {
-    margin: 0.9rem 0 0.5rem !important;
-}
-[data-testid="stSidebar"] .streamlit-expanderHeader {
-    background: rgba(15, 23, 42, 0.4) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 10px !important;
-    font-size: 0.9rem !important;
-    color: var(--text-heading) !important;
-}
-[data-testid="stSidebar"] hr.section-divider {
-    margin: 0.9rem 0 !important;
-}
-/* Clickable saved-match rows inside "My saved matches" */
-[data-testid="stSidebar"] div[data-testid="stExpander"] button {
-    text-align: left !important;
-    font-size: 15px !important;
-    line-height: 1.35 !important;
-    white-space: pre-line !important;
-    padding: 0.55rem 0.7rem !important;
-    border: 1px solid #30363D !important;
-    border-radius: 10px !important;
-    background-color: rgba(22, 27, 34, 0.9) !important;
-    color: var(--text-body) !important;
-}
-@media (hover: hover) {
-    [data-testid="stSidebar"] div[data-testid="stExpander"] button:hover {
-        background-color: #21262D !important;
-        border-color: #2EA043 !important;
+    @media (hover: hover) {
+        .sidebar-welcome a:hover {
+            color: inherit !important;
+            text-decoration: none !important;
+        }
     }
-}
-
-/* Wishlist cards now reuse the product-guide card markup and styles. */
-.wishlist-marker, .wishlist-name-marker { display: none !important; }
-
-/* ── Hero header — one centered flex column (mobile-safe) ── */
-.hero-block {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    text-align: center !important;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box !important;
-    padding: 0.4rem 1rem 0.6rem;
-}
-.hero-block .logo-pill {
-    flex-shrink: 0;
-    padding: 8px 14px !important;
-    border-radius: 14px !important;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
-}
-.hero-logo {
-    height: 2.7rem;
-    width: auto;
-    display: block;
-    border-radius: 10px;
-    background: transparent !important;
-    padding: 0;
-    box-shadow: none;
-}
-.hero-title {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    display: inline-block;
-    font-size: 2.5rem !important;
-    font-weight: 800;
-    color: var(--text-heading);
-    background: linear-gradient(90deg, #34D399, #60a5fa);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    line-height: 1.1;
-    margin: 0 !important;
-}
-.hero-tagline {
-    font-size: 1rem !important;
-    color: var(--text-body) !important;
-    margin: 0.4rem 0 0 !important;
-    font-weight: 400;
-    letter-spacing: 0.02em;
-}
-
-/* ── Primary action (emerald gradient) ── */
-.stButton > button[kind="primary"],
-.stButton > button[data-testid="stBaseButton-primary"],
-button[kind="primary"],
-button[kind="primary"] p {
-    background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
-    border: none !important;
-    color: #FFFFFF !important;
-    font-size: 1rem !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.3px !important;
-    border-radius: 10px !important;
-    transition: none !important;
-    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
-}
-/* Touch devices must get a clean first tap: hover effects are desktop-only. */
-@media (hover: hover) {
-    .stButton > button[kind="primary"]:hover,
-    .stButton > button[data-testid="stBaseButton-primary"]:hover,
-    button[kind="primary"]:hover,
-    button[kind="primary"] p:hover {
-        background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
-        color: #FFFFFF !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 6px 18px rgba(16, 185, 129, 0.5) !important;
+    /* Consistent spacing / clean borders for sidebar sections */
+    [data-testid="stSidebar"] .stMarkdown h2 {
+        margin: 0.9rem 0 0.5rem !important;
     }
-}
-
-/* ── Section divider ── */
-.section-divider {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 0.7rem 0;
-}
-
-/* ── Ranked swaps — high-contrast SaaS comparison cards ── */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) {
-    background-color: #161B22 !important;
-    border: 1px solid #30363D !important;
-    border-radius: 16px !important;
-    padding: 1.25rem !important;
-    height: 100% !important;
-    min-height: 360px !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card--top) {
-    border-color: #2EA043 !important;
-    box-shadow: 0 0 0 1px rgba(46, 160, 67, 0.25), 0 14px 34px rgba(0, 0, 0, 0.32) !important;
-}
-div[data-testid="stColumn"]:has(.swap-card) > div[data-testid="stVerticalBlock"] {
-    height: 100% !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) > div[data-testid="stVerticalBlock"] {
-    display: flex !important;
-    flex-direction: column !important;
-    height: 100% !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) div[data-testid="stButton"] {
-    margin-top: auto !important;
-}
-.swap-card {
-    min-height: 360px !important;
-    display: flex;
-    flex-direction: column;
-}
-.swap-card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.85rem;
-}
-.swap-rank-pill {
-    display: inline-flex;
-    align-items: center;
-    padding: 5px 11px;
-    border-radius: 999px;
-    font-size: 0.78rem;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-}
-.swap-score-pill {
-    display: inline-flex;
-    align-items: center;
-    padding: 5px 11px;
-    border-radius: 999px;
-    background: #0B0F19 !important;
-    border: 1px solid #2EA043 !important;
-    color: #7EE2A8 !important;
-    font-size: 0.82rem;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-.swap-thumb {
-    width: 100%;
-    height: 150px;
-    max-height: 150px;
-    object-fit: cover;
-    border-radius: 10px;
-    display: block;
-    margin-bottom: 0.85rem;
-    background: #0B0F19;
-}
-.swap-thumb-fallback {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3.2rem;
-}
-.swap-name {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 18px !important;
-    font-weight: 700 !important;
-    color: #FFFFFF !important;
-    line-height: 1.25 !important;
-    margin: 0 0 0.25rem !important;
-}
-.swap-meta {
-    font-size: 0.8rem;
-    color: #94A3B8;
-    margin-bottom: 0.7rem !important;
-    overflow-wrap: anywhere;
-}
-.swap-macros {
-    margin: 0.2rem 0 0.6rem;
-}
-.swap-macro-pill {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 9px;
-    margin: 0.15rem 0.3rem 0.15rem 0;
-    border-radius: 999px;
-    border: 1px solid;
-    font-size: 14px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-}
-.swap-macro-pill.protein  { background: rgba(52,211,153,0.12); color: #34D399; border-color: rgba(52,211,153,0.35); }
-.swap-macro-pill.carbs    { background: rgba(96,165,250,0.12); color: #60A5FA; border-color: rgba(96,165,250,0.35); }
-.swap-macro-pill.fat      { background: rgba(244,114,182,0.12); color: #F472B6; border-color: rgba(244,114,182,0.35); }
-.swap-macro-pill.calories { background: rgba(251,191,36,0.12); color: #FBBF24; border-color: rgba(251,191,36,0.35); }
-.swap-deltas {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-    margin-bottom: 0.75rem;
-}
-.swap-delta {
-    display: inline-flex;
-    align-items: center;
-    padding: 3px 8px;
-    border-radius: 999px;
-    font-size: 0.78rem;
-    font-weight: 700;
-    background: rgba(148, 163, 184, 0.10);
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    color: #CBD5E1;
-}
-.swap-delta--good {
-    background: rgba(46, 160, 67, 0.14);
-    border-color: rgba(46, 160, 67, 0.40);
-    color: #7EE2A8;
-}
-.swap-delta--warn {
-    background: rgba(251, 191, 36, 0.12);
-    border-color: rgba(251, 191, 36, 0.35);
-    color: #FBBF24;
-}
-.swap-explanation {
-    background: #0B0F19;
-    border-left: 3px solid #2EA043;
-    border-radius: 0 10px 10px 0;
-    padding: 0.8rem 0.9rem;
-    font-size: 15px;
-    color: #C9D1D9;
-    line-height: 1.5;
-    margin: 0 0 0.9rem;
-    flex: 1;
-}
-.swap-explanation strong {
-    color: #F1F5F9;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) .stButton > button {
-    min-height: 42px !important;
-    font-size: 0.9rem !important;
-    border-radius: 10px !important;
-}
-@media (max-width: 768px) {
-    div[data-testid="stColumn"]:has(.swap-card) {
-        flex: 0 0 100% !important;
-        width: 100% !important;
+    [data-testid="stSidebar"] .streamlit-expanderHeader {
+        background: rgba(15, 23, 42, 0.4) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 10px !important;
+        font-size: 0.9rem !important;
+        color: var(--text-heading) !important;
     }
-}
-
-/* ── Product images — fixed heights, no fullscreen chrome ── */
-button[title="View fullscreen"], [data-testid="StyledFullScreenButton"] {
-    display: none !important;
-}
-.spotlight-card-marker {
-    display: none !important;
-}
-.spotlight-thumb {
-    width: 100%;
-    height: 210px;
-    max-height: 210px;
-    object-fit: cover;
-    border-radius: 12px;
-    display: block;
-    background: #0B0F19;
-}
-.spotlight-thumb-fallback {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 4.2rem;
-}
-.product-emoji {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 150px;
-    font-size: 4.2rem;
-    background: #0B0F19;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-}
-/* ── Tag / pill badges ── */
-.tag {
-    display: inline-block;
-    font-size: 0.8rem;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 999px;
-    margin: 0.15rem 0.25rem 0.15rem 0;
-    color: var(--text-body);
-}
-.macro-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    font-family: 'Inter', sans-serif;
-    font-variant-numeric: tabular-nums;
-    padding: 4px 10px;
-    border-radius: 999px;
-    margin: 0.1rem 0.25rem 0.1rem 0;
-    border: 1px solid;
-}
-.macro-pill.protein { background: rgba(52, 211, 153, 0.12); color: #34D399; border-color: rgba(52, 211, 153, 0.35); }
-.macro-pill.carbs   { background: rgba(96, 165, 250, 0.12); color: #60A5FA; border-color: rgba(96, 165, 250, 0.35); }
-.macro-pill.fat     { background: rgba(244, 114, 182, 0.12); color: #F472B6; border-color: rgba(244, 114, 182, 0.35); }
-.macro-pill.fiber   { background: rgba(168, 85, 247, 0.12); color: #A855F7; border-color: rgba(168, 85, 247, 0.35); }
-.macro-pill.calories{ background: rgba(251, 191, 36, 0.12); color: #FBBF24; border-color: rgba(251, 191, 36, 0.35); }
-
-/* ── Dedicated Product Details — rich nutrition guide ── */
-.detail-guide-marker { display: none !important; }
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.detail-guide-marker) {
-    background: linear-gradient(180deg, rgba(22, 27, 34, 0.96), rgba(13, 17, 23, 0.96)) !important;
-    border: 1px solid rgba(46, 160, 67, 0.35) !important;
-    border-radius: 14px !important;
-    padding: 1.1rem !important;
-    margin-top: 0.9rem !important;
-}
-.detail-section-title {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 1.05rem !important;
-    font-weight: 800 !important;
-    color: #7EE2A8 !important;
-    margin: 0 0 0.55rem !important;
-    letter-spacing: 0.01em !important;
-}
-.detail-section-title + .detail-copy,
-.detail-section-title + .detail-macro-table {
-    margin-top: 0 !important;
-}
-.detail-copy {
-    font-size: 0.92rem !important;
-    line-height: 1.65 !important;
-    color: #C9D1D9 !important;
-    margin: 0 0 0.85rem !important;
-}
-.detail-macro-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    font-size: 0.86rem !important;
-    font-variant-numeric: tabular-nums !important;
-}
-.detail-macro-table th, .detail-macro-table td {
-    padding: 0.45rem 0.55rem !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
-    text-align: right !important;
-}
-.detail-macro-table th:first-child, .detail-macro-table td:first-child {
-    text-align: left !important;
-    color: #94A3B8 !important;
-}
-.detail-macro-table thead th {
-    color: #7EE2A8 !important;
-    font-weight: 700 !important;
-    border-bottom-color: rgba(46, 160, 67, 0.45) !important;
-}
-.detail-macro-table tbody tr:last-child td { border-bottom: none !important; }
-.detail-mini-card {
-    background: rgba(11, 15, 25, 0.55) !important;
-    border: 1px solid rgba(255, 255, 255, 0.07) !important;
-    border-radius: 10px !important;
-    padding: 0.75rem 0.85rem !important;
-    margin-bottom: 0.7rem !important;
-}
-.detail-mini-card p { margin: 0 !important; }
-.detail-mini-label {
-    font-size: 0.72rem !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.09em !important;
-    color: #8B949E !important;
-    margin-bottom: 0.3rem !important;
-}
-.detail-mini-value {
-    font-size: 0.95rem !important;
-    font-weight: 650 !important;
-    color: #E6EDF3 !important;
-}
-.detail-tip-list {
-    margin: 0 !important;
-    padding-left: 1.1rem !important;
-    color: #C9D1D9 !important;
-    font-size: 0.9rem !important;
-    line-height: 1.6 !important;
-}
-
-/* ── Landing (empty state) — compact ── */
-.landing {
-    position: relative;
-    max-width: 1060px;
-    margin: 0.75rem auto 0;
-    padding: 1.1rem 1.4rem 0.9rem;
-    background: rgba(21, 28, 44, 0.6);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: 0 20px 50px rgba(2, 6, 23, 0.35);
-    overflow: hidden;
-}
-.landing::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 2px;
-    background: linear-gradient(90deg, #34D399, #60a5fa);
-    opacity: 0.9;
-}
-.landing-eyebrow {
-    text-align: center;
-    color: #60a5fa;
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    margin-bottom: 0.35rem;
-}
-.landing-title {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    text-align: center;
-    color: var(--text-heading);
-    font-size: 1.75rem;
-    font-weight: 800;
-    line-height: 1.25;
-    margin: 0 0 0.5rem;
-}
-.landing-sub {
-    max-width: 640px;
-    margin: 0 auto 0.9rem !important;
-    text-align: center;
-    color: var(--text-body) !important;
-    font-size: 0.95rem !important;
-    line-height: 1.5;
-}
-.steps {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
-    margin: 0.5rem 0;
-}
-.step {
-    background: rgba(11, 15, 25, 0.5);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.75rem 0.7rem 0.8rem;
-    transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
-}
-@media (hover: hover) {
-    .step:hover {
-        border-color: rgba(255, 255, 255, 0.18);
-        transform: translateY(-2px);
+    [data-testid="stSidebar"] hr.section-divider {
+        margin: 0.9rem 0 !important;
     }
-}
-.step-num {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    margin-bottom: 0.35rem;
-    font-size: 0.85rem;
-    font-weight: 800;
-    color: var(--bg-obsidian);
-    background: var(--accent-mint);
-}
-.step h3 {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    margin: 0 0 0.15rem;
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--text-heading);
-}
-.step p {
-    margin: 0;
-    font-size: 0.875rem;
-    line-height: 1.5;
-    color: var(--text-body);
-}
-.landing-cta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    margin-top: 0.8rem;
-    padding-top: 0.7rem;
-    border-top: 1px dashed var(--border);
-    color: var(--text-muted);
-    font-size: 0.9rem;
-}
-.landing-cta .arrow { color: #60a5fa; font-weight: 700; }
-.landing-facts {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5rem;
-    margin-top: 0.6rem;
-}
-.landing-facts span {
-    font-size: 0.8rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--text-body);
-    background: rgba(11, 15, 25, 0.5);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 0.2rem 0.7rem;
-    font-weight: 600;
-}
-@media (max-width: 820px) {
-    .landing { padding: 0.9rem 1rem 0.8rem; }
-    .landing-title { font-size: 1.4rem; }
-    .steps { grid-template-columns: 1fr; }
-}
-
-/* ── Top how-it-works expander — high-contrast one-line guide bar ── */
-.how-guide-anchor { display: none !important; }
-div[data-testid="stExpander"]:has(.landing) {
-    margin: 0.15rem 0 1.1rem !important;
-}
-div[data-testid="stExpander"]:has(.landing) summary,
-div[data-testid="stExpander"]:has(.landing) button[data-testid="stExpanderHeader"],
-div[data-testid="stExpander"]:has(.landing) [data-testid="stExpanderHeader"],
-div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] summary,
-div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"],
-div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
-    background-color: #161B22 !important;
-    border: 1px solid #30363D !important;
-    border-radius: 10px !important;
-    padding: 10px 14px !important;
-    color: #E6EDF3 !important;
-    font-size: 16px !important;
-    font-weight: 600 !important;
-}
-div[data-testid="stExpander"]:has(.landing) [data-testid="stExpanderHeader"] p,
-div[data-testid="stExpander"]:has(.landing) summary p,
-div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] p {
-    color: #E6EDF3 !important;
-    font-size: 16px !important;
-    font-weight: 600 !important;
-}
-div[data-testid="stExpander"]:has(.landing) [data-testid="stExpanderHeader"] svg,
-div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] svg {
-    color: #7EE2A8 !important;
-    fill: #7EE2A8 !important;
-}
-
-/* ── Dedicated dark glass AI page ── */
-.ai-help-marker {
-    display: none !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) {
-    background: linear-gradient(145deg, #161B22, #0D1117) !important;
-    border: 1px solid rgba(46, 160, 67, 0.45) !important;
-    border-radius: 16px !important;
-    padding: 20px !important;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
-    margin-bottom: 16px !important;
-}
-.ai-help-heading {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 1.2rem !important;
-    font-weight: 800 !important;
-    color: #E6EDF3 !important;
-    line-height: 1.3 !important;
-}
-.ai-help-subtitle {
-    font-size: 0.92rem !important;
-    line-height: 1.55 !important;
-    color: #9BA7B4 !important;
-    margin: 0.35rem 0 1.1rem !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) .stButton > button {
-    min-height: 42px !important;
-    padding: 0.35rem 0.7rem !important;
-    font-size: 0.82rem !important;
-    font-weight: 650 !important;
-    color: #A7F3D0 !important;
-    background: rgba(46, 160, 67, 0.12) !important;
-    border: 1px solid rgba(46, 160, 67, 0.35) !important;
-    border-radius: 999px !important;
-    transition: none !important;
-}
-@media (hover: hover) {
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) .stButton > button:hover {
-        background: rgba(46, 160, 67, 0.22) !important;
-        border-color: rgba(46, 160, 67, 0.65) !important;
-        color: #FFFFFF !important;
+    /* Clickable saved-match rows inside "My saved matches" */
+    [data-testid="stSidebar"] div[data-testid="stExpander"] button {
+        text-align: left !important;
+        font-size: 15px !important;
+        line-height: 1.35 !important;
+        white-space: pre-line !important;
+        padding: 0.55rem 0.7rem !important;
+        border: 1px solid #30363D !important;
+        border-radius: 10px !important;
+        background-color: rgba(22, 27, 34, 0.9) !important;
+        color: var(--text-body) !important;
     }
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) [data-testid="stChatMessage"] {
-    width: 100% !important;
-    max-width: 100% !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) [data-testid="stChatInput"] {
-    width: 100% !important;
-}
-
-/* ── Sidebar header ── */
-.sidebar-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.9rem 0.9rem 1.1rem 0.9rem;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 1.25rem;
-    max-width: 100%;
-}
-.sidebar-header .sidebar-logo {
-    height: 2.4rem;
-    width: auto;
-    flex-shrink: 0;
-    border-radius: 10px;
-    background: transparent !important;
-    padding: 0;
-    box-shadow: none;
-}
-.sidebar-header .sidebar-text {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-.sidebar-header .sidebar-title {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 1.2rem;
-    font-weight: 800;
-    color: #f1f5f9;
-    margin: 0 0 0.1rem;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
-}
-.sidebar-header .sidebar-tagline {
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    margin: 0;
-    font-weight: 400;
-    line-height: 1.1;
-}
-
-/* ── Error state ── */
-.error-box {
-    background: #1E1015;
-    border: 1px solid #7F1D1D;
-    border-radius: 10px;
-    padding: 1rem 1.25rem;
-    color: #FCA5A5;
-    font-size: 0.95rem;
-    line-height: 1.5;
-}
-
-/* ── Comparison table ── */
-.macro-table th {
-    color: var(--text-body);
-    font-weight: 600;
-    font-size: 0.875rem;
-    text-transform: uppercase;
-}
-
-/* Center-align Streamlit dataframe (Nutrition Breakdown) headers & cells */
-[data-testid="stDataFrame"] th,
-[data-testid="stDataFrame"] td,
-.stDataFrame th,
-.stDataFrame td {
-    text-align: center !important;
-}
-
-/* ── Net Carbs keto highlight badge ── */
-.net-carbs-keto {
-    display: inline-block;
-    background: rgba(251,191,36,0.15);
-    border: 1px solid rgba(251,191,36,0.4);
-    color: #fbbf24;
-    border-radius: 6px;
-    padding: 2px 8px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    margin-left: 0.4rem;
-}
-.net-carbs-normal {
-    display: inline-block;
-    background: rgba(148,163,184,0.1);
-    border: 1px solid var(--border);
-    color: var(--text-body);
-    border-radius: 6px;
-    padding: 2px 8px;
-    font-size: 0.8rem;
-    margin-left: 0.4rem;
-}
-.macro-goal-badge {
-    display: inline-block;
-    background: rgba(46,160,67,0.12);
-    border: 1px solid rgba(46,160,67,0.38);
-    color: #7EE2A8;
-    border-radius: 999px;
-    padding: 2px 9px;
-    font-size: 0.76rem;
-    font-weight: 600;
-    margin: 0.25rem 0.35rem 0 0;
-    white-space: nowrap;
-}
-
-/* ── Local name tag ── */
-.local-name-tag {
-    display: inline-block;
-    background: rgba(96,165,250,0.1);
-    border: 1px solid rgba(96,165,250,0.3);
-    color: #93c5fd;
-    border-radius: 999px;
-    padding: 2px 10px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    margin-top: 0.25rem;
-    letter-spacing: 0.01em;
-}
-
-/* ── Caution callout ── */
-.caution-box {
-    background: rgba(239,68,68,0.07);
-    border-left: 3px solid rgba(239,68,68,0.5);
-    border-radius: 0 8px 8px 0;
-    padding: 0.55rem 0.9rem;
-    margin-top: 0.6rem;
-    font-size: 0.9rem;
-    color: #fca5a5;
-    line-height: 1.5;
-}
-.caution-box strong {
-    color: #f87171;
-    font-weight: 600;
-}
-
-/* ── Touch-first search card ── */
-/* Only the main search card gets this surface, not every bordered container. */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
-    background: linear-gradient(160deg, rgba(19, 28, 44, 0.82), rgba(8, 13, 23, 0.92)) !important;
-    border: 1px solid rgba(255, 255, 255, 0.10) !important;
-    border-radius: 18px !important;
-    padding: 1.1rem !important;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28) !important;
-}
-.search-card-title {
-    font-size: 16px !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.04em !important;
-    line-height: 1.4 !important;
-    color: #4ADE80 !important;
-    margin: 0 0 8px !important;
-}
-.search-card-title--spaced {
-    margin-top: 1.1rem !important;
-}
-.search-step-badge {
-    flex-shrink: 0 !important;
-}
-
-/* ── Filter questions — bold, crisp labels; choices stay regular weight ── */
-.filters-expander-marker {
-    display: none !important;
-}
-div[data-testid="stExpander"]:has(.filters-expander-marker) label[data-testid="stWidgetLabel"] p {
-    font-weight: 700 !important;
-    color: #E6EDF3 !important;
-    font-size: 16px !important;
-}
-div[data-testid="stExpander"]:has(.filters-expander-marker) .stRadio div[role="radiogroup"] label,
-div[data-testid="stExpander"]:has(.filters-expander-marker) .stRadio div[role="radiogroup"] span {
-    font-weight: 400 !important;
-}
-
-/* ── Sidebar product guide — compact single-column cards ── */
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.guide-card) {
-    background-color: #161B22 !important;
-    border: 1px solid #30363D !important;
-    border-radius: 12px !important;
-    padding: 12px !important;
-    margin-bottom: 12px !important;
-}
-.guide-thumb {
-    display: block;
-    width: 100%;
-    height: 100px;
-    object-fit: cover;
-    object-position: center;
-    border-radius: 8px !important;
-    margin-bottom: 0.5rem;
-}
-.guide-emoji {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100px;
-    border-radius: 8px;
-    background: rgba(148, 163, 184, 0.10);
-    font-size: 2.2rem;
-    margin-bottom: 0.5rem;
-}
-.guide-title {
-    font-size: 16px !important;
-    font-weight: 700 !important;
-    color: #FFFFFF !important;
-    line-height: 1.25 !important;
-}
-.guide-category {
-    font-size: 0.72rem !important;
-    color: var(--text-muted) !important;
-    margin: 0.15rem 0 0.4rem !important;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-.guide-macros .macro-pill {
-    font-size: 0.7rem !important;
-    padding: 2px 6px !important;
-}
-.guide-macros .macro-unit {
-    font-size: 0.7rem !important;
-    color: var(--text-muted) !important;
-    margin-left: 0.25rem !important;
-}
-.guide-tags .tag {
-    font-size: 0.68rem !important;
-    padding: 2px 6px !important;
-}
-.guide-cities {
-    font-size: 0.72rem !important;
-    color: var(--text-muted) !important;
-    margin-top: 0.35rem !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.guide-card) .stButton > button {
-    min-height: 32px !important;
-    padding: 0.3rem 0.6rem !important;
-    font-size: 0.78rem !important;
-    border-radius: 8px !important;
-    margin-top: 0.55rem !important;
-}
-
-.selected-value {
-    font-size: 16px !important;
-    font-weight: 700 !important;
-    color: #E6EDF3 !important;
-    margin: 6px 0 10px 0 !important;
-}
-.selected-value strong,
-.selected-value span {
-    font-weight: 700 !important;
-    color: #4ADE80 !important;
-}
-
-/* Quick-tap pills: active choice is emerald green. */
-div[data-testid="stPills"] button,
-button[data-baseweb="pill"] {
-    border-radius: 999px !important;
-    border: 1px solid rgba(148, 163, 184, 0.22) !important;
-    background: rgba(148, 163, 184, 0.08) !important;
-    color: #CBD5E1 !important;
-    font-weight: 600 !important;
-    padding: 0.45rem 0.85rem !important;
-    transition: none !important;
-}
-div[data-testid="stPills"] button[aria-pressed="true"],
-div[data-testid="stPills"] button[aria-checked="true"],
-div[data-testid="stPills"] button[data-selected="true"],
-button[data-baseweb="pill"][aria-pressed="true"],
-button[data-baseweb="pill"][aria-checked="true"],
-button[data-baseweb="pill"][data-selected="true"] {
-    background: #2EA043 !important;
-    border-color: #2EA043 !important;
-    color: #FFFFFF !important;
-    box-shadow: 0 6px 16px rgba(46, 160, 67, 0.32) !important;
-}
-@media (hover: hover) {
-    div[data-testid="stPills"] button:hover,
-    button[data-baseweb="pill"]:hover {
-        border-color: rgba(46, 160, 67, 0.55) !important;
-        color: #FFFFFF !important;
-    }
-}
-
-/* ── Back-to-home pill — pinned top-right on every dedicated page ── */
-div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) {
-    height: 2.6rem !important;
-    min-height: 2.6rem !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
-.back-home-top-right {
-    display: block !important;
-    visibility: hidden !important;
-    height: 2.6rem !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
-/* The button element is removed from normal flow and pinned opposite the
-   fixed ☰ Menu / >> control at the top-left. */
-div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] {
-    position: fixed !important;
-    top: 16px !important;
-    right: 16px !important;
-    left: auto !important;
-    z-index: 999999 !important;
-    display: block !important;
-    width: auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    text-align: right !important;
-}
-div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] div[data-testid="stButton"] {
-    display: block !important;
-    width: auto !important;
-    margin-left: auto !important;
-    margin-right: 0 !important;
-}
-div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] .stButton > button,
-div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"] {
-    background-color: rgba(46, 160, 67, 0.14) !important;
-    border: 1px solid rgba(46, 160, 67, 0.65) !important;
-    border-radius: 10px !important;
-    color: #6EE798 !important;
-    font-weight: 600 !important;
-    padding: 6px 16px !important;
-    width: auto !important;
-    display: block !important;
-    margin-left: auto !important;
-    margin-right: 0 !important;
-    height: auto !important;
-    min-height: 0 !important;
-    font-size: 15px !important;
-    line-height: 1.2 !important;
-    box-shadow: none !important;
-    transition: none !important;
-}
-div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] .stButton > button p,
-div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"] p {
-    color: #6EE798 !important;
-    font-size: 15px !important;
-    font-weight: 600 !important;
-    margin: 0 !important;
-}
-@media (hover: hover) {
-    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
-    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"]:hover {
-        background-color: rgba(46, 160, 67, 0.22) !important;
-        border-color: #3FB950 !important;
-        color: #FFFFFF !important;
-    }
-    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover p,
-    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"]:hover p {
-        color: #FFFFFF !important;
-    }
-}
-
-/* ── Unified results container + dashboard tabs ── */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) {
-    background-color: #161B22 !important;
-    border: 1px solid #30363D !important;
-    border-radius: 16px !important;
-    padding: 1.1rem !important;
-}
-.results-tabs-marker {
-    display: none !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) div[data-testid="stToggle"] label,
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) div[data-testid="stToggle"] label p,
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) div[data-testid="stCheckbox"] label,
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) div[data-testid="stCheckbox"] label p {
-    font-weight: 700 !important;
-    font-size: 16px !important;
-    color: #E6EDF3 !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs [data-baseweb="tab-list"] {
-    gap: 0.4rem !important;
-    background: #0B0F19 !important;
-    border: 1px solid #30363D !important;
-    border-radius: 12px !important;
-    padding: 0.25rem !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs button[data-baseweb="tab"] {
-    color: #94A3B8 !important;
-    background: transparent !important;
-    border-radius: 999px !important;
-    padding: 0.45rem 0.9rem !important;
-    font-size: 16px !important;
-    font-weight: 700 !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs button[data-baseweb="tab"] p {
-    font-weight: 700 !important;
-    font-size: 16px !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs button[data-baseweb="tab"][aria-selected="true"] {
-    color: #FFFFFF !important;
-    background: linear-gradient(135deg, #2EA043 0%, #10B981 100%) !important;
-    box-shadow: 0 6px 16px rgba(46, 160, 67, 0.28) !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs [data-baseweb="tab-highlight"],
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs [data-baseweb="tab-border"] {
-    background: transparent !important;
-}
-
-/* ── Saved-match rows: label + delete icon stay on one mobile row ── */
-section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"],
-div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] {
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-}
-section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child,
-section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child,
-div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child,
-div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child {
-    min-width: 0 !important;
-    flex: 1 1 auto !important;
-}
-section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:last-child,
-section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:last-child,
-div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:last-child,
-div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:last-child {
-    width: 46px !important;
-    min-width: 46px !important;
-    flex: 0 0 46px !important;
-}
-
-/* ── Desktop / laptop only — larger, centered reading experience ── */
-/* Everything here is gated at 769px so mobile typography stays untouched. */
-@media (min-width: 769px) {
-    section.main > div[data-testid="stMainBlockContainer"],
-    .block-container {
-        max-width: 1120px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
+    @media (hover: hover) {
+        [data-testid="stSidebar"] div[data-testid="stExpander"] button:hover {
+            background-color: #21262D !important;
+            border-color: #2EA043 !important;
+        }
     }
 
-    .search-card-title {
-        font-size: 18px !important;
-        font-weight: 700 !important;
-        letter-spacing: 0.04em !important;
-        line-height: 1.4 !important;
-        color: #4ADE80 !important;
-        margin-bottom: 8px !important;
-    }
+    /* Wishlist cards now reuse the product-guide card markup and styles. */
+    .wishlist-marker, .wishlist-name-marker { display: none !important; }
 
-    body,
-    .stMarkdown p,
-    .stTextInput label p,
-    .stNumberInput label p,
-    div[data-testid="stExpander"] summary p {
-        font-size: 16.5px !important;
-        line-height: 1.55 !important;
-    }
-
-    .stTextInput input,
-    .stNumberInput input {
-        font-size: 15.5px !important;
-        padding: 0.65rem 0.85rem !important;
-    }
-
-    div[data-testid="stPills"] button,
-    button[data-baseweb="pill"] {
-        font-size: 15.5px !important;
-        padding: 0.55rem 0.95rem !important;
-    }
-
-    .macro-pill,
-    .swap-macro-pill,
-    .macro-goal-badge {
-        font-size: 15.5px !important;
-        padding: 5px 11px !important;
-    }
-
-    /* Richer macro pills only inside the "Your Regular Food" spotlight card. */
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.spotlight-card-marker) .macro-pill,
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.spotlight-card-marker) .net-carbs-keto,
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.spotlight-card-marker) .net-carbs-normal,
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.spotlight-card-marker) .macro-goal-badge {
-        font-size: 16px !important;
-        padding: 6px 12px !important;
-    }
-
-    section[data-testid="stSidebar"] p,
-    section[data-testid="stSidebar"] label,
-    section[data-testid="stSidebar"] button,
-    .sidebar-welcome .welcome-name,
-    .sidebar-welcome .welcome-email {
-        font-size: 15.5px !important;
-    }
-
-    section.main .stMarkdown h3,
-    .swap-name {
-        font-size: 23px !important;
-    }
-}
-
-/* Lightweight mobile layout — no backdrop blur, tighter spacing. */
-@media (max-width: 768px) {
-    /* Top padding is set globally above; keep the compact header clear here. */
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
-        padding: 0.85rem !important;
-        border-radius: 14px !important;
-    }
-    .search-card-title {
-        font-size: 16px !important;
-        font-weight: 700 !important;
-        letter-spacing: 0.04em !important;
-        line-height: 1.4 !important;
-        color: #4ADE80 !important;
-        margin-bottom: 8px !important;
-    }
+    /* ── Hero header — one centered flex column (mobile-safe) ── */
     .hero-block {
-        padding: 0.35rem 0.75rem 0.55rem !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box !important;
+        padding: 0.4rem 1rem 0.6rem;
     }
     .hero-block .logo-pill {
-        padding: 7px 12px !important;
+        flex-shrink: 0;
+        padding: 8px 14px !important;
         border-radius: 14px !important;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
     }
     .hero-logo {
-        height: 2.4rem !important;
+        height: 2.7rem;
+        width: auto;
+        display: block;
+        border-radius: 10px;
+        background: transparent !important;
+        padding: 0;
+        box-shadow: none;
     }
     .hero-title {
-        font-size: 2rem !important;
-        letter-spacing: -0.02em !important;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        display: inline-block;
+        font-size: 2.5rem !important;
+        font-weight: 800;
+        color: var(--text-heading);
+        background: linear-gradient(90deg, #34D399, #60a5fa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        line-height: 1.1;
+        margin: 0 !important;
     }
     .hero-tagline {
-        font-size: 0.9rem !important;
-        margin-top: 0.3rem !important;
+        font-size: 1rem !important;
+        color: var(--text-body) !important;
+        margin: 0.4rem 0 0 !important;
+        font-weight: 400;
+        letter-spacing: 0.02em;
     }
-    .hero-divider {
-        margin: 0.5rem 0 !important;
-    }
-    .steps { grid-template-columns: 1fr !important; }
-}
 
-/* Desktop: the brand lives in the sidebar, so hide the duplicate centered
-   hero banner and let the search card start high on the page. */
-@media (min-width: 769px) {
-    .hero-block,
-    .hero-divider {
+    /* ── Primary action (emerald gradient) ── */
+    .stButton > button[kind="primary"],
+    .stButton > button[data-testid="stBaseButton-primary"],
+    button[kind="primary"],
+    button[kind="primary"] p {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+        border: none !important;
+        color: #FFFFFF !important;
+        font-size: 1rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.3px !important;
+        border-radius: 10px !important;
+        transition: none !important;
+        box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
+    }
+    /* Touch devices must get a clean first tap: hover effects are desktop-only. */
+    @media (hover: hover) {
+        .stButton > button[kind="primary"]:hover,
+        .stButton > button[data-testid="stBaseButton-primary"]:hover,
+        button[kind="primary"]:hover,
+        button[kind="primary"] p:hover {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+            color: #FFFFFF !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.5) !important;
+        }
+    }
+
+    /* ── Section divider ── */
+    .section-divider {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 0.7rem 0;
+    }
+
+    /* ── Ranked swaps — high-contrast SaaS comparison cards ── */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) {
+        background-color: #161B22 !important;
+        border: 1px solid #30363D !important;
+        border-radius: 16px !important;
+        padding: 1.25rem !important;
+        height: 100% !important;
+        min-height: 360px !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card--top) {
+        border-color: #2EA043 !important;
+        box-shadow: 0 0 0 1px rgba(46, 160, 67, 0.25), 0 14px 34px rgba(0, 0, 0, 0.32) !important;
+    }
+    div[data-testid="stColumn"]:has(.swap-card) > div[data-testid="stVerticalBlock"] {
+        height: 100% !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) > div[data-testid="stVerticalBlock"] {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100% !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) div[data-testid="stButton"] {
+        margin-top: auto !important;
+    }
+    .swap-card {
+        min-height: 360px !important;
+        display: flex;
+        flex-direction: column;
+    }
+    .swap-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin-bottom: 0.85rem;
+    }
+    .swap-rank-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 5px 11px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+    }
+    .swap-score-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 5px 11px;
+        border-radius: 999px;
+        background: #0B0F19 !important;
+        border: 1px solid #2EA043 !important;
+        color: #7EE2A8 !important;
+        font-size: 0.82rem;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+    .swap-thumb {
+        width: 100%;
+        height: 150px;
+        max-height: 150px;
+        object-fit: cover;
+        border-radius: 10px;
+        display: block;
+        margin-bottom: 0.85rem;
+        background: #0B0F19;
+    }
+    .swap-thumb-fallback {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3.2rem;
+    }
+    .swap-name {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        color: #FFFFFF !important;
+        line-height: 1.25 !important;
+        margin: 0 0 0.25rem !important;
+    }
+    .swap-meta {
+        font-size: 0.8rem;
+        color: #94A3B8;
+        margin-bottom: 0.7rem !important;
+        overflow-wrap: anywhere;
+    }
+    .swap-macros {
+        margin: 0.2rem 0 0.6rem;
+    }
+    .swap-macro-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 9px;
+        margin: 0.15rem 0.3rem 0.15rem 0;
+        border-radius: 999px;
+        border: 1px solid;
+        font-size: 14px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+    .swap-macro-pill.protein  { background: rgba(52,211,153,0.12); color: #34D399; border-color: rgba(52,211,153,0.35); }
+    .swap-macro-pill.carbs    { background: rgba(96,165,250,0.12); color: #60A5FA; border-color: rgba(96,165,250,0.35); }
+    .swap-macro-pill.fat      { background: rgba(244,114,182,0.12); color: #F472B6; border-color: rgba(244,114,182,0.35); }
+    .swap-macro-pill.calories { background: rgba(251,191,36,0.12); color: #FBBF24; border-color: rgba(251,191,36,0.35); }
+    .swap-deltas {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+        margin-bottom: 0.75rem;
+    }
+    .swap-delta {
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        background: rgba(148, 163, 184, 0.10);
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        color: #CBD5E1;
+    }
+    .swap-delta--good {
+        background: rgba(46, 160, 67, 0.14);
+        border-color: rgba(46, 160, 67, 0.40);
+        color: #7EE2A8;
+    }
+    .swap-delta--warn {
+        background: rgba(251, 191, 36, 0.12);
+        border-color: rgba(251, 191, 36, 0.35);
+        color: #FBBF24;
+    }
+    .swap-explanation {
+        background: #0B0F19;
+        border-left: 3px solid #2EA043;
+        border-radius: 0 10px 10px 0;
+        padding: 0.8rem 0.9rem;
+        font-size: 15px;
+        color: #C9D1D9;
+        line-height: 1.5;
+        margin: 0 0 0.9rem;
+        flex: 1;
+    }
+    .swap-explanation strong {
+        color: #F1F5F9;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.swap-card) .stButton > button {
+        min-height: 42px !important;
+        font-size: 0.9rem !important;
+        border-radius: 10px !important;
+    }
+    @media (max-width: 768px) {
+        div[data-testid="stColumn"]:has(.swap-card) {
+            flex: 0 0 100% !important;
+            width: 100% !important;
+        }
+    }
+
+    /* ── Product images — fixed heights, no fullscreen chrome ── */
+    button[title="View fullscreen"], [data-testid="StyledFullScreenButton"] {
         display: none !important;
     }
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
-        margin-top: 0.25rem !important;
+    .spotlight-card-marker {
+        display: none !important;
     }
-}
+    .spotlight-thumb {
+        width: 100%;
+        height: 210px;
+        max-height: 210px;
+        object-fit: cover;
+        border-radius: 12px;
+        display: block;
+        background: #0B0F19;
+    }
+    .spotlight-thumb-fallback {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 4.2rem;
+    }
+    .product-emoji {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 150px;
+        font-size: 4.2rem;
+        background: #0B0F19;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+    }
+    /* ── Tag / pill badges ── */
+    .tag {
+        display: inline-block;
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 999px;
+        margin: 0.15rem 0.25rem 0.15rem 0;
+        color: var(--text-body);
+    }
+    .macro-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+        font-variant-numeric: tabular-nums;
+        padding: 4px 10px;
+        border-radius: 999px;
+        margin: 0.1rem 0.25rem 0.1rem 0;
+        border: 1px solid;
+    }
+    .macro-pill.protein { background: rgba(52, 211, 153, 0.12); color: #34D399; border-color: rgba(52, 211, 153, 0.35); }
+    .macro-pill.carbs   { background: rgba(96, 165, 250, 0.12); color: #60A5FA; border-color: rgba(96, 165, 250, 0.35); }
+    .macro-pill.fat     { background: rgba(244, 114, 182, 0.12); color: #F472B6; border-color: rgba(244, 114, 182, 0.35); }
+    .macro-pill.fiber   { background: rgba(168, 85, 247, 0.12); color: #A855F7; border-color: rgba(168, 85, 247, 0.35); }
+    .macro-pill.calories{ background: rgba(251, 191, 36, 0.12); color: #FBBF24; border-color: rgba(251, 191, 36, 0.35); }
 
-/* ── Sidebar section labels, saved expander, and toggle styles ── */
-.sidebar-section-label {
-    font-size: 13.5px !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.08em;
-    color: #9BA3AF;
-    margin: 18px 0 8px 6px;
-    text-transform: uppercase !important;
-    line-height: 1.2 !important;
-}
-.saved-matches-marker {
-    display: none !important;
-}
-[data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) [data-testid="stExpanderHeader"] p,
-[data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) summary p,
-[data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) .streamlit-expanderHeader p {
-    font-weight: 600 !important;
-    font-size: 16.5px !important;
-    color: #E6EDF3 !important;
-}
+    /* ── Dedicated Product Details — rich nutrition guide ── */
+    .detail-guide-marker { display: none !important; }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.detail-guide-marker) {
+        background: linear-gradient(180deg, rgba(22, 27, 34, 0.96), rgba(13, 17, 23, 0.96)) !important;
+        border: 1px solid rgba(46, 160, 67, 0.35) !important;
+        border-radius: 14px !important;
+        padding: 1.1rem !important;
+        margin-top: 0.9rem !important;
+    }
+    .detail-section-title {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 1.05rem !important;
+        font-weight: 800 !important;
+        color: #7EE2A8 !important;
+        margin: 0 0 0.55rem !important;
+        letter-spacing: 0.01em !important;
+    }
+    .detail-section-title + .detail-copy,
+    .detail-section-title + .detail-macro-table {
+        margin-top: 0 !important;
+    }
+    .detail-copy {
+        font-size: 0.92rem !important;
+        line-height: 1.65 !important;
+        color: #C9D1D9 !important;
+        margin: 0 0 0.85rem !important;
+    }
+    .detail-macro-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        font-size: 0.86rem !important;
+        font-variant-numeric: tabular-nums !important;
+    }
+    .detail-macro-table th, .detail-macro-table td {
+        padding: 0.45rem 0.55rem !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+        text-align: right !important;
+    }
+    .detail-macro-table th:first-child, .detail-macro-table td:first-child {
+        text-align: left !important;
+        color: #94A3B8 !important;
+    }
+    .detail-macro-table thead th {
+        color: #7EE2A8 !important;
+        font-weight: 700 !important;
+        border-bottom-color: rgba(46, 160, 67, 0.45) !important;
+    }
+    .detail-macro-table tbody tr:last-child td { border-bottom: none !important; }
+    .detail-mini-card {
+        background: rgba(11, 15, 25, 0.55) !important;
+        border: 1px solid rgba(255, 255, 255, 0.07) !important;
+        border-radius: 10px !important;
+        padding: 0.75rem 0.85rem !important;
+        margin-bottom: 0.7rem !important;
+    }
+    .detail-mini-card p { margin: 0 !important; }
+    .detail-mini-label {
+        font-size: 0.72rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.09em !important;
+        color: #8B949E !important;
+        margin-bottom: 0.3rem !important;
+    }
+    .detail-mini-value {
+        font-size: 0.95rem !important;
+        font-weight: 650 !important;
+        color: #E6EDF3 !important;
+    }
+    .detail-tip-list {
+        margin: 0 !important;
+        padding-left: 1.1rem !important;
+        color: #C9D1D9 !important;
+        font-size: 0.9rem !important;
+        line-height: 1.6 !important;
+    }
 
-section[data-testid="stSidebar"] div[data-testid="stToggle"],
-section[data-testid="stSidebar"] div[data-testid="stCheckbox"] {
-    background-color: rgba(46, 160, 67, 0.12) !important;
-    border: 1px solid rgba(46, 160, 67, 0.45) !important;
-    border-radius: 10px !important;
-    padding: 8px 12px !important;
-}
-section[data-testid="stSidebar"] div[data-testid="stToggle"] label,
-section[data-testid="stSidebar"] div[data-testid="stToggle"] label p,
-section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label,
-section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
-    font-weight: 700 !important;
-    font-size: 16px !important;
-    color: #6EE798 !important;
-}
+    /* ── Landing (empty state) — compact ── */
+    .landing {
+        position: relative;
+        max-width: 1060px;
+        margin: 0.75rem auto 0;
+        padding: 1.1rem 1.4rem 0.9rem;
+        background: rgba(21, 28, 44, 0.6);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: 0 20px 50px rgba(2, 6, 23, 0.35);
+        overflow: hidden;
+    }
+    .landing::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 2px;
+        background: linear-gradient(90deg, #34D399, #60a5fa);
+        opacity: 0.9;
+    }
+    .landing-eyebrow {
+        text-align: center;
+        color: #60a5fa;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        margin-bottom: 0.35rem;
+    }
+    .landing-title {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        text-align: center;
+        color: var(--text-heading);
+        font-size: 1.75rem;
+        font-weight: 800;
+        line-height: 1.25;
+        margin: 0 0 0.5rem;
+    }
+    .landing-sub {
+        max-width: 640px;
+        margin: 0 auto 0.9rem !important;
+        text-align: center;
+        color: var(--text-body) !important;
+        font-size: 0.95rem !important;
+        line-height: 1.5;
+    }
+    .steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+        margin: 0.5rem 0;
+    }
+    .step {
+        background: rgba(11, 15, 25, 0.5);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0.75rem 0.7rem 0.8rem;
+        transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+    }
+    @media (hover: hover) {
+        .step:hover {
+            border-color: rgba(255, 255, 255, 0.18);
+            transform: translateY(-2px);
+        }
+    }
+    .step-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        margin-bottom: 0.35rem;
+        font-size: 0.85rem;
+        font-weight: 800;
+        color: var(--bg-obsidian);
+        background: var(--accent-mint);
+    }
+    .step h3 {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        margin: 0 0 0.15rem;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text-heading);
+    }
+    .step p {
+        margin: 0;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        color: var(--text-body);
+    }
+    .landing-cta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-top: 0.8rem;
+        padding-top: 0.7rem;
+        border-top: 1px dashed var(--border);
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+    .landing-cta .arrow { color: #60a5fa; font-weight: 700; }
+    .landing-facts {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-top: 0.6rem;
+    }
+    .landing-facts span {
+        font-size: 0.8rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--text-body);
+        background: rgba(11, 15, 25, 0.5);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0.2rem 0.7rem;
+        font-weight: 600;
+    }
+    @media (max-width: 820px) {
+        .landing { padding: 0.9rem 1rem 0.8rem; }
+        .landing-title { font-size: 1.4rem; }
+        .steps { grid-template-columns: 1fr; }
+    }
 
-/* ── Two-line profile header card (styled with .sidebar-profile-box below) ── */
-.profile-card {
-    background-color: #161B22 !important;
-    border: 1px solid #30363D !important;
-    border-radius: 14px !important;
-    padding: 14px 16px !important;
-    margin-top: 8px !important;
-    margin-bottom: 6px !important;
-    box-shadow: none !important;
-}
-.profile-user-row {
-    display: flex !important;
-    align-items: center !important;
-    gap: 12px !important;
-}
-.profile-avatar {
-    width: 42px !important;
-    height: 42px !important;
-    border-radius: 50% !important;
-    background: linear-gradient(135deg, #2EA043, #2563EB) !important;
-    color: #FFFFFF !important;
-    font-weight: 800 !important;
-    font-size: 18px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    flex-shrink: 0 !important;
-}
-.profile-name {
-    font-size: 16px !important;
-    font-weight: 700 !important;
-    color: #FFFFFF !important;
-    line-height: 1.25 !important;
-}
-.profile-email {
-    font-size: 13px !important;
-    color: #8B949E !important;
-    line-height: 1.35 !important;
-    margin-top: 2px !important;
-}
-.profile-stat-pill {
-    background-color: #1C2128 !important;
-    border: 1px solid #30363D !important;
-    border-radius: 999px !important;
-    padding: 7px 14px !important;
-    font-size: 14px !important;
-    color: #E6EDF3 !important;
-    margin-top: 8px !important;
-    text-align: center !important;
-}
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-signout-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    background-color: rgba(248, 81, 73, 0.14) !important;
-    border: 1px solid rgba(248, 81, 73, 0.65) !important;
-    color: #FFA198 !important;
-    border-radius: 10px !important;
-    font-weight: 600 !important;
-    margin-top: 12px !important;
-}
+    /* ── Top how-it-works expander — high-contrast one-line guide bar ── */
+    .how-guide-anchor { display: none !important; }
+    div[data-testid="stExpander"]:has(.landing) {
+        margin: 0.15rem 0 1.1rem !important;
+    }
+    div[data-testid="stExpander"]:has(.landing) summary,
+    div[data-testid="stExpander"]:has(.landing) button[data-testid="stExpanderHeader"],
+    div[data-testid="stExpander"]:has(.landing) [data-testid="stExpanderHeader"],
+    div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] summary,
+    div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"],
+    div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
+        background-color: #161B22 !important;
+        border: 1px solid #30363D !important;
+        border-radius: 10px !important;
+        padding: 10px 14px !important;
+        color: #E6EDF3 !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+    }
+    div[data-testid="stExpander"]:has(.landing) [data-testid="stExpanderHeader"] p,
+    div[data-testid="stExpander"]:has(.landing) summary p,
+    div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] p {
+        color: #E6EDF3 !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+    }
+    div[data-testid="stExpander"]:has(.landing) [data-testid="stExpanderHeader"] svg,
+    div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-testid="stVerticalBlockElement"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] svg {
+        color: #7EE2A8 !important;
+        fill: #7EE2A8 !important;
+    }
 
-/* ── Wishlist + catalogue + install launchers and dedicated full pages ── */
-.home-open-marker,
-.wishlist-open-marker,
-.catalogue-open-marker,
-.install-open-marker,
-.sidebar-profile-box,
-.sidebar-nav-active,
-.wishlist-page-marker,
-.catalogue-page-marker,
-.install-page-marker,
-.install-steps-marker,
-.install-primary-action-marker,
-.install-copy-action-marker,
-.install-copy-link-marker,
-.profile-toggle-marker,
-.profile-signout-marker,
-.wishlist-grid-marker,
-.catalogue-grid-marker {
-    display: none !important;
-}
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    width: 100% !important;
-    background: transparent !important;
-    border: none !important;
-    border-radius: 10px !important;
-    padding: 10px 14px !important;
-    font-weight: 600 !important;
-    font-size: 16px !important;
-    color: #E6EDF3 !important;
-    box-shadow: none !important;
-    min-height: 0 !important;
-    text-align: left !important;
-    justify-content: flex-start !important;
-}
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p,
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p,
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
-    font-size: 16px !important;
-    font-weight: 600 !important;
-    color: #E6EDF3 !important;
-}
-@media (hover: hover) {
-    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
-    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
-    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+    /* ── Dedicated dark glass AI page ── */
+    .ai-help-marker {
+        display: none !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) {
+        background: linear-gradient(145deg, #161B22, #0D1117) !important;
+        border: 1px solid rgba(46, 160, 67, 0.45) !important;
+        border-radius: 16px !important;
+        padding: 20px !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+        margin-bottom: 16px !important;
+    }
+    .ai-help-heading {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 1.2rem !important;
+        font-weight: 800 !important;
+        color: #E6EDF3 !important;
+        line-height: 1.3 !important;
+    }
+    .ai-help-subtitle {
+        font-size: 0.92rem !important;
+        line-height: 1.55 !important;
+        color: #9BA7B4 !important;
+        margin: 0.35rem 0 1.1rem !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) .stButton > button {
+        min-height: 42px !important;
+        padding: 0.35rem 0.7rem !important;
+        font-size: 0.82rem !important;
+        font-weight: 650 !important;
+        color: #A7F3D0 !important;
         background: rgba(46, 160, 67, 0.12) !important;
-        color: #FFFFFF !important;
+        border: 1px solid rgba(46, 160, 67, 0.35) !important;
+        border-radius: 999px !important;
+        transition: none !important;
     }
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.wishlist-page-marker),
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.catalogue-page-marker),
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.install-page-marker) {
-    background: linear-gradient(145deg, rgba(22, 27, 34, 0.98), rgba(13, 17, 23, 0.98)) !important;
-    border: 1px solid rgba(46, 160, 67, 0.35) !important;
-    border-radius: 16px !important;
-    padding: 16px !important;
-}
-/* Keep the final install-guide text clear of the floating corner badge. */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.install-page-marker) {
-    padding-bottom: 4.5rem !important;
-}
-.wishlist-page-heading {
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 1.7rem !important;
-    font-weight: 800 !important;
-    color: #FFFFFF !important;
-    margin: 0 0 14px !important;
-    letter-spacing: -0.02em !important;
-}
-.wishlist-page-heading span {
-    color: #FB7185 !important;
-}
-.catalogue-page-heading {
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 1.7rem !important;
-    font-weight: 800 !important;
-    color: #FFFFFF !important;
-    margin: 0 0 14px !important;
-    letter-spacing: -0.02em !important;
-}
-.catalogue-page-heading span {
-    color: #6EE798 !important;
-}
-.install-page-heading {
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 1.7rem !important;
-    font-weight: 800 !important;
-    color: #FFFFFF !important;
-    margin: 0 0 8px !important;
-    letter-spacing: -0.02em !important;
-}
-.install-page-subtitle {
-    color: #C9D1D9 !important;
-    font-size: 15px !important;
-    line-height: 1.5 !important;
-    margin: 0 0 18px !important;
-}
-@media (max-width: 768px) {
-    .wishlist-page-heading,
-    .catalogue-page-heading,
+    @media (hover: hover) {
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) .stButton > button:hover {
+            background: rgba(46, 160, 67, 0.22) !important;
+            border-color: rgba(46, 160, 67, 0.65) !important;
+            color: #FFFFFF !important;
+        }
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) [data-testid="stChatMessage"] {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) [data-testid="stChatInput"] {
+        width: 100% !important;
+    }
+
+    /* ── Sidebar header ── */
+    .sidebar-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.9rem 0.9rem 1.1rem 0.9rem;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 1.25rem;
+        max-width: 100%;
+    }
+    .sidebar-header .sidebar-logo {
+        height: 2.4rem;
+        width: auto;
+        flex-shrink: 0;
+        border-radius: 10px;
+        background: transparent !important;
+        padding: 0;
+        box-shadow: none;
+    }
+    .sidebar-header .sidebar-text {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .sidebar-header .sidebar-title {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: #f1f5f9;
+        margin: 0 0 0.1rem;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+    }
+    .sidebar-header .sidebar-tagline {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin: 0;
+        font-weight: 400;
+        line-height: 1.1;
+    }
+
+    /* ── Error state ── */
+    .error-box {
+        background: #1E1015;
+        border: 1px solid #7F1D1D;
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        color: #FCA5A5;
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+
+    /* ── Comparison table ── */
+    .macro-table th {
+        color: var(--text-body);
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+    }
+
+    /* Center-align Streamlit dataframe (Nutrition Breakdown) headers & cells */
+    [data-testid="stDataFrame"] th,
+    [data-testid="stDataFrame"] td,
+    .stDataFrame th,
+    .stDataFrame td {
+        text-align: center !important;
+    }
+
+    /* ── Net Carbs keto highlight badge ── */
+    .net-carbs-keto {
+        display: inline-block;
+        background: rgba(251,191,36,0.15);
+        border: 1px solid rgba(251,191,36,0.4);
+        color: #fbbf24;
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-left: 0.4rem;
+    }
+    .net-carbs-normal {
+        display: inline-block;
+        background: rgba(148,163,184,0.1);
+        border: 1px solid var(--border);
+        color: var(--text-body);
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 0.8rem;
+        margin-left: 0.4rem;
+    }
+    .macro-goal-badge {
+        display: inline-block;
+        background: rgba(46,160,67,0.12);
+        border: 1px solid rgba(46,160,67,0.38);
+        color: #7EE2A8;
+        border-radius: 999px;
+        padding: 2px 9px;
+        font-size: 0.76rem;
+        font-weight: 600;
+        margin: 0.25rem 0.35rem 0 0;
+        white-space: nowrap;
+    }
+
+    /* ── Local name tag ── */
+    .local-name-tag {
+        display: inline-block;
+        background: rgba(96,165,250,0.1);
+        border: 1px solid rgba(96,165,250,0.3);
+        color: #93c5fd;
+        border-radius: 999px;
+        padding: 2px 10px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-top: 0.25rem;
+        letter-spacing: 0.01em;
+    }
+
+    /* ── Caution callout ── */
+    .caution-box {
+        background: rgba(239,68,68,0.07);
+        border-left: 3px solid rgba(239,68,68,0.5);
+        border-radius: 0 8px 8px 0;
+        padding: 0.55rem 0.9rem;
+        margin-top: 0.6rem;
+        font-size: 0.9rem;
+        color: #fca5a5;
+        line-height: 1.5;
+    }
+    .caution-box strong {
+        color: #f87171;
+        font-weight: 600;
+    }
+
+    /* ── Touch-first search card ── */
+    /* Only the main search card gets this surface, not every bordered container. */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
+        background: linear-gradient(160deg, rgba(19, 28, 44, 0.82), rgba(8, 13, 23, 0.92)) !important;
+        border: 1px solid rgba(255, 255, 255, 0.10) !important;
+        border-radius: 18px !important;
+        padding: 1.1rem !important;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28) !important;
+    }
+    .search-card-title {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.04em !important;
+        line-height: 1.4 !important;
+        color: #4ADE80 !important;
+        margin: 0 0 8px !important;
+    }
+    .search-card-title--spaced {
+        margin-top: 1.1rem !important;
+    }
+    .search-step-badge {
+        flex-shrink: 0 !important;
+    }
+
+    /* ── Filter questions — bold, crisp labels; choices stay regular weight ── */
+    .filters-expander-marker {
+        display: none !important;
+    }
+    div[data-testid="stExpander"]:has(.filters-expander-marker) label[data-testid="stWidgetLabel"] p {
+        font-weight: 700 !important;
+        color: #E6EDF3 !important;
+        font-size: 16px !important;
+    }
+    div[data-testid="stExpander"]:has(.filters-expander-marker) .stRadio div[role="radiogroup"] label,
+    div[data-testid="stExpander"]:has(.filters-expander-marker) .stRadio div[role="radiogroup"] span {
+        font-weight: 400 !important;
+    }
+
+    /* ── Sidebar product guide — compact single-column cards ── */
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.guide-card) {
+        background-color: #161B22 !important;
+        border: 1px solid #30363D !important;
+        border-radius: 12px !important;
+        padding: 12px !important;
+        margin-bottom: 12px !important;
+    }
+    .guide-thumb {
+        display: block;
+        width: 100%;
+        height: 100px;
+        object-fit: cover;
+        object-position: center;
+        border-radius: 8px !important;
+        margin-bottom: 0.5rem;
+    }
+    .guide-emoji {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100px;
+        border-radius: 8px;
+        background: rgba(148, 163, 184, 0.10);
+        font-size: 2.2rem;
+        margin-bottom: 0.5rem;
+    }
+    .guide-title {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        color: #FFFFFF !important;
+        line-height: 1.25 !important;
+    }
+    .guide-category {
+        font-size: 0.72rem !important;
+        color: var(--text-muted) !important;
+        margin: 0.15rem 0 0.4rem !important;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+    .guide-macros .macro-pill {
+        font-size: 0.7rem !important;
+        padding: 2px 6px !important;
+    }
+    .guide-macros .macro-unit {
+        font-size: 0.7rem !important;
+        color: var(--text-muted) !important;
+        margin-left: 0.25rem !important;
+    }
+    .guide-tags .tag {
+        font-size: 0.68rem !important;
+        padding: 2px 6px !important;
+    }
+    .guide-cities {
+        font-size: 0.72rem !important;
+        color: var(--text-muted) !important;
+        margin-top: 0.35rem !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.guide-card) .stButton > button {
+        min-height: 32px !important;
+        padding: 0.3rem 0.6rem !important;
+        font-size: 0.78rem !important;
+        border-radius: 8px !important;
+        margin-top: 0.55rem !important;
+    }
+
+    .selected-value {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        color: #E6EDF3 !important;
+        margin: 6px 0 10px 0 !important;
+    }
+    .selected-value strong,
+    .selected-value span {
+        font-weight: 700 !important;
+        color: #4ADE80 !important;
+    }
+
+    /* Quick-tap pills: active choice is emerald green. */
+    div[data-testid="stPills"] button,
+    button[data-baseweb="pill"] {
+        border-radius: 999px !important;
+        border: 1px solid rgba(148, 163, 184, 0.22) !important;
+        background: rgba(148, 163, 184, 0.08) !important;
+        color: #CBD5E1 !important;
+        font-weight: 600 !important;
+        padding: 0.45rem 0.85rem !important;
+        transition: none !important;
+    }
+    div[data-testid="stPills"] button[aria-pressed="true"],
+    div[data-testid="stPills"] button[aria-checked="true"],
+    div[data-testid="stPills"] button[data-selected="true"],
+    button[data-baseweb="pill"][aria-pressed="true"],
+    button[data-baseweb="pill"][aria-checked="true"],
+    button[data-baseweb="pill"][data-selected="true"] {
+        background: #2EA043 !important;
+        border-color: #2EA043 !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 6px 16px rgba(46, 160, 67, 0.32) !important;
+    }
+    @media (hover: hover) {
+        div[data-testid="stPills"] button:hover,
+        button[data-baseweb="pill"]:hover {
+            border-color: rgba(46, 160, 67, 0.55) !important;
+            color: #FFFFFF !important;
+        }
+    }
+
+    /* ── Back-to-home pill — pinned top-right on every dedicated page ── */
+    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) {
+        height: 2.6rem !important;
+        min-height: 2.6rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .back-home-top-right {
+        display: block !important;
+        visibility: hidden !important;
+        height: 2.6rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    /* The button element is removed from normal flow and pinned opposite the
+       fixed ☰ Menu / >> control at the top-left. */
+    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] {
+        position: fixed !important;
+        top: 16px !important;
+        right: 16px !important;
+        left: auto !important;
+        z-index: 999999 !important;
+        display: block !important;
+        width: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        text-align: right !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] div[data-testid="stButton"] {
+        display: block !important;
+        width: auto !important;
+        margin-left: auto !important;
+        margin-right: 0 !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] .stButton > button,
+    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"] {
+        background-color: rgba(46, 160, 67, 0.14) !important;
+        border: 1px solid rgba(46, 160, 67, 0.65) !important;
+        border-radius: 10px !important;
+        color: #6EE798 !important;
+        font-weight: 600 !important;
+        padding: 6px 16px !important;
+        width: auto !important;
+        display: block !important;
+        margin-left: auto !important;
+        margin-right: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        font-size: 15px !important;
+        line-height: 1.2 !important;
+        box-shadow: none !important;
+        transition: none !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] .stButton > button p,
+    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"] p {
+        color: #6EE798 !important;
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        margin: 0 !important;
+    }
+    @media (hover: hover) {
+        div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
+        div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"]:hover {
+            background-color: rgba(46, 160, 67, 0.22) !important;
+            border-color: #3FB950 !important;
+            color: #FFFFFF !important;
+        }
+        div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover p,
+        div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"]:hover p {
+            color: #FFFFFF !important;
+        }
+    }
+
+    /* ── Unified results container + dashboard tabs ── */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) {
+        background-color: #161B22 !important;
+        border: 1px solid #30363D !important;
+        border-radius: 16px !important;
+        padding: 1.1rem !important;
+    }
+    .results-tabs-marker {
+        display: none !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) div[data-testid="stToggle"] label,
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) div[data-testid="stToggle"] label p,
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) div[data-testid="stCheckbox"] label,
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) div[data-testid="stCheckbox"] label p {
+        font-weight: 700 !important;
+        font-size: 16px !important;
+        color: #E6EDF3 !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs [data-baseweb="tab-list"] {
+        gap: 0.4rem !important;
+        background: #0B0F19 !important;
+        border: 1px solid #30363D !important;
+        border-radius: 12px !important;
+        padding: 0.25rem !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs button[data-baseweb="tab"] {
+        color: #94A3B8 !important;
+        background: transparent !important;
+        border-radius: 999px !important;
+        padding: 0.45rem 0.9rem !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs button[data-baseweb="tab"] p {
+        font-weight: 700 !important;
+        font-size: 16px !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs button[data-baseweb="tab"][aria-selected="true"] {
+        color: #FFFFFF !important;
+        background: linear-gradient(135deg, #2EA043 0%, #10B981 100%) !important;
+        box-shadow: 0 6px 16px rgba(46, 160, 67, 0.28) !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs [data-baseweb="tab-highlight"],
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.results-tabs-marker) .stTabs [data-baseweb="tab-border"] {
+        background: transparent !important;
+    }
+
+    /* ── Saved-match rows: label + delete icon stay on one mobile row ── */
+    section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"],
+    div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child,
+    section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child,
+    div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child,
+    div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child {
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:last-child,
+    section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:last-child,
+    div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:last-child,
+    div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:last-child {
+        width: 46px !important;
+        min-width: 46px !important;
+        flex: 0 0 46px !important;
+    }
+
+    /* ── Desktop / laptop only — larger, centered reading experience ── */
+    /* Everything here is gated at 769px so mobile typography stays untouched. */
+    @media (min-width: 769px) {
+        section.main > div[data-testid="stMainBlockContainer"],
+        .block-container {
+            max-width: 1120px !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+        }
+
+        .search-card-title {
+            font-size: 18px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.04em !important;
+            line-height: 1.4 !important;
+            color: #4ADE80 !important;
+            margin-bottom: 8px !important;
+        }
+
+        body,
+        .stMarkdown p,
+        .stTextInput label p,
+        .stNumberInput label p,
+        div[data-testid="stExpander"] summary p {
+            font-size: 16.5px !important;
+            line-height: 1.55 !important;
+        }
+
+        .stTextInput input,
+        .stNumberInput input {
+            font-size: 15.5px !important;
+            padding: 0.65rem 0.85rem !important;
+        }
+
+        div[data-testid="stPills"] button,
+        button[data-baseweb="pill"] {
+            font-size: 15.5px !important;
+            padding: 0.55rem 0.95rem !important;
+        }
+
+        .macro-pill,
+        .swap-macro-pill,
+        .macro-goal-badge {
+            font-size: 15.5px !important;
+            padding: 5px 11px !important;
+        }
+
+        /* Richer macro pills only inside the "Your Regular Food" spotlight card. */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.spotlight-card-marker) .macro-pill,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.spotlight-card-marker) .net-carbs-keto,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.spotlight-card-marker) .net-carbs-normal,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.spotlight-card-marker) .macro-goal-badge {
+            font-size: 16px !important;
+            padding: 6px 12px !important;
+        }
+
+        section[data-testid="stSidebar"] p,
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] button,
+        .sidebar-welcome .welcome-name,
+        .sidebar-welcome .welcome-email {
+            font-size: 15.5px !important;
+        }
+
+        section.main .stMarkdown h3,
+        .swap-name {
+            font-size: 23px !important;
+        }
+    }
+
+    /* Lightweight mobile layout — no backdrop blur, tighter spacing. */
+    @media (max-width: 768px) {
+        /* Top padding is set globally above; keep the compact header clear here. */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
+            padding: 0.85rem !important;
+            border-radius: 14px !important;
+        }
+        .search-card-title {
+            font-size: 16px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.04em !important;
+            line-height: 1.4 !important;
+            color: #4ADE80 !important;
+            margin-bottom: 8px !important;
+        }
+        .hero-block {
+            padding: 0.35rem 0.75rem 0.55rem !important;
+        }
+        .hero-block .logo-pill {
+            padding: 7px 12px !important;
+            border-radius: 14px !important;
+        }
+        .hero-logo {
+            height: 2.4rem !important;
+        }
+        .hero-title {
+            font-size: 2rem !important;
+            letter-spacing: -0.02em !important;
+        }
+        .hero-tagline {
+            font-size: 0.9rem !important;
+            margin-top: 0.3rem !important;
+        }
+        .hero-divider {
+            margin: 0.5rem 0 !important;
+        }
+        .steps { grid-template-columns: 1fr !important; }
+    }
+
+    /* Desktop: the brand lives in the sidebar, so hide the duplicate centered
+       hero banner and let the search card start high on the page. */
+    @media (min-width: 769px) {
+        .hero-block,
+        .hero-divider {
+            display: none !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
+            margin-top: 0.25rem !important;
+        }
+    }
+
+    /* ── Sidebar section labels, saved expander, and toggle styles ── */
+    .sidebar-section-label {
+        font-size: 13.5px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.08em;
+        color: #9BA3AF;
+        margin: 18px 0 8px 6px;
+        text-transform: uppercase !important;
+        line-height: 1.2 !important;
+    }
+    .saved-matches-marker {
+        display: none !important;
+    }
+    [data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) [data-testid="stExpanderHeader"] p,
+    [data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) summary p,
+    [data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) .streamlit-expanderHeader p {
+        font-weight: 600 !important;
+        font-size: 16.5px !important;
+        color: #E6EDF3 !important;
+    }
+
+    section[data-testid="stSidebar"] div[data-testid="stToggle"],
+    section[data-testid="stSidebar"] div[data-testid="stCheckbox"] {
+        background-color: rgba(46, 160, 67, 0.12) !important;
+        border: 1px solid rgba(46, 160, 67, 0.45) !important;
+        border-radius: 10px !important;
+        padding: 8px 12px !important;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stToggle"] label,
+    section[data-testid="stSidebar"] div[data-testid="stToggle"] label p,
+    section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label,
+    section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
+        font-weight: 700 !important;
+        font-size: 16px !important;
+        color: #6EE798 !important;
+    }
+
+    /* ── Two-line profile header card (styled with .sidebar-profile-box below) ── */
+    .profile-card {
+        background-color: #161B22 !important;
+        border: 1px solid #30363D !important;
+        border-radius: 14px !important;
+        padding: 14px 16px !important;
+        margin-top: 8px !important;
+        margin-bottom: 6px !important;
+        box-shadow: none !important;
+    }
+    .profile-user-row {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+    }
+    .profile-avatar {
+        width: 42px !important;
+        height: 42px !important;
+        border-radius: 50% !important;
+        background: linear-gradient(135deg, #2EA043, #2563EB) !important;
+        color: #FFFFFF !important;
+        font-weight: 800 !important;
+        font-size: 18px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+    }
+    .profile-name {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        color: #FFFFFF !important;
+        line-height: 1.25 !important;
+    }
+    .profile-email {
+        font-size: 13px !important;
+        color: #8B949E !important;
+        line-height: 1.35 !important;
+        margin-top: 2px !important;
+    }
+    .profile-stat-pill {
+        background-color: #1C2128 !important;
+        border: 1px solid #30363D !important;
+        border-radius: 999px !important;
+        padding: 7px 14px !important;
+        font-size: 14px !important;
+        color: #E6EDF3 !important;
+        margin-top: 8px !important;
+        text-align: center !important;
+    }
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-signout-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+        background-color: rgba(248, 81, 73, 0.14) !important;
+        border: 1px solid rgba(248, 81, 73, 0.65) !important;
+        color: #FFA198 !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+        margin-top: 12px !important;
+    }
+
+    /* ── Wishlist + catalogue + install launchers and dedicated full pages ── */
+    .home-open-marker,
+    .wishlist-open-marker,
+    .catalogue-open-marker,
+    .install-open-marker,
+    .sidebar-profile-box,
+    .sidebar-nav-active,
+    .wishlist-page-marker,
+    .catalogue-page-marker,
+    .install-page-marker,
+    .install-steps-marker,
+    .install-primary-action-marker,
+    .install-copy-action-marker,
+    .install-copy-link-marker,
+    .profile-toggle-marker,
+    .profile-signout-marker,
+    .wishlist-grid-marker,
+    .catalogue-grid-marker {
+        display: none !important;
+    }
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+        width: 100% !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 10px !important;
+        padding: 10px 14px !important;
+        font-weight: 600 !important;
+        font-size: 16px !important;
+        color: #E6EDF3 !important;
+        box-shadow: none !important;
+        min-height: 0 !important;
+        text-align: left !important;
+        justify-content: flex-start !important;
+    }
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p,
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p,
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #E6EDF3 !important;
+    }
+    @media (hover: hover) {
+        [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
+        [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
+        [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+            background: rgba(46, 160, 67, 0.12) !important;
+            color: #FFFFFF !important;
+        }
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.wishlist-page-marker),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.catalogue-page-marker),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.install-page-marker) {
+        background: linear-gradient(145deg, rgba(22, 27, 34, 0.98), rgba(13, 17, 23, 0.98)) !important;
+        border: 1px solid rgba(46, 160, 67, 0.35) !important;
+        border-radius: 16px !important;
+        padding: 16px !important;
+    }
+    /* Keep the final install-guide text clear of the floating corner badge. */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.install-page-marker) {
+        padding-bottom: 4.5rem !important;
+    }
+    .wishlist-page-heading {
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
+        font-size: 1.7rem !important;
+        font-weight: 800 !important;
+        color: #FFFFFF !important;
+        margin: 0 0 14px !important;
+        letter-spacing: -0.02em !important;
+    }
+    .wishlist-page-heading span {
+        color: #FB7185 !important;
+    }
+    .catalogue-page-heading {
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
+        font-size: 1.7rem !important;
+        font-weight: 800 !important;
+        color: #FFFFFF !important;
+        margin: 0 0 14px !important;
+        letter-spacing: -0.02em !important;
+    }
+    .catalogue-page-heading span {
+        color: #6EE798 !important;
+    }
     .install-page-heading {
-        font-size: 1.35rem !important;
-    }
-}
-.wishlist-empty-card {
-    border: 1px dashed rgba(46, 160, 67, 0.5) !important;
-    border-radius: 14px !important;
-    background: rgba(46, 160, 67, 0.08) !important;
-    padding: 28px 20px !important;
-    text-align: center !important;
-    color: #C9D1D9 !important;
-}
-.wishlist-empty-card .empty-icon {
-    display: block !important;
-    font-size: 2.4rem !important;
-    margin-bottom: 10px !important;
-}
-.wishlist-empty-card .empty-title {
-    display: block !important;
-    font-size: 1.15rem !important;
-    font-weight: 700 !important;
-    color: #F8FAFC !important;
-    margin-bottom: 6px !important;
-}
-
-/* ── Dedicated install page — clean two-step platform cards ── */
-div[data-testid="stVerticalBlockElement"]:has(.install-steps-marker) + div[data-testid="stHorizontalBlock"] {
-    display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 14px !important;
-    align-items: stretch !important;
-}
-div[data-testid="stVerticalBlockElement"]:has(.install-steps-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-    width: auto !important;
-    min-width: 0 !important;
-}
-@media (max-width: 768px) {
-    div[data-testid="stVerticalBlockElement"]:has(.install-steps-marker) + div[data-testid="stHorizontalBlock"] {
-        grid-template-columns: 1fr !important;
-    }
-}
-.install-step-card {
-    height: 100% !important;
-    background: linear-gradient(145deg, rgba(46, 160, 67, 0.14), rgba(22, 27, 34, 0.95)) !important;
-    border: 1px solid rgba(46, 160, 67, 0.5) !important;
-    border-radius: 14px !important;
-    padding: 18px !important;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22) !important;
-}
-.install-step-num {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 30px !important;
-    height: 30px !important;
-    border-radius: 999px !important;
-    background: rgba(46, 160, 67, 0.25) !important;
-    border: 1px solid rgba(46, 160, 67, 0.7) !important;
-    color: #6EE798 !important;
-    font-weight: 800 !important;
-    margin-bottom: 10px !important;
-}
-.install-step-title {
-    font-size: 1.1rem !important;
-    font-weight: 800 !important;
-    color: #FFFFFF !important;
-    margin-bottom: 8px !important;
-}
-.install-step-body {
-    color: #C9D1D9 !important;
-    font-size: 14.5px !important;
-    line-height: 1.6 !important;
-}
-.install-step-body strong {
-    color: #6EE798 !important;
-    font-weight: 700 !important;
-}
-.install-native-note {
-    color: #8B949E !important;
-    font-size: 13px !important;
-    margin-top: 14px !important;
-}
-div[data-testid="stVerticalBlockElement"]:has(.install-page-marker) #mm-pwa-install-slot {
-    margin-top: 12px !important;
-}
-div[data-testid="stVerticalBlockElement"]:has(.install-primary-action-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    width: 100% !important;
-    min-height: 50px !important;
-    padding: 12px 18px !important;
-    border: 1.5px solid #4ADE80 !important;
-    border-radius: 12px !important;
-    background: linear-gradient(135deg, #217A3E 0%, #134725 100%) !important;
-    box-shadow: 0 0 18px rgba(74, 222, 128, 0.3) !important;
-    color: #FFFFFF !important;
-    font-size: 16px !important;
-    font-weight: 800 !important;
-    letter-spacing: 0.02em !important;
-}
-div[data-testid="stVerticalBlockElement"]:has(.install-copy-action-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    width: 100% !important;
-    min-height: 46px !important;
-    padding: 10px 16px !important;
-    border: 1.5px solid rgba(46, 160, 67, 0.75) !important;
-    border-radius: 12px !important;
-    background: rgba(22, 27, 34, 0.9) !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-    color: #A7F3D0 !important;
-    font-size: 15px !important;
-    font-weight: 700 !important;
-}
-div[data-testid="stVerticalBlockElement"]:has(.install-copy-link-marker) + div[data-testid="stVerticalBlockElement"] [data-testid="stCodeBlock"] {
-    background: rgba(13, 17, 23, 0.95) !important;
-    border: 1px solid rgba(46, 160, 67, 0.45) !important;
-    border-radius: 10px !important;
-    padding: 8px 10px !important;
-}
-@media (hover: hover) {
-    div[data-testid="stVerticalBlockElement"]:has(.install-primary-action-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
-        background: linear-gradient(135deg, #2EA043 0%, #176534 100%) !important;
-        border-color: #6EE798 !important;
-        transform: translateY(-1px) !important;
-    }
-    div[data-testid="stVerticalBlockElement"]:has(.install-copy-action-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
-        background: rgba(46, 160, 67, 0.24) !important;
-        border-color: #4ADE80 !important;
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
+        font-size: 1.7rem !important;
+        font-weight: 800 !important;
         color: #FFFFFF !important;
-        transform: translateY(-1px) !important;
+        margin: 0 0 8px !important;
+        letter-spacing: -0.02em !important;
     }
-}
+    .install-page-subtitle {
+        color: #C9D1D9 !important;
+        font-size: 15px !important;
+        line-height: 1.5 !important;
+        margin: 0 0 18px !important;
+    }
+    @media (max-width: 768px) {
+        .wishlist-page-heading,
+        .catalogue-page-heading,
+        .install-page-heading {
+            font-size: 1.35rem !important;
+        }
+    }
+    .wishlist-empty-card {
+        border: 1px dashed rgba(46, 160, 67, 0.5) !important;
+        border-radius: 14px !important;
+        background: rgba(46, 160, 67, 0.08) !important;
+        padding: 28px 20px !important;
+        text-align: center !important;
+        color: #C9D1D9 !important;
+    }
+    .wishlist-empty-card .empty-icon {
+        display: block !important;
+        font-size: 2.4rem !important;
+        margin-bottom: 10px !important;
+    }
+    .wishlist-empty-card .empty-title {
+        display: block !important;
+        font-size: 1.15rem !important;
+        font-weight: 700 !important;
+        color: #F8FAFC !important;
+        margin-bottom: 6px !important;
+    }
 
-div[data-testid="stVerticalBlockElement"]:has(.wishlist-grid-marker) + div[data-testid="stHorizontalBlock"],
-div[data-testid="stVerticalBlockElement"]:has(.catalogue-grid-marker) + div[data-testid="stHorizontalBlock"] {
-    display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 16px !important;
-    align-items: start !important;
-}
-div[data-testid="stVerticalBlockElement"]:has(.wishlist-grid-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"],
-div[data-testid="stVerticalBlockElement"]:has(.catalogue-grid-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-    width: auto !important;
-    min-width: 0 !important;
-}
-@media (max-width: 768px) {
+    /* ── Dedicated install page — clean two-step platform cards ── */
+    div[data-testid="stVerticalBlockElement"]:has(.install-steps-marker) + div[data-testid="stHorizontalBlock"] {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 14px !important;
+        align-items: stretch !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.install-steps-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        width: auto !important;
+        min-width: 0 !important;
+    }
+    @media (max-width: 768px) {
+        div[data-testid="stVerticalBlockElement"]:has(.install-steps-marker) + div[data-testid="stHorizontalBlock"] {
+            grid-template-columns: 1fr !important;
+        }
+    }
+    .install-step-card {
+        height: 100% !important;
+        background: linear-gradient(145deg, rgba(46, 160, 67, 0.14), rgba(22, 27, 34, 0.95)) !important;
+        border: 1px solid rgba(46, 160, 67, 0.5) !important;
+        border-radius: 14px !important;
+        padding: 18px !important;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22) !important;
+    }
+    .install-step-num {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 30px !important;
+        height: 30px !important;
+        border-radius: 999px !important;
+        background: rgba(46, 160, 67, 0.25) !important;
+        border: 1px solid rgba(46, 160, 67, 0.7) !important;
+        color: #6EE798 !important;
+        font-weight: 800 !important;
+        margin-bottom: 10px !important;
+    }
+    .install-step-title {
+        font-size: 1.1rem !important;
+        font-weight: 800 !important;
+        color: #FFFFFF !important;
+        margin-bottom: 8px !important;
+    }
+    .install-step-body {
+        color: #C9D1D9 !important;
+        font-size: 14.5px !important;
+        line-height: 1.6 !important;
+    }
+    .install-step-body strong {
+        color: #6EE798 !important;
+        font-weight: 700 !important;
+    }
+    .install-native-note {
+        color: #8B949E !important;
+        font-size: 13px !important;
+        margin-top: 14px !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.install-page-marker) #mm-pwa-install-slot {
+        margin-top: 12px !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.install-primary-action-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+        width: 100% !important;
+        min-height: 50px !important;
+        padding: 12px 18px !important;
+        border: 1.5px solid #4ADE80 !important;
+        border-radius: 12px !important;
+        background: linear-gradient(135deg, #217A3E 0%, #134725 100%) !important;
+        box-shadow: 0 0 18px rgba(74, 222, 128, 0.3) !important;
+        color: #FFFFFF !important;
+        font-size: 16px !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.02em !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.install-copy-action-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+        width: 100% !important;
+        min-height: 46px !important;
+        padding: 10px 16px !important;
+        border: 1.5px solid rgba(46, 160, 67, 0.75) !important;
+        border-radius: 12px !important;
+        background: rgba(22, 27, 34, 0.9) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        color: #A7F3D0 !important;
+        font-size: 15px !important;
+        font-weight: 700 !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.install-copy-link-marker) + div[data-testid="stVerticalBlockElement"] [data-testid="stCodeBlock"] {
+        background: rgba(13, 17, 23, 0.95) !important;
+        border: 1px solid rgba(46, 160, 67, 0.45) !important;
+        border-radius: 10px !important;
+        padding: 8px 10px !important;
+    }
+    @media (hover: hover) {
+        div[data-testid="stVerticalBlockElement"]:has(.install-primary-action-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+            background: linear-gradient(135deg, #2EA043 0%, #176534 100%) !important;
+            border-color: #6EE798 !important;
+            transform: translateY(-1px) !important;
+        }
+        div[data-testid="stVerticalBlockElement"]:has(.install-copy-action-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+            background: rgba(46, 160, 67, 0.24) !important;
+            border-color: #4ADE80 !important;
+            color: #FFFFFF !important;
+            transform: translateY(-1px) !important;
+        }
+    }
+
     div[data-testid="stVerticalBlockElement"]:has(.wishlist-grid-marker) + div[data-testid="stHorizontalBlock"],
     div[data-testid="stVerticalBlockElement"]:has(.catalogue-grid-marker) + div[data-testid="stHorizontalBlock"] {
-        grid-template-columns: 1fr !important;
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 16px !important;
+        align-items: start !important;
     }
-}
-
-/* ── Catalogue pagination — emerald-outlined buttons on the main screen ── */
-.catalogue-view-more-marker,
-.catalogue-show-less-marker {
-    display: none !important;
-}
-div[data-testid="stVerticalBlockElement"]:has(.catalogue-view-more-marker) + div[data-testid="stVerticalBlockElement"],
-div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div[data-testid="stVerticalBlockElement"] {
-    display: flex !important;
-    justify-content: center !important;
-}
-div[data-testid="stVerticalBlockElement"]:has(.catalogue-view-more-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
-div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    background: linear-gradient(135deg, rgba(46, 160, 67, 0.2), rgba(22, 27, 34, 0.95)) !important;
-    border: 1px solid rgba(46, 160, 67, 0.65) !important;
-    color: #6EE798 !important;
-    font-weight: 700 !important;
-    font-size: 15px !important;
-    letter-spacing: 0.03em !important;
-    border-radius: 10px !important;
-    padding: 10px 20px !important;
-    min-width: 150px !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-    margin-top: 0.5rem !important;
-}
-@media (hover: hover) {
-    div[data-testid="stVerticalBlockElement"]:has(.catalogue-view-more-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
-    div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
-        background: rgba(46, 160, 67, 0.32) !important;
-        border-color: #3FB950 !important;
-        color: #FFFFFF !important;
+    div[data-testid="stVerticalBlockElement"]:has(.wishlist-grid-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"],
+    div[data-testid="stVerticalBlockElement"]:has(.catalogue-grid-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        width: auto !important;
+        min-width: 0 !important;
     }
-}
-
-/* 1. Secondary buttons = clean, left-aligned menu rows. */
-section[data-testid="stSidebar"] button[kind="secondary"] {
-    background: transparent !important;
-    border: none !important;
-    border-radius: 10px !important;
-    padding: 10px 14px !important;
-    display: flex !important;
-    justify-content: flex-start !important;
-    align-items: center !important;
-    text-align: left !important;
-    width: 100% !important;
-    box-shadow: none !important;
-}
-section[data-testid="stSidebar"] button[kind="secondary"] > div,
-section[data-testid="stSidebar"] button[kind="secondary"] p {
-    font-size: 16.5px !important;
-    font-weight: 600 !important;
-    color: #E6EDF3 !important;
-    text-align: left !important;
-    justify-content: flex-start !important;
-    width: 100% !important;
-    margin: 0 !important;
-}
-
-/* 2. Primary button = the single glowing AI Help CTA at the bottom. */
-section[data-testid="stSidebar"] button[kind="primary"] {
-    background: linear-gradient(135deg, #2EA043 0%, #34D399 100%) !important;
-    border: none !important;
-    border-radius: 999px !important;
-    padding: 14px 18px !important;
-    margin-top: 14px !important;
-    justify-content: center !important;
-    box-shadow: 0 4px 18px rgba(52, 211, 153, 0.35) !important;
-}
-section[data-testid="stSidebar"] button[kind="primary"] > div,
-section[data-testid="stSidebar"] button[kind="primary"] p {
-    color: #051B11 !important;
-    font-size: 17px !important;
-    font-weight: 800 !important;
-    text-align: center !important;
-    justify-content: center !important;
-}
-
-@media (hover: hover) {
-    section[data-testid="stSidebar"] button[kind="secondary"]:hover {
-        background-color: rgba(255, 255, 255, 0.06) !important;
+    @media (max-width: 768px) {
+        div[data-testid="stVerticalBlockElement"]:has(.wishlist-grid-marker) + div[data-testid="stHorizontalBlock"],
+        div[data-testid="stVerticalBlockElement"]:has(.catalogue-grid-marker) + div[data-testid="stHorizontalBlock"] {
+            grid-template-columns: 1fr !important;
+        }
     }
-    section[data-testid="stSidebar"] button[kind="primary"]:hover {
+
+    /* ── Catalogue pagination — emerald-outlined buttons on the main screen ── */
+    .catalogue-view-more-marker,
+    .catalogue-show-less-marker {
+        display: none !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.catalogue-view-more-marker) + div[data-testid="stVerticalBlockElement"],
+    div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div[data-testid="stVerticalBlockElement"] {
+        display: flex !important;
+        justify-content: center !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.catalogue-view-more-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
+    div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+        background: linear-gradient(135deg, rgba(46, 160, 67, 0.2), rgba(22, 27, 34, 0.95)) !important;
+        border: 1px solid rgba(46, 160, 67, 0.65) !important;
+        color: #6EE798 !important;
+        font-weight: 700 !important;
+        font-size: 15px !important;
+        letter-spacing: 0.03em !important;
+        border-radius: 10px !important;
+        padding: 10px 20px !important;
+        min-width: 150px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        margin-top: 0.5rem !important;
+    }
+    @media (hover: hover) {
+        div[data-testid="stVerticalBlockElement"]:has(.catalogue-view-more-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
+        div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+            background: rgba(46, 160, 67, 0.32) !important;
+            border-color: #3FB950 !important;
+            color: #FFFFFF !important;
+        }
+    }
+
+    /* 1. Secondary buttons = clean, left-aligned menu rows. */
+    section[data-testid="stSidebar"] button[kind="secondary"] {
+        background: transparent !important;
+        border: none !important;
+        border-radius: 10px !important;
+        padding: 10px 14px !important;
+        display: flex !important;
+        justify-content: flex-start !important;
+        align-items: center !important;
+        text-align: left !important;
+        width: 100% !important;
+        box-shadow: none !important;
+    }
+    section[data-testid="stSidebar"] button[kind="secondary"] > div,
+    section[data-testid="stSidebar"] button[kind="secondary"] p {
+        font-size: 16.5px !important;
+        font-weight: 600 !important;
+        color: #E6EDF3 !important;
+        text-align: left !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
+        margin: 0 !important;
+    }
+
+    /* 2. Primary button = the single glowing AI Help CTA at the bottom. */
+    section[data-testid="stSidebar"] button[kind="primary"] {
         background: linear-gradient(135deg, #2EA043 0%, #34D399 100%) !important;
-        box-shadow: 0 6px 22px rgba(52, 211, 153, 0.48) !important;
+        border: none !important;
+        border-radius: 999px !important;
+        padding: 14px 18px !important;
+        margin-top: 14px !important;
+        justify-content: center !important;
+        box-shadow: 0 4px 18px rgba(52, 211, 153, 0.35) !important;
     }
-}
-
-/* 2. Preference expanders reuse the main page's dark-card surface. */
-section[data-testid="stSidebar"] div[data-testid="stExpander"] {
-    background-color: #161B22 !important;
-    border: 1px solid #30363D !important;
-    border-radius: 10px !important;
-    margin-bottom: 6px !important;
-    overflow: hidden !important;
-}
-section[data-testid="stSidebar"] div[data-testid="stExpander"] details {
-    background-color: #161B22 !important;
-    border: none !important;
-    border-radius: 10px !important;
-}
-section[data-testid="stSidebar"] div[data-testid="stExpander"] summary,
-section[data-testid="stSidebar"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"],
-section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
-    background-color: #161B22 !important;
-    border: none !important;
-    border-radius: 10px !important;
-    padding: 10px 14px !important;
-    justify-content: flex-start !important;
-    text-align: left !important;
-}
-
-section[data-testid="stSidebar"] div[data-testid="stExpander"] summary p,
-section[data-testid="stSidebar"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"] p,
-section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] p {
-    font-size: 16.5px !important;
-    font-weight: 600 !important;
-    color: #E6EDF3 !important;
-}
-@media (hover: hover) {
-    section[data-testid="stSidebar"] div[data-testid="stExpander"] summary:hover,
-    section[data-testid="stSidebar"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"]:hover,
-    section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"]:hover {
-        background-color: #1C2128 !important;
+    section[data-testid="stSidebar"] button[kind="primary"] > div,
+    section[data-testid="stSidebar"] button[kind="primary"] p {
+        color: #051B11 !important;
+        font-size: 17px !important;
+        font-weight: 800 !important;
+        text-align: center !important;
+        justify-content: center !important;
     }
-}
-/* Save actions inside expanders stay visibly actionable without becoming
-   another loud pill in the drawer. */
-html body section[data-testid="stSidebar"] div[data-testid="stExpander"] div[data-testid="stButton"] button,
-html body section[data-testid="stSidebar"] div[data-testid="stExpander"] div[data-testid="stButton"] button p {
-    background-color: #21262D !important;
-    border: 1px solid rgba(63, 185, 80, 0.35) !important;
-    color: #E6EDF3 !important;
-    font-weight: 600 !important;
-    border-radius: 10px !important;
-}
 
-/* 3. Sign out stays distinct but still reads as a row inside the card. */
-section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="profile_card_signout"] {
-    background-color: rgba(248, 81, 73, 0.12) !important;
-    border: 1px solid rgba(248, 81, 73, 0.55) !important;
-    border-radius: 10px !important;
-    padding: 10px 14px !important;
-    color: #FFA198 !important;
-    box-shadow: none !important;
-}
-
-@media (hover: hover) {
-    section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="profile_card_signout"]:hover {
-        background-color: rgba(248, 81, 73, 0.2) !important;
-        border-color: rgba(248, 81, 73, 0.8) !important;
+    @media (hover: hover) {
+        section[data-testid="stSidebar"] button[kind="secondary"]:hover {
+            background-color: rgba(255, 255, 255, 0.06) !important;
+        }
+        section[data-testid="stSidebar"] button[kind="primary"]:hover {
+            background: linear-gradient(135deg, #2EA043 0%, #34D399 100%) !important;
+            box-shadow: 0 6px 22px rgba(52, 211, 153, 0.48) !important;
+        }
     }
-}
 
-/* Profile wrapper: .sidebar-profile-box lives on a marker inside the actual
-   Streamlit container, so the wrapper (not just the button) is the dark card. */
-html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-profile-box) {
-    background-color: #161B22 !important;
-    border: 1px solid #30363D !important;
-    border-radius: 14px !important;
-    padding: 12px 14px !important;
-    margin-bottom: 6px !important;
-    white-space: pre-line !important;
-    line-height: 1.45 !important;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
-}
-html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-profile-box) .stButton > button {
-    width: 100% !important;
-    background: transparent !important;
-    border: none !important;
-    border-radius: 10px !important;
-    padding: 0 !important;
-    min-height: 0 !important;
-    box-shadow: none !important;
-    justify-content: flex-start !important;
-    text-align: left !important;
-    white-space: pre-line !important;
-    line-height: 1.45 !important;
-    transition: none !important;
-}
-html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-profile-box) .stButton > button p {
-    font-size: 16.5px !important;
-    font-weight: 700 !important;
-    color: #E6EDF3 !important;
-    white-space: pre-line !important;
-    line-height: 1.45 !important;
-    text-align: left !important;
-}
+    /* 2. Preference expanders reuse the main page's dark-card surface. */
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] {
+        background-color: #161B22 !important;
+        border: 1px solid #30363D !important;
+        border-radius: 10px !important;
+        margin-bottom: 6px !important;
+        overflow: hidden !important;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] details {
+        background-color: #161B22 !important;
+        border: none !important;
+        border-radius: 10px !important;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] summary,
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"],
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
+        background-color: #161B22 !important;
+        border: none !important;
+        border-radius: 10px !important;
+        padding: 10px 14px !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+    }
 
-/* Active nav wrapper: the marker carries .sidebar-nav-active on the current
-   view, and the adjacent button gets the emerald card treatment. */
-html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.sidebar-nav-active) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    background: rgba(46, 160, 67, 0.16) !important;
-    border: 1px solid rgba(63, 185, 80, 0.45) !important;
-    border-left: 4px solid #3FB950 !important;
-    border-radius: 10px !important;
-    box-shadow: none !important;
-    color: #6EE798 !important;
-}
-html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.sidebar-nav-active) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
-    color: #6EE798 !important;
-    font-weight: 700 !important;
-}
-</style>
-""", unsafe_allow_html=True)
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] summary p,
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"] p,
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] p {
+        font-size: 16.5px !important;
+        font-weight: 600 !important;
+        color: #E6EDF3 !important;
+    }
+    @media (hover: hover) {
+        section[data-testid="stSidebar"] div[data-testid="stExpander"] summary:hover,
+        section[data-testid="stSidebar"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"]:hover,
+        section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"]:hover {
+            background-color: #1C2128 !important;
+        }
+    }
+    /* Save actions inside expanders stay visibly actionable without becoming
+       another loud pill in the drawer. */
+    html body section[data-testid="stSidebar"] div[data-testid="stExpander"] div[data-testid="stButton"] button,
+    html body section[data-testid="stSidebar"] div[data-testid="stExpander"] div[data-testid="stButton"] button p {
+        background-color: #21262D !important;
+        border: 1px solid rgba(63, 185, 80, 0.35) !important;
+        color: #E6EDF3 !important;
+        font-weight: 600 !important;
+        border-radius: 10px !important;
+    }
+
+    /* 3. Sign out stays distinct but still reads as a row inside the card. */
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="profile_card_signout"] {
+        background-color: rgba(248, 81, 73, 0.12) !important;
+        border: 1px solid rgba(248, 81, 73, 0.55) !important;
+        border-radius: 10px !important;
+        padding: 10px 14px !important;
+        color: #FFA198 !important;
+        box-shadow: none !important;
+    }
+
+    @media (hover: hover) {
+        section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="profile_card_signout"]:hover {
+            background-color: rgba(248, 81, 73, 0.2) !important;
+            border-color: rgba(248, 81, 73, 0.8) !important;
+        }
+    }
+
+    /* Profile wrapper: .sidebar-profile-box lives on a marker inside the actual
+       Streamlit container, so the wrapper (not just the button) is the dark card. */
+    html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-profile-box) {
+        background-color: #161B22 !important;
+        border: 1px solid #30363D !important;
+        border-radius: 14px !important;
+        padding: 12px 14px !important;
+        margin-bottom: 6px !important;
+        white-space: pre-line !important;
+        line-height: 1.45 !important;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+    }
+    html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-profile-box) .stButton > button {
+        width: 100% !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 10px !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        box-shadow: none !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        white-space: pre-line !important;
+        line-height: 1.45 !important;
+        transition: none !important;
+    }
+    html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-profile-box) .stButton > button p {
+        font-size: 16.5px !important;
+        font-weight: 700 !important;
+        color: #E6EDF3 !important;
+        white-space: pre-line !important;
+        line-height: 1.45 !important;
+        text-align: left !important;
+    }
+
+    /* Active nav wrapper: the marker carries .sidebar-nav-active on the current
+       view, and the adjacent button gets the emerald card treatment. */
+    html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.sidebar-nav-active) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+        background: rgba(46, 160, 67, 0.16) !important;
+        border: 1px solid rgba(63, 185, 80, 0.45) !important;
+        border-left: 4px solid #3FB950 !important;
+        border-radius: 10px !important;
+        box-shadow: none !important;
+        color: #6EE798 !important;
+    }
+    html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.sidebar-nav-active) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
+        color: #6EE798 !important;
+        font-weight: 700 !important;
+    }
+    </style>
+"""
+
+st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # Re-apply the touch-first defaults after the dashboard theme so mobile blur
 # and transition rules cannot win the cascade on first tap.
@@ -5742,9 +5771,13 @@ def product_image(name: str) -> Path | None:
 
 
 @st.cache_resource(show_spinner=False)
-def product_image_src(name: str) -> str | None:
-    """Return a cached data-URI for embedding a product photo in custom HTML."""
-    image = product_image(name)
+def get_cached_image_b64(product_name: str) -> str | None:
+    """Return one product photo as a cached data-URI.
+
+    Callers must invoke this only for cards actually on screen, so Home with
+    the dedicated pages closed never base64-encodes the full 30-image catalogue.
+    """
+    image = product_image(product_name)
     if not image:
         return None
     mime = "image/png" if image.suffix.lower() == ".png" else "image/jpeg"
@@ -7294,7 +7327,7 @@ def render_product_spotlight(
         )
         col_img, col_info = st.columns([1.2, 2.5], vertical_alignment="center")
         with col_img:
-            image_src = product_image_src(name)
+            image_src = get_cached_image_b64(name)
             if image_src:
                 # Inline <img> keeps the exact fixed height and avoids
                 # Streamlit's fullscreen button entirely.
@@ -7346,7 +7379,7 @@ def _render_sidebar_product_card(
     on_wishlist_click=None,
 ) -> None:
     """Shared dark card for the full-page wishlist and product catalogue."""
-    image_src = product_image_src(item_name)
+    image_src = get_cached_image_b64(item_name)
     if image_src:
         image_html = (
             f'<img class="guide-thumb" src="{image_src}" '
@@ -7849,7 +7882,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         rerun_scope="app",
         debounce=80,
         reset_function=_reset_food_search_input,
-        key=f"food_search_{st.session_state['food_box_ver']}",
+        key="food_searchbox",
     )
     if food_pick:
         selected_food = str(food_pick).strip()
@@ -7945,7 +7978,7 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
         rerun_scope="app",
         debounce=80,
         reset_function=_reset_city_search_input,
-        key=f"city_search_{st.session_state['city_box_ver']}",
+        key="city_searchbox",
     )
     if city_pick:
         selected_city_value = str(city_pick).strip()
@@ -8264,7 +8297,7 @@ with st.container(border=True):
                 nutr        = alt["nutrition"]
                 nutr_scaled = _scale(nutr, alt["name"])
 
-                thumb = product_image_src(alt["name"])
+                thumb = get_cached_image_b64(alt["name"])
                 if thumb:
                     thumb_html = (
                         f'<img class="swap-thumb" src="{thumb}" '
