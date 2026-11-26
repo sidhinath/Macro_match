@@ -50,11 +50,17 @@ nutrition data, constrained by availability, diet rules, and allergens.**
 - **Product guide with photos** — the selected product and every catalogue item
   show a photo, category, macros per 100 g, diet/allergen badges and city
   availability, so unfamiliar foods are easy to recognise.
-- **Username/password authentication** — sign in / sign up / sign out powered
-  by Supabase Auth. Accounts live in Supabase (cloud); passwords are handled
-  by Supabase and never stored locally. Saved match history is kept per user
-  in a Supabase table keyed by user ID, with Row Level Security so each user
-  sees only their own rows.
+- **Email/Password & Google OAuth Sign-In** — powered by Supabase Auth, with
+  persistent user accounts (cloud-hosted; passwords are handled by Supabase and
+  never stored locally) and **Saved Match History** protected by Row-Level
+  Security (RLS) so each user sees only their own rows.
+- **Daily Macro Targets & Saved Preferences** — users can save their daily
+  protein/calorie goals and default diet/allergen filters in the sidebar, with
+  real-time `% of daily protein goal` badges shown on every food card.
+- **Mobile-First Responsive UX** — step-by-step search flow (1. Product,
+  2. Destination, 3. Preferences), instant autocomplete searchboxes, quick-tap
+  pills, an interactive 30-product visual sidebar guide, and mobile swipe
+  gestures.
 - **Auto-generated API docs** at `/docs` (Swagger UI) and `/redoc`.
 - **Test suite** covering city filtering, invalid products, vegan and allergen
   invariants, and weight sensitivity.
@@ -355,8 +361,9 @@ the API), including secrets, cold starts, and troubleshooting, are in
   not a nutrition database. City availability is hand-maintained.
 - **Scores are relative.** Min-max normalization uses the original product plus
   the filtered candidates for that query, so adding a product can shift scores.
-- **No persistence or user accounts.** Every request is stateless; nothing is
-  stored.
+- User accounts, saved match history, daily macro targets, and default dietary
+  preferences are persisted securely per user in Supabase with Row-Level
+  Security (RLS).
 - **Keto is a carb ceiling** (≤ 10 g / 100 g), not a full macro-ratio model.
 - **Public API has no auth or rate limiting.** If you expose it with a real
   Anthropic key, add a key cap or gateway to avoid burning credits.

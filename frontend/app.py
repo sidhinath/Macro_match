@@ -34,7 +34,8 @@ load_dotenv()
 
 # Zero-height component that installs mobile sidebar gestures once per session.
 # It listens on window.parent.document so a swipe from anywhere closes the
-# sidebar, and it also closes the sidebar after a Product guide "Select" tap.
+# sidebar, and it also closes the sidebar after a Product guide "Select" /
+# "👁️ View Details" tap or a wishlist food-name tap.
 _MOBILE_SIDEBAR_TOGGLE_JS = """
 <script>
 (function () {
@@ -142,16 +143,23 @@ _MOBILE_SIDEBAR_TOGGLE_JS = """
                              { passive: true, capture: true });
     }
 
-    // Product-guide Select buttons are Streamlit widgets that trigger a full
-    // rerun; a delegated parent-document listener is the reliable place to
-    // collapse the mobile sidebar right after the selection is registered.
+    // Product-guide Select / View Details buttons and wishlist food-name rows
+    // are Streamlit widgets that trigger a full rerun; a delegated
+    // parent-document listener is the reliable place to collapse the mobile
+    // sidebar right after the tap.
     if (!host.__mmGuideSelectBound) {
         host.__mmGuideSelectBound = true;
         host.__mmGuideSelectHandler = function (event) {
             if (host.innerWidth > MOBILE_MAX_WIDTH) { return; }
             var target = event.target && event.target.closest
                 ? event.target.closest('button') : null;
-            if (!target || (target.textContent || '').trim() !== 'Select') { return; }
+            if (!target) { return; }
+            var label = (target.textContent || '').trim();
+            if (label !== 'Select' && label.indexOf('View Details') === -1) {
+                // Wishlist food-name buttons carry a hidden marker in their column.
+                var wishCol = target.closest('[data-testid="stColumn"]');
+                if (!wishCol || !wishCol.querySelector('.wishlist-name-marker')) { return; }
+            }
             var sidebar = doc.querySelector('[data-testid="stSidebar"]');
             if (!sidebar || !sidebar.contains(target)) { return; }
             // Retry once only if Streamlit has not swapped in the collapse
@@ -352,6 +360,15 @@ def _normalize_allergens(value) -> list[str]:
     return [item for item in value if item in ALLERGEN_OPTIONS]
 
 
+def _normalize_wishlist(value) -> list[str]:
+    """Accept a stored wishlist list (or single name) and drop empty values."""
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, (list, tuple, set)):
+        return []
+    return [str(item) for item in value if item]
+
+
 def _load_user_preferences(user) -> None:
     """Initialize per-user goals/preferences once from Supabase Auth metadata."""
     user_id = getattr(user, "id", None)
@@ -371,6 +388,7 @@ def _load_user_preferences(user) -> None:
     st.session_state["default_allergens_select"] = _normalize_allergens(
         metadata.get("default_allergens")
     )
+    st.session_state["wishlist"] = _normalize_wishlist(metadata.get("wishlist", []))
 
     st.session_state["_preferences_user_id"] = user_id
     st.session_state["_preferences_filters_pending"] = True
@@ -1634,6 +1652,7 @@ def load_saved_match(match):
         "alternatives": match.get("alternatives") or [],
     }
     st.session_state["show_swaps_results"] = True
+    st.session_state["inspect_product"] = None
     st.rerun()
 
 
@@ -1769,10 +1788,13 @@ if "city_box_ver" not in st.session_state:
 # browser's cached open state so every pick reliably closes the list.
 st.session_state.setdefault("food_browse_ver", 0)
 st.session_state.setdefault("city_browse_ver", 0)
-# Home shows the regular-food spotlight; Find Alternatives switches to the
-# ranked swaps view. This flag is the single source of truth for that switch.
+# Sidebar product guide shows 5 cards at a time; "View More" adds five more.
+st.session_state.setdefault("guide_visible_count", 5)
+# Home is clean by default; Find Alternatives switches to the ranked swaps
+# view, while View Details opens a full product card on the main screen.
 if "show_swaps_results" not in st.session_state:
     st.session_state["show_swaps_results"] = False
+st.session_state.setdefault("inspect_product", None)
 if "daily_protein_goal" not in st.session_state:
     st.session_state["daily_protein_goal"] = 120
 if "daily_calorie_goal" not in st.session_state:
@@ -1781,6 +1803,7 @@ if "default_diet_select" not in st.session_state:
     st.session_state["default_diet_select"] = "None"
 if "default_allergens_select" not in st.session_state:
     st.session_state["default_allergens_select"] = []
+st.session_state.setdefault("wishlist", [])
 
 # Auth has already been enforced above, so it is safe to hydrate the signed-in
 # user's saved targets/preferences before any dashboard widgets are created.
@@ -1874,6 +1897,54 @@ def _save_user_metadata(updates: dict, success_message: str) -> None:
         st.error(f"Could not save your settings: {exc}")
 
 
+def toggle_wishlist(product_name: str) -> None:
+    """Add/remove a food and persist the list to Supabase Auth user_metadata."""
+    if not product_name:
+        return
+    wishlist = _normalize_wishlist(st.session_state.get("wishlist", []))
+    if product_name in wishlist:
+        wishlist.remove(product_name)
+        message = "Removed from Wishlist"
+    else:
+        wishlist.append(product_name)
+        message = "Added to Wishlist"
+
+    st.session_state["wishlist"] = wishlist
+    try:
+        response = supabase.auth.update_user(
+            {"data": {"wishlist": st.session_state["wishlist"]}}
+        )
+        user = getattr(response, "user", None)
+        if user is not None:
+            st.session_state["supabase_user"] = user
+    except Exception as exc:
+        st.error(f"Could not save your wishlist: {exc}")
+    st.toast(message)
+
+
+def _wishlist_button_label(product_name: str) -> str:
+    """Label that always reflects the current wishlist state."""
+    return (
+        "❤️ Wishlisted"
+        if product_name in st.session_state.get("wishlist", [])
+        else "🤍 Wishlist"
+    )
+
+
+def render_wishlist_button(
+    product_name: str, key: str, use_container_width: bool = False
+) -> None:
+    """Reusable wishlist toggle for guide, spotlight and swap cards."""
+    if st.button(
+        _wishlist_button_label(product_name),
+        key=key,
+        use_container_width=use_container_width,
+        type="secondary",
+    ):
+        toggle_wishlist(product_name)
+        st.rerun()
+
+
 def _protein_goal_badge(protein_per_100g) -> str:
     """Small badge showing daily protein coverage for a 100 g portion."""
     try:
@@ -1888,9 +1959,32 @@ def _protein_goal_badge(protein_per_100g) -> str:
 
 
 def _reset_swaps_view() -> None:
-    """Return to the home view and drop any cached ranked results."""
+    """Return to the clean home view and drop inspect/ranked-result state."""
     st.session_state["show_swaps_results"] = False
+    st.session_state["inspect_product"] = None
     st.session_state.pop("match_result_data", None)
+
+
+def _render_back_to_home(key: str) -> None:
+    """Sleek centred back button shared by the details and swaps views."""
+    _back_left, btn_col, _back_right = st.columns([2, 1, 2])
+    with btn_col:
+        # No bordered container: only the styled button renders in this column.
+        st.markdown(
+            '<div class="back-home-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        if st.button(
+            "⌂ Back to home", key=key, help="Return to the start page"
+        ):
+            _reset_swaps_view()
+            st.rerun()
+
+
+def _reset_guide_pagination() -> None:
+    """Restart the product guide at five cards each time the toggle turns on."""
+    if st.session_state.get("show_product_guide"):
+        st.session_state["guide_visible_count"] = 5
 
 
 def _sync_food_selection(canonical: str, search_value: str | None = None) -> None:
@@ -1931,15 +2025,24 @@ def select_food_callback(widget_key: str) -> None:
 
 
 def select_food_value_callback(product: str) -> None:
-    """Sidebar guide `on_click` callback for an explicitly named product."""
+    """Sidebar guide `Select`: load the product into Step 1 of the clean home."""
     if not product:
         return
-    was_showing_results = st.session_state.get("show_swaps_results", False)
     _sync_food_selection(product, product)
+    st.session_state["inspect_product"] = None
     _reset_swaps_view()
     st.session_state["food_box_ver"] = st.session_state.get("food_box_ver", 0) + 1
-    if was_showing_results:
-        st.rerun()
+    st.rerun()
+
+
+def inspect_food_value_callback(product: str) -> None:
+    """Sidebar guide `👁️ View Details`: open the full card on the main screen."""
+    if not product:
+        return
+    st.session_state["inspect_product"] = product
+    st.session_state["show_swaps_results"] = False
+    st.session_state.pop("match_result_data", None)
+    st.rerun()
 
 
 def select_city_callback(widget_key: str) -> None:
@@ -2796,6 +2899,22 @@ h1, h2, h3, .stHeading {
     }
 }
 
+/* Wishlist rows: keep name / Use / 🗑️ on one line in the narrow sidebar. */
+.wishlist-marker, .wishlist-name-marker { display: none !important; }
+[data-testid="stSidebar"] div[data-testid="stExpander"]:has(.wishlist-marker) div[data-testid="stHorizontalBlock"] {
+    flex-wrap: nowrap !important;
+    gap: 0.25rem !important;
+}
+[data-testid="stSidebar"] div[data-testid="stExpander"]:has(.wishlist-marker) div[data-testid="stColumn"] {
+    min-width: 0 !important;
+}
+[data-testid="stSidebar"] div[data-testid="stExpander"]:has(.wishlist-marker) .stButton > button {
+    min-height: 30px !important;
+    padding: 0.2rem 0.35rem !important;
+    font-size: 0.75rem !important;
+    border-radius: 8px !important;
+}
+
 /* ── Hero header — one centered flex column (mobile-safe) ── */
 .hero-block {
     display: flex !important;
@@ -3497,6 +3616,29 @@ div[data-testid="stExpander"]:has(.filters-expander-marker) .stRadio div[role="r
     margin-top: 0.55rem !important;
 }
 
+/* ── Sidebar guide pagination — subtle counter + emerald "View More" ── */
+.guide-view-more-marker, .guide-show-less-marker { display: none !important; }
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.guide-view-more-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    min-height: 34px !important;
+    padding: 0.3rem 0.6rem !important;
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+    color: #7EE2A8 !important;
+    background: rgba(46, 160, 67, 0.10) !important;
+    border: 1px solid #2EA043 !important;
+    border-radius: 8px !important;
+    margin-top: 0.4rem !important;
+}
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.guide-show-less-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    min-height: 30px !important;
+    padding: 0.2rem 0.5rem !important;
+    font-size: 0.75rem !important;
+    color: var(--text-muted) !important;
+    border: 1px solid #30363D !important;
+    border-radius: 8px !important;
+    margin-top: 0.3rem !important;
+}
+
 .selected-value {
     font-size: 16px !important;
     font-weight: 700 !important;
@@ -4187,6 +4329,7 @@ def render_product_spotlight(name: str, detail: dict, keto: bool = False) -> Non
                 unsafe_allow_html=True,
             )
             st.markdown(_badges_html(detail), unsafe_allow_html=True)
+            render_wishlist_button(name, key=f"wishlist_spotlight_{name}")
             with st.expander(f"📍 Available in {len(detail['cities'])} cities"):
                 st.write(", ".join(detail["cities"]))
 
@@ -4252,8 +4395,10 @@ def render_product_spotlight(name: str, detail: dict, keto: bool = False) -> Non
 
 
 def render_product_guide(details: dict[str, dict]) -> None:
-    """Compact one-column visual catalogue tailored to the sidebar width."""
-    for item_name in sorted(details):
+    """Compact, paginated one-column catalogue tailored to the sidebar width."""
+    all_products = sorted(details)
+    visible_products = all_products[:st.session_state["guide_visible_count"]]
+    for item_name in visible_products:
         detail = details[item_name]
         image_src = product_image_src(item_name)
         if image_src:
@@ -4288,23 +4433,58 @@ def render_product_guide(details: dict[str, dict]) -> None:
                 "</div>",
                 unsafe_allow_html=True,
             )
-            # Callback updates every state key before the button's single
-            # rerun, so the chosen food appears immediately in the search box.
-            # On mobile, the injected parent-document listener collapses the
-            # sidebar as soon as this widget is clicked.
-            st.button(
-                "Select",
-                key=f"guide_select_{item_name}",
-                use_container_width=True,
-                type="secondary",
-                on_click=select_food_value_callback,
-                args=(item_name,),
-            )
+            # All three buttons update state before their single rerun. On
+            # mobile, the injected parent-document listener collapses the
+            # sidebar after Select, View Details, or a wishlist tap.
+            col_sel, col_det, col_wish = st.columns([1, 1.15, 1])
+            with col_sel:
+                st.button(
+                    "Select",
+                    key=f"guide_select_{item_name}",
+                    use_container_width=True,
+                    type="secondary",
+                    on_click=select_food_value_callback,
+                    args=(item_name,),
+                )
+            with col_det:
+                st.button(
+                    "👁️ View Details",
+                    key=f"guide_details_{item_name}",
+                    use_container_width=True,
+                    type="secondary",
+                    on_click=inspect_food_value_callback,
+                    args=(item_name,),
+                )
+            with col_wish:
+                render_wishlist_button(
+                    item_name,
+                    key=f"wishlist_guide_{item_name}",
+                    use_container_width=True,
+                )
 
-    st.caption(
-        "Product photos: Wikipedia / Wikimedia Commons — "
-        "see `assets/products/CREDITS.md` for the source of each image."
-    )
+    st.caption(f"Showing {len(visible_products)} of {len(all_products)} products")
+
+    if st.session_state["guide_visible_count"] < len(all_products):
+        st.markdown(
+            '<div class="guide-view-more-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        if st.button(
+            f"👇 View More (+{min(5, len(all_products) - st.session_state.guide_visible_count)} more)",
+            key="guide_view_more",
+            use_container_width=True,
+        ):
+            st.session_state["guide_visible_count"] += 5
+            st.rerun()
+
+    if st.session_state["guide_visible_count"] > 5:
+        st.markdown(
+            '<div class="guide-show-less-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("🔼 Show Less", key="guide_show_less", use_container_width=True):
+            st.session_state["guide_visible_count"] = 5
+            st.rerun()
 
 
 def call_api(payload: dict) -> requests.Response | None:
@@ -4345,6 +4525,7 @@ def render_footer() -> None:
                 packaging labels for exact allergen details.
             </div>
             <div>© 2026 MacroMatch · Eat Smart, Travel Anywhere.</div>
+            <div>Photos: Wikimedia Commons.</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -4473,6 +4654,55 @@ with st.sidebar:
         saved_matches_slot = st.empty()
         render_saved_matches(saved_matches_slot)
 
+    # ─── Per-user wishlist (persisted in Supabase Auth user_metadata) ────
+    wishlist_items = _normalize_wishlist(st.session_state.get("wishlist", []))
+    with st.expander(
+        f"❤️ My Wishlist ({len(st.session_state.get('wishlist', []))})", expanded=False
+    ):
+        st.markdown(
+            '<div class="wishlist-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        if not wishlist_items:
+            st.caption("No favorite foods saved yet. Tap 🤍 Wishlist on any product!")
+        else:
+            for food_name in wishlist_items:
+                col_name, col_use, col_del = st.columns([3, 1, 1])
+                with col_name:
+                    # Hidden marker lets the mobile sidebar-close listener
+                    # recognise a food-name tap without matching Use / 🗑️.
+                    st.markdown(
+                        '<div class="wishlist-name-marker" aria-hidden="true"></div>',
+                        unsafe_allow_html=True,
+                    )
+                    st.button(
+                        food_name,
+                        key=f"wishlist_name_{food_name}",
+                        use_container_width=True,
+                        type="secondary",
+                        on_click=inspect_food_value_callback,
+                        args=(food_name,),
+                    )
+                with col_use:
+                    st.button(
+                        "Use",
+                        key=f"wishlist_use_{food_name}",
+                        use_container_width=True,
+                        type="secondary",
+                        on_click=select_food_value_callback,
+                        args=(food_name,),
+                    )
+                with col_del:
+                    st.button(
+                        "🗑️",
+                        key=f"wishlist_remove_{food_name}",
+                        use_container_width=True,
+                        type="secondary",
+                        on_click=toggle_wishlist,
+                        args=(food_name,),
+                        help=f"Remove {food_name} from wishlist",
+                    )
+
     # ─── Product guide (moved here from the bottom of the main page) ─────
     product_details = load_product_details()
     st.markdown(
@@ -4484,7 +4714,9 @@ with st.sidebar:
         "its macros per 100 g, diet rules and allergens."
     )
     if st.toggle(
-        f"**Show all {len(product_details)} products**", key="show_product_guide"
+        f"**Show all {len(product_details)} products**",
+        key="show_product_guide",
+        on_change=_reset_guide_pagination,
     ):
         render_product_guide(product_details)
 
@@ -4845,6 +5077,7 @@ with st.container(border=True):
         key="find_alternatives",
     ):
         st.session_state["show_swaps_results"] = True
+        st.session_state["inspect_product"] = None  # hide any open details view
         st.session_state.pop("match_result_data", None)  # force a fresh API call
         st.rerun()
 
@@ -4855,38 +5088,35 @@ with st.container(border=True):
 # Main area — results
 # ─────────────────────────────────────────────
 
-selected_detail = product_details.get(selected_product)
+inspect_product = st.session_state.get("inspect_product")
 
 if not show_swaps_results:
-    # The 3-step guide is pinned above the search card; results follow immediately.
-    if selected_detail:
-        st.markdown("### 🥗 Your Regular Food")
-        render_product_spotlight(
-            selected_product,
-            selected_detail,
-            keto="keto" in selected_diets,
-        )
-        st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    if inspect_product is not None:
+        # Details view: the full card + How to Eat / Use stay on the MAIN screen,
+        # never crammed into the narrow sidebar.
+        inspect_detail = product_details.get(inspect_product)
+        if inspect_detail:
+            _render_back_to_home("back_to_home_details")
+            st.markdown("### 🥗 Your Regular Food")
+            render_product_spotlight(
+                inspect_product,
+                inspect_detail,
+                keto="keto" in selected_diets,
+            )
+            st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+        else:
+            # Stale state (e.g. a product removed from the CSV) → clean home.
+            st.session_state["inspect_product"] = None
 
+    # Default home: only the clean Step 1 / 2 / 3 search card is shown.
     render_footer()
     st.stop()
 
 
 # ── Back to home ──────────────────────────────
 # In the swaps view this stays at the very top, immediately before the results
-# container. The regular-food card (including How to Eat / Use) is home-only.
-_back_left, btn_col, _back_right = st.columns([2, 1, 2])
-with btn_col:
-    # No bordered container: only the styled button renders in this column.
-    st.markdown(
-        '<div class="back-home-marker" aria-hidden="true"></div>',
-        unsafe_allow_html=True,
-    )
-    if st.button(
-        "⌂ Back to home", key="back_to_home", help="Return to the start page"
-    ):
-        _reset_swaps_view()
-        st.rerun()
+# container. The regular-food card is home/details-only, never in the sidebar.
+_render_back_to_home("back_to_home")
 
 
 # ── Call the API (result cached in session state so save-reruns keep the view)
@@ -5134,23 +5364,31 @@ with st.container(border=True):
                         '</div>',
                         unsafe_allow_html=True,
                     )
-                    if st.button(
-                        "💾 Save Match",
-                        key=f"save_swap_{rank_i + 1}",
-                        use_container_width=True,
-                        type="primary",
-                    ):
-                        if save_match(
-                            CURRENT_USER_ID,
-                            selected_product,
-                            selected_city,
-                            selected_diets,
-                            selected_allergens,
-                            priority_label,
-                            [alt],
+                    col_wish, col_save = st.columns([1, 1])
+                    with col_wish:
+                        render_wishlist_button(
+                            alt["name"],
+                            key=f"wishlist_swap_{rank_i + 1}",
+                            use_container_width=True,
+                        )
+                    with col_save:
+                        if st.button(
+                            "💾 Save Match",
+                            key=f"save_swap_{rank_i + 1}",
+                            use_container_width=True,
+                            type="primary",
                         ):
-                            st.session_state["saved_match_flash"] = True
-                            st.rerun()
+                            if save_match(
+                                CURRENT_USER_ID,
+                                selected_product,
+                                selected_city,
+                                selected_diets,
+                                selected_allergens,
+                                priority_label,
+                                [alt],
+                            ):
+                                st.session_state["saved_match_flash"] = True
+                                st.rerun()
 
     with tab_nutrition:
         # ── Exact macro table + chart (second tab) ────────────────────────────
