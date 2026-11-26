@@ -45,6 +45,12 @@ nutrition data, constrained by availability, diet rules, and allergens.**
 - **LLM explanations with a safety net** — Claude describes *why* each match
   fits; authentication, rate-limit, network, and parsing failures fall back to
   deterministic, data-driven text.
+- **Interactive AI Diet & Product Help** — a top-bar chat assistant answers food,
+  macro-comparison, travel-planning and personal-goal questions using the 30-product
+  catalogue plus current filters; it also has a deterministic catalogue fallback
+  when no LLM key is configured.
+- **Persistent wishlist** — favorite foods are saved in Supabase Auth
+  `user_metadata`, with one-tap details/use/remove rows in the sidebar.
 - **Rich Streamlit UI** — ranked cards with product thumbnails, macro comparison
   tables, bar charts, and a dark, card-based layout.
 - **Product guide with photos** — the selected product and every catalogue item
@@ -361,9 +367,13 @@ the API), including secrets, cold starts, and troubleshooting, are in
   not a nutrition database. City availability is hand-maintained.
 - **Scores are relative.** Min-max normalization uses the original product plus
   the filtered candidates for that query, so adding a product can shift scores.
-- User accounts, saved match history, daily macro targets, and default dietary
-  preferences are persisted securely per user in Supabase with Row-Level
-  Security (RLS).
+- User accounts, saved match history, daily macro targets, default dietary
+  preferences, and wishlist favorites are persisted securely per user in
+  Supabase. Saved matches use Row-Level Security (RLS); goals/preferences and
+  the wishlist live in Auth `user_metadata`, so no extra tables are needed.
+- The AI help assistant reuses the optional Anthropic key. If it is missing or
+  the call fails, answers come from a deterministic `products.csv` fallback, so
+  the help button still works.
 - **Keto is a carb ceiling** (≤ 10 g / 100 g), not a full macro-ratio model.
 - **Public API has no auth or rate limiting.** If you expose it with a real
   Anthropic key, add a key cap or gateway to avoid burning credits.

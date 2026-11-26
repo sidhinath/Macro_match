@@ -1790,6 +1790,9 @@ st.session_state.setdefault("food_browse_ver", 0)
 st.session_state.setdefault("city_browse_ver", 0)
 # Sidebar product guide shows 5 cards at a time; "View More" adds five more.
 st.session_state.setdefault("guide_visible_count", 5)
+# Top-bar AI assistant panel and its in-session conversation history.
+st.session_state.setdefault("show_ai_help", False)
+st.session_state.setdefault("ai_chat_history", [])
 # Home is clean by default; Find Alternatives switches to the ranked swaps
 # view, while View Details opens a full product card on the main screen.
 if "show_swaps_results" not in st.session_state:
@@ -3379,6 +3382,45 @@ div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-test
     fill: #7EE2A8 !important;
 }
 
+/* ── Top-bar AI assistant toggle + dark glass chat panel ── */
+.ai-help-toggle-marker, .ai-help-marker { display: none !important; }
+div[data-testid="stVerticalBlockElement"]:has(.ai-help-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    min-height: 46px !important;
+    padding: 0.5rem 0.9rem !important;
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    color: #7EE2A8 !important;
+    background: rgba(46, 160, 67, 0.10) !important;
+    border: 1px solid #2EA043 !important;
+    border-radius: 10px !important;
+    transition: all 0.15s ease !important;
+}
+div[data-testid="stVerticalBlockElement"]:has(.ai-help-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+    background: rgba(46, 160, 67, 0.20) !important;
+    border-color: #3FB950 !important;
+    color: #A7F3D0 !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) {
+    background-color: #161B22 !important;
+    border: 1px solid #2EA043 !important;
+    border-radius: 14px !important;
+    padding: 16px !important;
+    margin-bottom: 16px !important;
+}
+.ai-help-heading {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 1.1rem !important;
+    font-weight: 750 !important;
+    color: #E6EDF3 !important;
+    line-height: 1.3 !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) .stButton > button {
+    font-size: 0.8rem !important;
+    padding: 0.35rem 0.5rem !important;
+    border: 1px solid #30363D !important;
+    border-radius: 9px !important;
+}
+
 /* ── Sidebar header ── */
 .sidebar-header {
     display: flex;
@@ -4217,6 +4259,473 @@ def load_product_details() -> dict[str, dict]:
     return details
 
 
+# ─────────────────────────────────────────────
+# Context-aware AI diet & product assistant
+# ─────────────────────────────────────────────
+
+def _ai_current_context() -> dict:
+    """Snapshot the user's live MacroMatch choices for the AI assistant."""
+    selected_product = _canonical_value(
+        str(st.session_state.get("selected_product", "")), PRODUCT_DISPLAY_ALIASES
+    )
+    selected_city = _canonical_value(
+        str(st.session_state.get("selected_city", "")), CITY_DISPLAY_ALIASES
+    )
+
+    # Before the main filter widgets are first created, apply the saved
+    # sidebar defaults. Once they exist, respect exactly what the user tapped.
+    if "diet_pills" in st.session_state:
+        diet_values = list(st.session_state.get("diet_pills") or [])
+    else:
+        saved = st.session_state.get("default_diet_select")
+        diet_values = [saved] if saved and saved != "None" else []
+
+    if "allergen_select" in st.session_state:
+        allergen_values = list(st.session_state.get("allergen_select") or [])
+    else:
+        allergen_values = list(
+            st.session_state.get("default_allergens_select") or []
+        )
+
+    label_to_key = {label: key for key, label in DIET_LABELS.items()}
+    diets: list[str] = []
+    for value in diet_values:
+        key = label_to_key.get(value, value)
+        if key in DIET_LABELS and key not in diets:
+            diets.append(key)
+
+    allergens = [
+        value for value in allergen_values if value in ALLERGEN_OPTIONS
+    ]
+
+    try:
+        protein_goal = float(st.session_state.get("daily_protein_goal", 120))
+    except (TypeError, ValueError):
+        protein_goal = 120.0
+    try:
+        calorie_goal = float(st.session_state.get("daily_calorie_goal", 2000))
+    except (TypeError, ValueError):
+        calorie_goal = 2000.0
+
+    return {
+        "selected_product": selected_product,
+        "selected_city": selected_city,
+        "diets": diets,
+        "allergens": allergens,
+        "protein_goal": protein_goal,
+        "calorie_goal": calorie_goal,
+    }
+
+
+def _ai_catalog_text(details: dict[str, dict]) -> str:
+    """Compact per-100 g facts for every product in data/products.csv."""
+    lines = []
+    for name in sorted(details):
+        detail = details[name]
+        diet_flags = [
+            label
+            for key, label in (
+                ("vegan", "vegan"),
+                ("vegetarian", "vegetarian"),
+                ("dairy_free", "dairy-free"),
+                ("gluten_free", "gluten-free"),
+                ("low_sugar", "low-sugar"),
+            )
+            if detail.get(key)
+        ]
+        allergens = [
+            label
+            for key, label in (
+                ("contains_soy", "soy"),
+                ("contains_nuts", "nuts"),
+                ("contains_dairy", "dairy"),
+            )
+            if detail.get(key)
+        ]
+        lines.append(
+            f"{name} | category={detail.get('category', '')} | "
+            f"per 100 g: protein={detail['protein']:g}g, carbs={detail['carbs']:g}g, "
+            f"fat={detail['fat']:g}g, fibre={detail['fiber']:g}g, "
+            f"calories={detail['calories']:g}kcal | "
+            f"diet={'/'.join(diet_flags) or 'none'} | "
+            f"contains={'/'.join(allergens) or 'none'} | "
+            f"available_in={', '.join(detail.get('cities', [])) or 'none'}"
+        )
+    return "\n".join(lines)
+
+
+def _ai_system_prompt(context: dict, details: dict[str, dict]) -> str:
+    context_text = (
+        f"Selected product: {context['selected_product'] or 'none'}\n"
+        f"Destination city: {context['selected_city'] or 'none'}\n"
+        f"Active diet rules: {', '.join(context['diets']) or 'none'}\n"
+        f"Allergens to avoid: {', '.join(context['allergens']) or 'none'}\n"
+        f"Daily protein goal: {context['protein_goal']:g} g\n"
+        f"Daily calorie goal: {context['calorie_goal']:g} kcal"
+    )
+    return f"""You are the MacroMatch Nutrition & Product Assistant inside the
+MacroMatch food-swap app. Answer the user's question concisely and accurately,
+using ONLY the product facts and user context below. All nutrition values are
+per 100 g; simple arithmetic (for example, goal percentages) is allowed.
+
+Rules:
+- Be brief: usually 2-5 short bullets or one short paragraph.
+- Only recommend foods from the catalogue below, and respect the active diet
+  rules and allergens whenever making suggestions.
+- Never invent foods, brands, prices, macros, availability, or health claims.
+- If the answer is not covered by the data, say so plainly and point to the
+  closest catalogue facts you do have.
+- Do not give medical advice. A short caution is fine only when clearly relevant.
+
+USER CONTEXT
+{context_text}
+
+MACROMATCH PRODUCT CATALOGUE (data/products.csv)
+{_ai_catalog_text(details)}
+"""
+
+
+def _configured_anthropic_key() -> str | None:
+    """Read an Anthropic-compatible key from Streamlit secrets or the env."""
+    for key_name in ("ANTHROPIC_API_KEY", "LLM_API_KEY"):
+        try:
+            value = st.secrets.get(key_name)
+        except Exception:
+            value = None
+        if value:
+            return str(value)
+        value = os.getenv(key_name)
+        if value:
+            return value
+    return None
+
+
+def _call_anthropic(system_prompt: str, question: str) -> str | None:
+    """Return an LLM answer, or None when unavailable/misconfigured/failed."""
+    api_key = _configured_anthropic_key()
+    if not api_key:
+        return None
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=700,
+            system=system_prompt,
+            messages=[{"role": "user", "content": question}],
+        )
+        text = "".join(
+            block.text
+            for block in message.content
+            if getattr(block, "type", None) == "text"
+        ).strip()
+        return text or None
+    except Exception:
+        # Missing quota, network trouble, or an older SDK all fall through to
+        # the deterministic catalogue answer below.
+        return None
+
+
+def _ai_macro_summary(detail: dict) -> str:
+    return (
+        f"P {detail['protein']:g}g · C {detail['carbs']:g}g · "
+        f"F {detail['fat']:g}g · fibre {detail['fiber']:g}g · "
+        f"{detail['calories']:g} kcal per 100 g"
+    )
+
+
+def _deterministic_ai_answer(
+    question: str, details: dict[str, dict], context: dict
+) -> str:
+    """Data-backed answer that always works, even with no API key/network."""
+    q = question.lower()
+    diets = set(context["diets"])
+    allergens = set(context["allergens"])
+    goal = context["protein_goal"] or 120.0
+    calories = context["calorie_goal"] or 2000.0
+    city = context["selected_city"]
+
+    def allowed(detail: dict) -> bool:
+        if "vegan" in diets and not detail.get("vegan"):
+            return False
+        if "vegetarian" in diets and not detail.get("vegetarian"):
+            return False
+        if "dairy_free" in diets and not detail.get("dairy_free"):
+            return False
+        if "gluten_free" in diets and not detail.get("gluten_free"):
+            return False
+        if "low_sugar" in diets and not detail.get("low_sugar"):
+            return False
+        if "soy" in allergens and detail.get("contains_soy"):
+            return False
+        if "nuts" in allergens and detail.get("contains_nuts"):
+            return False
+        if "dairy" in allergens and detail.get("contains_dairy"):
+            return False
+        return True
+
+    def goal_note(detail: dict) -> str:
+        pct = round(detail["protein"] / goal * 100) if goal else 0
+        kcal_pct = round(detail["calories"] / calories * 100) if calories else 0
+        return f"{pct}% of your {goal:g} g protein goal · {kcal_pct}% of your {calories:g} kcal goal per 100 g"
+
+    def lines_for(items: list[tuple[str, dict]]) -> list[str]:
+        return [
+            f"- **{name}** — {_ai_macro_summary(detail)}; {goal_note(detail)}."
+            for name, detail in items
+        ]
+
+    # Direct question about one catalogue food.
+    named = [
+        (name, details[name])
+        for name in sorted(details)
+        if name.lower() in q
+    ]
+    if named and len(named) == 1:
+        name, detail = named[0]
+        diet_labels = [
+            label
+            for key, label in (
+                ("vegan", "vegan"),
+                ("vegetarian", "vegetarian"),
+                ("dairy_free", "dairy-free"),
+                ("gluten_free", "gluten-free"),
+                ("low_sugar", "low-sugar"),
+            )
+            if detail.get(key)
+        ]
+        allergen_labels = [
+            label
+            for key, label in (
+                ("contains_soy", "soy"),
+                ("contains_nuts", "nuts"),
+                ("contains_dairy", "dairy"),
+            )
+            if detail.get(key)
+        ]
+        return "\n".join(
+            [
+                f"**{name}** ({detail.get('category', 'product')}), per 100 g:",
+                f"- {_ai_macro_summary(detail)}",
+                f"- {goal_note(detail)}",
+                f"- Diet tags: {', '.join(diet_labels) or 'none listed'}.",
+                f"- Contains: {', '.join(allergen_labels) or 'no listed major allergens'}.",
+                f"- Available in: {', '.join(detail.get('cities', [])) or 'no city data listed'}.",
+            ]
+        )
+
+    # Selected-food macro comparison.
+    if "compare" in q or "comparison" in q:
+        selected = context.get("selected_product")
+        selected_detail = details.get(selected)
+        if not selected_detail:
+            return (
+                "Pick a food in Step 1 first, then ask me to compare it. "
+                "I can compare any of the 30 catalogue foods per 100 g."
+            )
+        higher = [
+            (name, detail)
+            for name, detail in details.items()
+            if name != selected and detail["protein"] > selected_detail["protein"] and allowed(detail)
+        ]
+        higher.sort(key=lambda item: item[1]["protein"], reverse=True)
+        answer = [
+            f"**{selected}** (your selected food), per 100 g:",
+            f"- {_ai_macro_summary(selected_detail)}",
+            f"- {goal_note(selected_detail)}",
+        ]
+        if higher:
+            answer.append("\nHigher-protein catalogue options that fit your rules:")
+            answer.extend(lines_for(higher[:3]))
+        else:
+            answer.append(
+                "\nNo higher-protein catalogue option matches your current rules. "
+                "Try relaxing a diet or allergen filter."
+            )
+        return "\n".join(answer)
+
+    # Travel / snack planning. Destination availability matters here.
+    if "travel" in q or "snack" in q or "trip" in q:
+        pool = [(name, detail) for name, detail in details.items() if allowed(detail)]
+        in_city = [
+            (name, detail) for name, detail in pool if city and city in detail.get("cities", [])
+        ]
+        pool = in_city or pool
+        pool.sort(
+            key=lambda item: (
+                item[1]["protein"] * 2.5
+                + item[1]["fiber"] * 1.5
+                + (12 if item[1].get("low_sugar") else 0)
+                - item[1]["carbs"] * 0.25
+                - item[1]["calories"] * 0.04
+            ),
+            reverse=True,
+        )
+        if not pool:
+            return (
+                "No catalogue food matches every filter you have set. "
+                "Remove one diet or allergen rule and I can suggest options."
+            )
+        intro = (
+            f"Portable picks available in **{city}**"
+            if in_city and city
+            else "Portable picks from the catalogue"
+        )
+        return "\n".join([intro + " (per 100 g):", *lines_for(pool[:5])])
+
+    # High-protein / general diet suggestions.
+    high_protein = (
+        "protein" in q
+        and any(word in q for word in ("high", "best", "top", "more", "boost"))
+    )
+    if high_protein or "vegetarian" in q or "vegan" in q or "diet" in q:
+        pool = [(name, detail) for name, detail in details.items() if allowed(detail)]
+        if "vegetarian" in q or "vegan" in q:
+            require_vegan = "vegan" in q
+            pool = [
+                (name, detail)
+                for name, detail in pool
+                if (detail.get("vegan") if require_vegan else detail.get("vegetarian"))
+            ]
+        pool.sort(key=lambda item: item[1]["protein"], reverse=True)
+        if not pool:
+            return (
+                "No catalogue food matches every filter you have set. "
+                "Try removing one diet or allergen rule."
+            )
+        heading = (
+            "Highest-protein vegan options"
+            if "vegan" in q
+            else "Highest-protein vegetarian options"
+            if "vegetarian" in q
+            else "Highest-protein options that fit your rules"
+        )
+        return "\n".join([heading + " (per 100 g):", *lines_for(pool[:5])])
+
+    # Availability question for the current destination.
+    if city and city.lower() in q:
+        pool = [
+            (name, detail)
+            for name, detail in details.items()
+            if allowed(detail) and city in detail.get("cities", [])
+        ]
+        if pool:
+            pool.sort(key=lambda item: item[1]["protein"], reverse=True)
+            return "\n".join(
+                [f"Catalogue foods available in **{city}** (per 100 g):",
+                 *lines_for(pool[:5])]
+            )
+
+    # Friendly general answer.
+    selected = context.get("selected_product")
+    selected_detail = details.get(selected)
+    pool = [(name, detail) for name, detail in details.items() if allowed(detail)]
+    pool.sort(key=lambda item: item[1]["protein"], reverse=True)
+    answer = []
+    if selected_detail:
+        answer.append(
+            f"Your selected food is **{selected}**: {_ai_macro_summary(selected_detail)}."
+        )
+    answer.append(
+        f"Across the {len(details)} catalogue foods, the strongest protein options "
+        f"that fit your current rules are:"
+    )
+    answer.extend(lines_for(pool[:3]))
+    answer.append(
+        f"Ask me to compare two foods, plan travel snacks for {city or 'your city'}, "
+        "or suggest high-protein vegetarian options."
+    )
+    return "\n".join(answer)
+
+
+def _generate_ai_answer(question: str) -> str:
+    """LLM answer when configured, with a deterministic data-backed fallback."""
+    details = load_product_details()
+    context = _ai_current_context()
+    llm_answer = _call_anthropic(_ai_system_prompt(context, details), question)
+    if llm_answer:
+        return llm_answer
+    return _deterministic_ai_answer(question, details, context)
+
+
+def _submit_ai_question(question: str) -> None:
+    """Append one exchange to the in-session AI chat history."""
+    question = question.strip()
+    if not question:
+        return
+    history = list(st.session_state.get("ai_chat_history") or [])
+    history.append({"role": "user", "content": question})
+    try:
+        answer = _generate_ai_answer(question)
+    except Exception:
+        answer = _deterministic_ai_answer(
+            question, load_product_details(), _ai_current_context()
+        )
+    history.append({"role": "assistant", "content": answer})
+    # Keep the panel light on long sessions while preserving recent context.
+    st.session_state["ai_chat_history"] = history[-20:]
+
+
+def _render_ai_help() -> None:
+    """Dark glass chat panel, toggled from the top bar next to How it Works."""
+    if not st.session_state.get("show_ai_help"):
+        return
+
+    with st.container(border=True):
+        st.markdown(
+            '<div class="ai-help-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        header_col, close_col = st.columns([5, 1])
+        with header_col:
+            st.markdown(
+                '<div class="ai-help-heading">🤖 MacroMatch Nutrition &amp; Product Assistant</div>',
+                unsafe_allow_html=True,
+            )
+            st.caption(
+                "Grounded in MacroMatch's 30 foods, your current picks, "
+                "diet rules and goals."
+            )
+        with close_col:
+            if st.button("✕ Close", key="ai_help_close", use_container_width=True):
+                st.session_state["show_ai_help"] = False
+                st.rerun()
+
+        suggestions = [
+            "💪 High-protein vegetarian options",
+            "🥗 Compare my selected food macros",
+            "✈️ Best travel snacks for my diet",
+        ]
+        quick_col1, quick_col2, quick_col3 = st.columns(3)
+        pending_prompt: str | None = None
+        for col, label in zip(
+            (quick_col1, quick_col2, quick_col3), suggestions
+        ):
+            with col:
+                if st.button(
+                    label,
+                    key=f"ai_quick_{label[:12]}",
+                    use_container_width=True,
+                    type="secondary",
+                ):
+                    pending_prompt = label
+
+        for message in st.session_state.get("ai_chat_history", []):
+            with st.chat_message(message.get("role", "assistant")):
+                st.markdown(message.get("content", ""))
+
+        chat_prompt = st.chat_input(
+            "Ask anything about foods, macros, or your diet..."
+        )
+        question = chat_prompt or pending_prompt
+        if question:
+            _submit_ai_question(question)
+            # A single rerun renders the appended user/assistant pair in order,
+            # for both chat_input submissions and quick-prompt taps.
+            st.rerun()
+
+
 def _macro_line(detail: dict, serving_g: int | None = None) -> str:
     """Return a one-line macro summary. If serving_g is given, scales per-serving."""
     if serving_g:
@@ -4592,8 +5101,28 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 st.markdown('<hr class="section-divider hero-divider">', unsafe_allow_html=True)
 
-# Pinned directly under the header, before the search card.
-render_how_it_works()
+# Pinned directly under the header, before the search card. The AI help toggle
+# sits beside the how-it-works bar with its own emerald-accented style.
+col_how, col_ai = st.columns([1.3, 1], vertical_alignment="center")
+with col_how:
+    render_how_it_works()
+with col_ai:
+    st.markdown(
+        '<div class="ai-help-toggle-marker" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        "🤖 Ask AI Diet & Product Help",
+        key="ai_help_toggle",
+        use_container_width=True,
+    ):
+        st.session_state["show_ai_help"] = not st.session_state.get(
+            "show_ai_help", False
+        )
+        st.rerun()
+
+# The chat panel opens directly beneath the toggle, above the search card.
+_render_ai_help()
 
 
 # ─────────────────────────────────────────────
