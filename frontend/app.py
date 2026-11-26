@@ -353,6 +353,9 @@ LOGO_SRC = _transparent_logo_data_url(_LOGO_PATH)
 # still being injected from a single zero-height component.
 _PWA_HEAD_INJECTION_JS = ""
 _PWA_INSTALL_BUTTON_JS = ""
+INSTALL_APP_URL = (
+    "https://macromatchgit-8qnnjnxumw4sjopvkcpttz.streamlit.app/"
+)
 
 if LOGO_SRC:
     _PWA_MANIFEST = {
@@ -387,6 +390,7 @@ if LOGO_SRC:
         var MANIFEST_HREF = __MM_MANIFEST_HREF__;
         var ICON_HREF = __MM_ICON_HREF__;
         var INSTALL_KEY = '__mmDeferredInstallPrompt';
+        var ALIAS_KEY = 'deferredInstallPrompt';
 
         function parentWindow() {
             try {
@@ -437,31 +441,47 @@ if LOGO_SRC:
             parent.addEventListener('beforeinstallprompt', function (event) {
                 event.preventDefault();
                 parent[INSTALL_KEY] = event;
-                if (window !== parent) { window[INSTALL_KEY] = event; }
+                parent[ALIAS_KEY] = event;
+                if (window !== parent) {
+                    window[INSTALL_KEY] = event;
+                    window[ALIAS_KEY] = event;
+                }
             });
             parent.__mmPwaInstallListener = true;
         }
         if (!parent.__mmPwaInstalledListener) {
             parent.addEventListener('appinstalled', function () {
                 parent[INSTALL_KEY] = null;
+                parent[ALIAS_KEY] = null;
                 parent.__mmInstallPromptActive = false;
-                if (window !== parent) { window[INSTALL_KEY] = null; }
+                if (window !== parent) {
+                    window[INSTALL_KEY] = null;
+                    window[ALIAS_KEY] = null;
+                }
             });
             parent.__mmPwaInstalledListener = true;
+        }
+
+        if (parent[INSTALL_KEY] && !parent[ALIAS_KEY]) {
+            parent[ALIAS_KEY] = parent[INSTALL_KEY];
         }
 
         if (!parent.__mmTriggerInstallPrompt) {
             parent.__mmTriggerInstallPrompt = function () {
                 if (parent.__mmInstallPromptActive) { return false; }
-                var promptEvent = parent[INSTALL_KEY];
+                var promptEvent = parent[ALIAS_KEY] || parent[INSTALL_KEY];
                 if (!promptEvent || typeof promptEvent.prompt !== 'function') {
                     return false;
                 }
                 parent.__mmInstallPromptActive = true;
                 var finish = function () {
                     parent[INSTALL_KEY] = null;
+                    parent[ALIAS_KEY] = null;
                     parent.__mmInstallPromptActive = false;
-                    if (window !== parent) { window[INSTALL_KEY] = null; }
+                    if (window !== parent) {
+                        window[INSTALL_KEY] = null;
+                        window[ALIAS_KEY] = null;
+                    }
                 };
                 try {
                     var choicePromise = promptEvent.prompt();
@@ -554,23 +574,14 @@ if LOGO_SRC:
                 slot.appendChild(button);
             }
 
-            var canPrompt = !!(parent[KEY] && typeof parent[KEY].prompt === 'function');
+            var deferred = parent.deferredInstallPrompt || parent[KEY];
+            var canPrompt = !!(deferred && typeof deferred.prompt === 'function');
             button.style.display = canPrompt ? 'inline-flex' : 'none';
             return true;
         }
 
         var parent = parentWindow();
         ensureButton();
-
-        // Opening the dedicated install page attempts the native prompt too;
-        // if the browser requires another user gesture, the button above is
-        // the visible fallback.
-        if (!parent.__mmInstallAutoTried) {
-            parent.__mmInstallAutoTried = true;
-            if (typeof parent.__mmTriggerInstallPrompt === 'function') {
-                parent.__mmTriggerInstallPrompt();
-            }
-        }
 
         var tries = 0;
         var timer = parent.setInterval(function () {
@@ -580,6 +591,306 @@ if LOGO_SRC:
     </script>
     """
 
+# Shared parent-document banner used by the install/copy actions. Streamlit's
+# iframe sandbox can swallow the native prompt, so every action ends with a
+# visible, plain-language instruction instead of failing silently.
+_PWA_INSTALL_FEEDBACK_JS = """
+(function () {
+    function parentWindow() {
+        try {
+            return (window.parent && window.parent.document) ? window.parent : window;
+        } catch (e) {
+            return window;
+        }
+    }
+
+    var parent = parentWindow();
+    if (typeof parent.__mmShowInstallBanner === 'function') { return; }
+
+    parent.__mmShowInstallBanner = function (message, kind) {
+        var doc = parent.document;
+        if (!doc || !doc.body) { return; }
+        var banner = doc.getElementById('mm-install-banner');
+        if (!banner) {
+            banner = doc.createElement('div');
+            banner.id = 'mm-install-banner';
+            banner.setAttribute('role', 'status');
+            banner.setAttribute('aria-live', 'polite');
+            banner.style.cssText = [
+                'position:fixed',
+                'left:50%',
+                'bottom:24px',
+                'transform:translateX(-50%)',
+                'z-index:1000000',
+                'max-width:min(92vw, 520px)',
+                'width:max-content',
+                'padding:12px 16px',
+                'border-radius:12px',
+                'border:1px solid #3FB950',
+                'background:rgba(15,23,42,0.98)',
+                'color:#FFFFFF',
+                'font-size:14px',
+                'font-weight:600',
+                'line-height:1.45',
+                'text-align:center',
+                'box-shadow:0 10px 30px rgba(0,0,0,0.55)'
+            ].join(';');
+            doc.body.appendChild(banner);
+        }
+        banner.textContent = message;
+        banner.style.background = kind === 'ok'
+            ? 'rgba(46,160,67,0.96)' : 'rgba(15,23,42,0.98)';
+        banner.style.borderColor = kind === 'ok' ? '#4ADE80' : '#3FB950';
+        banner.style.display = 'block';
+        if (parent.__mmInstallBannerTimer) {
+            parent.clearTimeout(parent.__mmInstallBannerTimer);
+        }
+        parent.__mmInstallBannerTimer = parent.setTimeout(function () {
+            banner.style.display = 'none';
+        }, 9000);
+    };
+})();
+"""
+
+_PWA_INSTALL_ACTION_JS = """
+<script>
+""" + _PWA_INSTALL_FEEDBACK_JS + """
+(function () {
+    var FALLBACK_MESSAGE =
+        "Tap your browser menu (⋮ in Chrome or Share ⬆️ in Safari) → select 'Add to Home screen' to install!";
+
+    function parentWindow() {
+        try {
+            return (window.parent && window.parent.document) ? window.parent : window;
+        } catch (e) {
+            return window;
+        }
+    }
+
+    var parent = parentWindow();
+    var showBanner = parent.__mmShowInstallBanner;
+    if (typeof showBanner !== 'function') { return; }
+
+    var promptEvent = parent.deferredInstallPrompt || parent.__mmDeferredInstallPrompt;
+    if (!promptEvent || typeof promptEvent.prompt !== 'function') {
+        showBanner(FALLBACK_MESSAGE, 'fallback');
+        return;
+    }
+
+    var finish = function (outcome) {
+        var accepted = outcome && (
+            outcome.outcome === 'accepted' || outcome === 'accepted'
+        );
+        parent.deferredInstallPrompt = null;
+        parent.__mmDeferredInstallPrompt = null;
+        parent.__mmInstallPromptActive = false;
+        showBanner(
+            accepted
+                ? '✅ MacroMatch is installed! Open it from your home screen.'
+                : FALLBACK_MESSAGE,
+            accepted ? 'ok' : 'fallback'
+        );
+    };
+
+    try {
+        parent.__mmInstallPromptActive = true;
+        var choice = promptEvent.prompt();
+        if (choice && typeof choice.then === 'function') {
+            choice.then(finish).catch(function () {
+                showBanner(FALLBACK_MESSAGE, 'fallback');
+            });
+        } else if (promptEvent.userChoice && typeof promptEvent.userChoice.then === 'function') {
+            promptEvent.userChoice.then(finish).catch(function () {
+                showBanner(FALLBACK_MESSAGE, 'fallback');
+            });
+        } else {
+            finish(null);
+        }
+    } catch (e) {
+        parent.__mmInstallPromptActive = false;
+        showBanner(FALLBACK_MESSAGE, 'fallback');
+    }
+})();
+</script>
+"""
+
+_PWA_COPY_LINK_JS = """
+<script>
+""" + _PWA_INSTALL_FEEDBACK_JS + """
+(function () {
+    var APP_URL = __MM_APP_URL__;
+    var SUCCESS_MESSAGE =
+        "✅ App link copied! Open it in Chrome or Safari, then tap 'Install App Now'.";
+    var FAILURE_MESSAGE =
+        "Could not copy automatically — long-press the link in the box below to copy it.";
+
+    function parentWindow() {
+        try {
+            return (window.parent && window.parent.document) ? window.parent : window;
+        } catch (e) {
+            return window;
+        }
+    }
+
+    var parent = parentWindow();
+    var showBanner = parent.__mmShowInstallBanner;
+
+    function fallbackCopy() {
+        var doc = parent.document;
+        if (!doc || !doc.body) { return false; }
+        var area = doc.createElement('textarea');
+        area.value = APP_URL;
+        area.setAttribute('readonly', '');
+        area.style.cssText = [
+            'position:fixed',
+            'top:-1000px',
+            'left:-1000px',
+            'opacity:0'
+        ].join(';');
+        doc.body.appendChild(area);
+        area.focus();
+        area.select();
+        if (area.setSelectionRange) {
+            area.setSelectionRange(0, APP_URL.length);
+        }
+        var copied = false;
+        try {
+            copied = !!(doc.execCommand && doc.execCommand('copy'));
+        } catch (e) {
+            copied = false;
+        }
+        doc.body.removeChild(area);
+        return copied;
+    }
+
+    function notify(message, kind) {
+        if (typeof showBanner === 'function') { showBanner(message, kind); }
+    }
+
+    try {
+        var nav = parent.navigator || window.navigator;
+        if (nav && nav.clipboard && nav.clipboard.writeText) {
+            nav.clipboard.writeText(APP_URL).then(function () {
+                notify(SUCCESS_MESSAGE, 'ok');
+            }).catch(function () {
+                if (fallbackCopy()) {
+                    notify(SUCCESS_MESSAGE, 'ok');
+                } else {
+                    notify(FAILURE_MESSAGE, 'fallback');
+                }
+            });
+        } else if (fallbackCopy()) {
+            notify(SUCCESS_MESSAGE, 'ok');
+        } else {
+            notify(FAILURE_MESSAGE, 'fallback');
+        }
+    } catch (e) {
+        if (fallbackCopy()) {
+            notify(SUCCESS_MESSAGE, 'ok');
+        } else {
+            notify(FAILURE_MESSAGE, 'fallback');
+        }
+    }
+})();
+</script>
+""".replace("__MM_APP_URL__", json.dumps(INSTALL_APP_URL))
+
+# Browser-history bridge for the Python nav_stack. Streamlit already listens to
+# parent popstate events and reruns with the new query string; writing the stack
+# depth into ``?step=`` is enough to make the phone's Back button step through
+# views instead of leaving the app. A sentinel entry keeps Back inside the app
+# even when the user is already on Home.
+_NAV_HISTORY_SYNC_JS = """
+<script>
+(function () {
+    var DEPTH = __MM_NAV_DEPTH__;
+
+    function parentWindow() {
+        try {
+            return (window.parent && window.parent.document) ? window.parent : window;
+        } catch (e) {
+            return window;
+        }
+    }
+
+    function historyState() {
+        return { navDepth: DEPTH, mmNav: true };
+    }
+
+    var parent = parentWindow();
+    var win = parent;
+    var current = typeof parent.__mmNavDepth === 'number' ? parent.__mmNavDepth : null;
+
+    function writeState(mode) {
+        var url;
+        try {
+            url = new URL(win.location.href);
+            url.searchParams.set('step', String(DEPTH));
+            if (mode === 'push') {
+                win.history.pushState(historyState(), '', url.toString());
+            } else {
+                win.history.replaceState(historyState(), '', url.toString());
+            }
+        } catch (e) {
+            // Keep the in-memory depth even if URL APIs are unavailable.
+        }
+        parent.__mmNavDepth = DEPTH;
+    }
+
+    if (current === null) {
+        writeState('replace');
+        // One extra Home entry means the first hardware Back press cannot exit.
+        try {
+            win.history.pushState(historyState(), '', win.location.href);
+        } catch (e) { /* keep the single entry */ }
+        parent.__mmNavDepth = DEPTH;
+    } else if (DEPTH > current) {
+        writeState('push');
+    } else if (DEPTH < current) {
+        var urlStep = NaN;
+        try {
+            urlStep = parseInt(new URL(win.location.href).searchParams.get('step'), 10);
+        } catch (e) { /* fall through and rewind */ }
+
+        // A hardware Back press already moved the browser URL to DEPTH and
+        // Python followed it. Only rewind when the visible Back pill popped the
+        // stack while the URL is still deeper, otherwise we would step back a
+        // second time and skip a page.
+        if (isNaN(urlStep) || urlStep > DEPTH) {
+            try {
+                win.history.go(DEPTH - current);
+            } catch (e) { /* replace below still keeps the URL consistent */ }
+            try {
+                var url = new URL(win.location.href);
+                if (url.searchParams.get('step') !== String(DEPTH)) {
+                    url.searchParams.set('step', String(DEPTH));
+                    win.history.replaceState(historyState(), '', url.toString());
+                }
+            } catch (e) { /* no-op */ }
+        }
+        parent.__mmNavDepth = DEPTH;
+    } else {
+        try {
+            var currentUrl = new URL(win.location.href);
+            var needsWrite = (
+                currentUrl.searchParams.get('step') !== String(DEPTH) ||
+                !win.history.state ||
+                win.history.state.navDepth !== DEPTH
+            );
+            if (needsWrite) { writeState('replace'); }
+        } catch (e) { /* no-op */ }
+        parent.__mmNavDepth = DEPTH;
+    }
+})();
+</script>
+"""
+
+
+def _nav_history_sync_js(depth: int) -> str:
+    """Fill the current stack depth into the browser-history bridge."""
+    return _NAV_HISTORY_SYNC_JS.replace("__MM_NAV_DEPTH__", json.dumps(max(1, depth)))
+
+
 # All zero-height JS components are rendered in one deferred block at the very
 # end of the script (or immediately before an early stop). Keeping them out of
 # the page body prevents blank vertical gaps above the top-right back button.
@@ -588,11 +899,19 @@ _DEFERRED_COLLAPSE_FLAGS = (
     "_collapse_sidebar_for_wishlist",
     "_collapse_sidebar_for_catalogue",
     "_collapse_sidebar_for_install",
+    "_collapse_sidebar_for_nav",
 )
 
 
 def _render_deferred_components() -> None:
     """Render every parent-document JS helper after the visible page content."""
+    if "nav_stack" in st.session_state:
+        components.html(
+            _nav_history_sync_js(len(st.session_state["nav_stack"])),
+            height=0,
+            scrolling=False,
+        )
+
     components.html(_VIEWPORT_DETECT_JS, height=0, scrolling=False)
 
     if _PWA_HEAD_INJECTION_JS:
@@ -608,6 +927,12 @@ def _render_deferred_components() -> None:
 
     if st.session_state.get("show_install_page", False) and _PWA_INSTALL_BUTTON_JS:
         components.html(_PWA_INSTALL_BUTTON_JS, height=0, scrolling=False)
+
+    if st.session_state.pop("_install_prompt_requested", False) and _PWA_INSTALL_ACTION_JS:
+        components.html(_PWA_INSTALL_ACTION_JS, height=0, scrolling=False)
+
+    if st.session_state.pop("_install_copy_requested", False) and _PWA_COPY_LINK_JS:
+        components.html(_PWA_COPY_LINK_JS, height=0, scrolling=False)
 
 
 def _stop_after_deferred_components() -> None:
@@ -2065,16 +2390,7 @@ def load_saved_match(match):
         "priority": priority,
         "alternatives": match.get("alternatives") or [],
     }
-    st.session_state["show_swaps_results"] = True
-    st.session_state["inspect_product"] = None
-    st.session_state["show_ai_help"] = False
-    st.session_state["show_wishlist_page"] = False
-    st.session_state["show_all_products_page"] = False
-    st.session_state["show_install_page"] = False
-    st.session_state["_collapse_sidebar_for_details"] = False
-    st.session_state["_collapse_sidebar_for_wishlist"] = False
-    st.session_state["_collapse_sidebar_for_catalogue"] = False
-    st.session_state["_collapse_sidebar_for_install"] = False
+    navigate_to({"view": "swaps"})
 
 
 @st.fragment(key="saved_matches")
@@ -2244,13 +2560,79 @@ if "default_allergens_select" not in st.session_state:
     st.session_state["default_allergens_select"] = []
 st.session_state.setdefault("wishlist", [])
 
+# ─────────────────────────────────────────────
+# Step-by-step navigation history
+# ─────────────────────────────────────────────
+# nav_stack[-1] is always the active screen. Keeping a real stack (instead of
+# one boolean per page) lets both the top-right pill and the phone's hardware
+# Back button step through the exact pages the user visited.
+st.session_state.setdefault("nav_stack", [{"view": "home"}])
+if (
+    not isinstance(st.session_state["nav_stack"], list)
+    or not st.session_state["nav_stack"]
+):
+    st.session_state["nav_stack"] = [{"view": "home"}]
+
+
+def _apply_view_state(view: dict) -> None:
+    """Mirror the active stack entry onto the existing view flags."""
+    name = view.get("view", "home")
+    st.session_state["show_swaps_results"] = name == "swaps"
+    st.session_state["inspect_product"] = (
+        view.get("product") if name == "details" else None
+    )
+    st.session_state["show_ai_help"] = name == "help"
+    st.session_state["show_wishlist_page"] = name == "wishlist"
+    st.session_state["show_all_products_page"] = name == "all_products"
+    st.session_state["show_install_page"] = name == "install"
+
+
+def navigate_to(view_dict: dict) -> None:
+    """Push a view onto the stack and show it, collapsing the mobile sidebar."""
+    stack = st.session_state.setdefault("nav_stack", [{"view": "home"}])
+    entry = dict(view_dict)
+    if stack[-1] != entry:
+        stack.append(entry)
+        # The deferred JS only collapses when the viewport is <= 768px.
+        st.session_state["_collapse_sidebar_for_nav"] = True
+    _apply_view_state(stack[-1])
+
+
+def navigate_back() -> None:
+    """Pop one screen, returning to the exact page the user came from."""
+    stack = st.session_state.setdefault("nav_stack", [{"view": "home"}])
+    if len(stack) > 1:
+        stack.pop()
+    _apply_view_state(stack[-1])
+
+
+def _sync_nav_stack_from_query() -> None:
+    """Apply a browser Back gesture reported by Streamlit's popstate rerun.
+
+    The deferred JS writes the current stack depth into ``?step=``. Streamlit
+    reruns on history navigation and gives us the URL's new depth here, so we
+    never need a second widget click that could race the popstate rerun.
+    """
+    raw_step = st.query_params.get("step")
+    try:
+        target_depth = int(str(raw_step))
+    except (TypeError, ValueError):
+        return
+    stack = st.session_state.setdefault("nav_stack", [{"view": "home"}])
+    if 1 <= target_depth < len(stack):
+        del stack[target_depth:]
+        _apply_view_state(stack[-1])
+
+
+_sync_nav_stack_from_query()
+
 # Auth has already been enforced above, so it is safe to hydrate the signed-in
 # user's saved targets/preferences before any dashboard widgets are created.
 if st.session_state.get("supabase_user") is not None:
     _load_user_preferences(st.session_state["supabase_user"])
 
 # Dedicated views own the whole main area: no hero, no how-it-works bar, no
-# Help toggle, and no search form until the user taps "⌂ Back to home".
+# Help toggle, and no search form until the user taps the top-right Back pill.
 show_product_details = st.session_state.get("inspect_product") is not None
 show_ai_help = st.session_state.get("show_ai_help", False)
 show_wishlist_page = st.session_state.get("show_wishlist_page", False)
@@ -2420,93 +2802,43 @@ def _protein_goal_badge(protein_per_100g) -> str:
 
 def _reset_swaps_view() -> None:
     """Return to the clean home view and drop inspect/AI/ranked-result state."""
-    st.session_state["show_swaps_results"] = False
-    st.session_state["inspect_product"] = None
-    st.session_state["show_ai_help"] = False
-    st.session_state["show_wishlist_page"] = False
-    st.session_state["show_all_products_page"] = False
-    st.session_state["show_install_page"] = False
-    st.session_state["_collapse_sidebar_for_details"] = False
-    st.session_state["_collapse_sidebar_for_wishlist"] = False
-    st.session_state["_collapse_sidebar_for_catalogue"] = False
-    st.session_state["_collapse_sidebar_for_install"] = False
+    navigate_to({"view": "home"})
     st.session_state.pop("match_result_data", None)
 
 
 def _open_swaps_results() -> None:
     """Find Alternatives callback: one state pass, one automatic widget rerun."""
-    st.session_state["show_swaps_results"] = True
-    st.session_state["inspect_product"] = None
-    st.session_state["show_ai_help"] = False
-    st.session_state["show_wishlist_page"] = False
-    st.session_state["show_all_products_page"] = False
-    st.session_state["show_install_page"] = False
-    st.session_state["_collapse_sidebar_for_details"] = False
-    st.session_state["_collapse_sidebar_for_wishlist"] = False
-    st.session_state["_collapse_sidebar_for_catalogue"] = False
-    st.session_state["_collapse_sidebar_for_install"] = False
     st.session_state.pop("match_result_data", None)
+    navigate_to({"view": "swaps"})
 
 
 def _close_ai_help() -> None:
-    """AI Help back-button callback (the button supplies the single rerun)."""
-    st.session_state["show_ai_help"] = False
-    st.session_state["show_wishlist_page"] = False
-    st.session_state["show_all_products_page"] = False
-    st.session_state["show_install_page"] = False
-    st.session_state["_collapse_sidebar_for_wishlist"] = False
-    st.session_state["_collapse_sidebar_for_catalogue"] = False
-    st.session_state["_collapse_sidebar_for_install"] = False
+    """AI Help back-button callback: step back to the previous view."""
+    navigate_back()
 
 
 def _open_wishlist_page() -> None:
     """Sidebar button callback: hand the main screen to the wishlist view."""
-    st.session_state["show_wishlist_page"] = True
-    st.session_state["inspect_product"] = None
-    st.session_state["show_swaps_results"] = False
-    st.session_state["show_ai_help"] = False
-    st.session_state["show_all_products_page"] = False
-    st.session_state["show_install_page"] = False
-    st.session_state["_collapse_sidebar_for_details"] = False
-    st.session_state["_collapse_sidebar_for_wishlist"] = True
-    st.session_state["_collapse_sidebar_for_catalogue"] = False
-    st.session_state["_collapse_sidebar_for_install"] = False
-    st.session_state.pop("match_result_data", None)
+    navigate_to({"view": "wishlist"})
 
 
 def _close_wishlist_page() -> None:
-    """Wishlist back-button callback (the button supplies the single rerun)."""
-    st.session_state["show_wishlist_page"] = False
-    st.session_state["_collapse_sidebar_for_wishlist"] = False
-    st.session_state["show_install_page"] = False
-    st.session_state["_collapse_sidebar_for_install"] = False
+    """Wishlist back-button callback: step back to the previous view."""
+    navigate_back()
 
 
 def _open_catalogue_page() -> None:
     """Sidebar button callback: hand the main screen to the product catalogue."""
     mobile = str(st.query_params.get("mm_mobile", "0")) in ("1", "true", "True")
     page_size = 4 if mobile else CATALOGUE_PAGE_SIZE
-    st.session_state["show_all_products_page"] = True
-    st.session_state["show_wishlist_page"] = False
-    st.session_state["inspect_product"] = None
-    st.session_state["show_swaps_results"] = False
-    st.session_state["show_ai_help"] = False
-    st.session_state["show_install_page"] = False
     st.session_state["catalogue_initial_count"] = page_size
     st.session_state["catalogue_visible_count"] = page_size
-    st.session_state["_collapse_sidebar_for_details"] = False
-    st.session_state["_collapse_sidebar_for_wishlist"] = False
-    st.session_state["_collapse_sidebar_for_catalogue"] = True
-    st.session_state["_collapse_sidebar_for_install"] = False
-    st.session_state.pop("match_result_data", None)
+    navigate_to({"view": "all_products"})
 
 
 def _close_catalogue_page() -> None:
-    """Catalogue back-button callback (the button supplies the single rerun)."""
-    st.session_state["show_all_products_page"] = False
-    st.session_state["_collapse_sidebar_for_catalogue"] = False
-    st.session_state["show_install_page"] = False
-    st.session_state["_collapse_sidebar_for_install"] = False
+    """Catalogue back-button callback: step back to the previous view."""
+    navigate_back()
 
 
 def _show_more_catalogue_products() -> None:
@@ -2523,23 +2855,22 @@ def _show_less_catalogue_products() -> None:
 
 def _open_install_page() -> None:
     """Sidebar button callback: hand the main screen to the PWA install guide."""
-    st.session_state["show_install_page"] = True
-    st.session_state["show_wishlist_page"] = False
-    st.session_state["show_all_products_page"] = False
-    st.session_state["inspect_product"] = None
-    st.session_state["show_swaps_results"] = False
-    st.session_state["show_ai_help"] = False
-    st.session_state["_collapse_sidebar_for_details"] = False
-    st.session_state["_collapse_sidebar_for_wishlist"] = False
-    st.session_state["_collapse_sidebar_for_catalogue"] = False
-    st.session_state["_collapse_sidebar_for_install"] = True
-    st.session_state.pop("match_result_data", None)
+    navigate_to({"view": "install"})
 
 
 def _close_install_page() -> None:
-    """Install-page back-button callback (the button supplies the single rerun)."""
-    st.session_state["show_install_page"] = False
-    st.session_state["_collapse_sidebar_for_install"] = False
+    """Install-page back-button callback: step back to the previous view."""
+    navigate_back()
+
+
+def _request_install_prompt() -> None:
+    """Install-page action callback; the deferred JS handles the native prompt."""
+    st.session_state["_install_prompt_requested"] = True
+
+
+def _request_copy_app_link() -> None:
+    """Install-page action callback; the deferred JS copies the live app URL."""
+    st.session_state["_install_copy_requested"] = True
 
 
 def _toggle_user_profile() -> None:
@@ -2558,7 +2889,7 @@ def _profile_sign_out() -> None:
     st.session_state.clear()
 
 
-def _render_top_right_back_button(key: str, on_click) -> None:
+def _render_top_right_back_button(key: str, on_click=None) -> None:
     """Render the shared top-right back pill on every dedicated page."""
     # The invisible marker reserves header height in the normal flow while CSS
     # pins the actual button to the top-right, opposite the sidebar control.
@@ -2566,32 +2897,34 @@ def _render_top_right_back_button(key: str, on_click) -> None:
         '<div class="back-home-top-right" aria-hidden="true"></div>',
         unsafe_allow_html=True,
     )
+    stack = st.session_state.get("nav_stack") or [{"view": "home"}]
+    label = "⌂ Back" if len(stack) > 1 else "⌂ Back to home"
     st.button(
-        "⌂ Back to home",
+        label,
         key=key,
-        help="Return to the start page",
-        on_click=on_click,
+        help="Go back one step",
+        on_click=on_click or navigate_back,
     )
 
 
 def _render_back_to_home(key: str) -> None:
     """Top-right back button shared by the details and swaps views."""
-    _render_top_right_back_button(key, _reset_swaps_view)
+    _render_top_right_back_button(key, navigate_back)
 
 
 def _render_wishlist_back_to_home(key: str) -> None:
     """Top-right dark-emerald back pill for the dedicated wishlist page."""
-    _render_top_right_back_button(key, _close_wishlist_page)
+    _render_top_right_back_button(key, navigate_back)
 
 
 def _render_catalogue_back_to_home(key: str) -> None:
     """Top-right dark-emerald back pill for the dedicated catalogue page."""
-    _render_top_right_back_button(key, _close_catalogue_page)
+    _render_top_right_back_button(key, navigate_back)
 
 
 def _render_install_back_to_home(key: str) -> None:
     """Top-right dark-emerald back pill for the dedicated install page."""
-    _render_top_right_back_button(key, _close_install_page)
+    _render_top_right_back_button(key, navigate_back)
 
 
 def _sync_food_selection(canonical: str, search_value: str | None = None) -> None:
@@ -2636,14 +2969,7 @@ def select_food_value_callback(product: str) -> None:
     if not product:
         return
     _sync_food_selection(product, product)
-    st.session_state["inspect_product"] = None
     _reset_swaps_view()
-    st.session_state["show_wishlist_page"] = False
-    st.session_state["show_all_products_page"] = False
-    st.session_state["show_install_page"] = False
-    st.session_state["_collapse_sidebar_for_wishlist"] = False
-    st.session_state["_collapse_sidebar_for_catalogue"] = False
-    st.session_state["_collapse_sidebar_for_install"] = False
     st.session_state["food_box_ver"] = st.session_state.get("food_box_ver", 0) + 1
 
 
@@ -2651,17 +2977,7 @@ def inspect_food_value_callback(product: str) -> None:
     """View Details / wishlist name: open the dedicated full-page overview."""
     if not product:
         return
-    st.session_state["inspect_product"] = product
-    st.session_state["show_swaps_results"] = False
-    st.session_state["show_ai_help"] = False
-    st.session_state["show_wishlist_page"] = False
-    st.session_state["show_all_products_page"] = False
-    st.session_state["show_install_page"] = False
-    st.session_state["_collapse_sidebar_for_details"] = True
-    st.session_state["_collapse_sidebar_for_wishlist"] = False
-    st.session_state["_collapse_sidebar_for_catalogue"] = False
-    st.session_state["_collapse_sidebar_for_install"] = False
-    st.session_state.pop("match_result_data", None)
+    navigate_to({"view": "details", "product": product})
 
 
 def select_city_callback(widget_key: str) -> None:
@@ -4183,27 +4499,9 @@ div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-test
     fill: #7EE2A8 !important;
 }
 
-/* ── Top-bar Help toggle + dedicated dark glass AI page ── */
-.ai-help-toggle-marker, .ai-help-marker {
+/* ── Dedicated dark glass AI page ── */
+.ai-help-marker {
     display: none !important;
-}
-div[data-testid="stVerticalBlockElement"]:has(.ai-help-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    min-height: 46px !important;
-    padding: 0.5rem 0.9rem !important;
-    font-size: 0.95rem !important;
-    font-weight: 700 !important;
-    color: #7EE2A8 !important;
-    background: rgba(46, 160, 67, 0.10) !important;
-    border: 1px solid #2EA043 !important;
-    border-radius: 10px !important;
-    transition: all 0.15s ease !important;
-}
-@media (hover: hover) {
-    div[data-testid="stVerticalBlockElement"]:has(.ai-help-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
-        background: rgba(46, 160, 67, 0.20) !important;
-        border-color: #3FB950 !important;
-        color: #A7F3D0 !important;
-    }
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) {
     background: linear-gradient(145deg, #161B22, #0D1117) !important;
@@ -4943,6 +5241,9 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
 .catalogue-page-marker,
 .install-page-marker,
 .install-steps-marker,
+.install-primary-action-marker,
+.install-copy-action-marker,
+.install-copy-link-marker,
 .profile-toggle-marker,
 .profile-signout-marker,
 .wishlist-grid-marker,
@@ -4982,6 +5283,10 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.install-page-marker) {
     border: 1px solid rgba(46, 160, 67, 0.35) !important;
     border-radius: 16px !important;
     padding: 16px !important;
+}
+/* Keep the final install-guide text clear of the floating corner badge. */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.install-page-marker) {
+    padding-bottom: 4.5rem !important;
 }
 .wishlist-page-heading {
     font-family: 'Plus Jakarta Sans', sans-serif !important;
@@ -5106,6 +5411,50 @@ div[data-testid="stVerticalBlockElement"]:has(.install-steps-marker) + div[data-
 }
 div[data-testid="stVerticalBlockElement"]:has(.install-page-marker) #mm-pwa-install-slot {
     margin-top: 12px !important;
+}
+div[data-testid="stVerticalBlockElement"]:has(.install-primary-action-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    width: 100% !important;
+    min-height: 50px !important;
+    padding: 12px 18px !important;
+    border: 1.5px solid #4ADE80 !important;
+    border-radius: 12px !important;
+    background: linear-gradient(135deg, #217A3E 0%, #134725 100%) !important;
+    box-shadow: 0 0 18px rgba(74, 222, 128, 0.3) !important;
+    color: #FFFFFF !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.02em !important;
+}
+div[data-testid="stVerticalBlockElement"]:has(.install-copy-action-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    width: 100% !important;
+    min-height: 46px !important;
+    padding: 10px 16px !important;
+    border: 1.5px solid rgba(46, 160, 67, 0.75) !important;
+    border-radius: 12px !important;
+    background: rgba(22, 27, 34, 0.9) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    color: #A7F3D0 !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+}
+div[data-testid="stVerticalBlockElement"]:has(.install-copy-link-marker) + div[data-testid="stVerticalBlockElement"] [data-testid="stCodeBlock"] {
+    background: rgba(13, 17, 23, 0.95) !important;
+    border: 1px solid rgba(46, 160, 67, 0.45) !important;
+    border-radius: 10px !important;
+    padding: 8px 10px !important;
+}
+@media (hover: hover) {
+    div[data-testid="stVerticalBlockElement"]:has(.install-primary-action-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+        background: linear-gradient(135deg, #2EA043 0%, #176534 100%) !important;
+        border-color: #6EE798 !important;
+        transform: translateY(-1px) !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.install-copy-action-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+        background: rgba(46, 160, 67, 0.24) !important;
+        border-color: #4ADE80 !important;
+        color: #FFFFFF !important;
+        transform: translateY(-1px) !important;
+    }
 }
 
 div[data-testid="stVerticalBlockElement"]:has(.wishlist-grid-marker) + div[data-testid="stHorizontalBlock"],
@@ -5268,6 +5617,20 @@ section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="profile
         background: linear-gradient(135deg, rgba(248, 81, 73, 0.35), rgba(110, 28, 28, 0.65)) !important;
         border-color: rgba(248, 81, 73, 0.9) !important;
     }
+}
+
+/* Bottom-of-sidebar AI Help pill: targeted so the generic sidebar button
+   rules (which have their own !important declarations) cannot override it. */
+section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_ai_help_btn"] {
+    background: linear-gradient(135deg, #1E7E48 0%, #0F4C5C 100%) !important;
+    border: 1.5px solid #4ADE80 !important;
+    border-radius: 999px !important;
+    padding: 13px 18px !important;
+    font-size: 17px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 0 20px rgba(74, 222, 128, 0.35) !important;
+    transition: all 0.15s ease !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -6244,23 +6607,13 @@ def _submit_ai_prompt(prompt: str) -> None:
 
 
 def _open_ai_help() -> None:
-    """Top-bar Help button: open the dedicated AI view from a clean home."""
-    st.session_state["show_ai_help"] = True
-    st.session_state["inspect_product"] = None
-    st.session_state["show_swaps_results"] = False
-    st.session_state["show_wishlist_page"] = False
-    st.session_state["show_all_products_page"] = False
-    st.session_state["show_install_page"] = False
-    st.session_state["_collapse_sidebar_for_details"] = False
-    st.session_state["_collapse_sidebar_for_wishlist"] = False
-    st.session_state["_collapse_sidebar_for_catalogue"] = False
-    st.session_state["_collapse_sidebar_for_install"] = False
-    st.session_state.pop("match_result_data", None)
+    """Sidebar Help button: open the dedicated AI view and close mobile nav."""
+    navigate_to({"view": "help"})
 
 
 def _render_ai_back_to_home(key: str) -> None:
     """Top-right dark-emerald back button for the dedicated AI help page."""
-    _render_top_right_back_button(key, _close_ai_help)
+    _render_top_right_back_button(key, navigate_back)
 
 
 def _render_ai_help() -> None:
@@ -6466,6 +6819,33 @@ def _render_install_page() -> None:
         )
 
         st.markdown(
+            '<div class="install-primary-action-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        st.button(
+            "📲 Install App Now",
+            key="install_app_now_btn",
+            help="Trigger the native install prompt or show the manual steps",
+            on_click=_request_install_prompt,
+        )
+
+        st.markdown(
+            '<div class="install-copy-action-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        st.button(
+            "📋 Copy App Link",
+            key="install_copy_link_btn",
+            help="Copy the link, then open it in Chrome or Safari to install",
+            on_click=_request_copy_app_link,
+        )
+        st.markdown(
+            '<div class="install-copy-link-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        st.code(INSTALL_APP_URL, language=None)
+
+        st.markdown(
             '<div class="install-steps-marker" aria-hidden="true"></div>',
             unsafe_allow_html=True,
         )
@@ -6497,13 +6877,14 @@ def _render_install_page() -> None:
             unsafe_allow_html=True,
         )
         st.markdown(
-            '<div class="install-native-note">If your browser supports a one-tap '
-            "install, the button appears above automatically. Otherwise follow "
-            "the steps for your device.</div>",
+            '<div class="install-native-note">If the one-tap install is blocked '
+            "by your browser or an in-app browser, tap <strong>Install App "
+            "Now</strong> for instructions, or copy the link above and open it "
+            "in Chrome or Safari before installing.</div>",
             unsafe_allow_html=True,
         )
-        # The native-install button helper runs in the deferred JS block so it
-        # cannot add blank space above the top-right back button.
+        # The native-install button helper and both action snippets run in the
+        # deferred JS block so they cannot add blank space above the back button.
 
 
 def _macro_line(detail: dict, serving_g: int | None = None) -> str:
@@ -7041,23 +7422,9 @@ if (
     """, unsafe_allow_html=True)
     st.markdown('<hr class="section-divider hero-divider">', unsafe_allow_html=True)
 
-    # Pinned directly under the header, before the search card. The AI help
-    # toggle sits beside the how-it-works bar with its emerald-accented style.
-    col_how, col_ai = st.columns([1.3, 1], vertical_alignment="center")
-    with col_how:
-        render_how_it_works()
-    with col_ai:
-        st.markdown(
-            '<div class="ai-help-toggle-marker" aria-hidden="true"></div>',
-            unsafe_allow_html=True,
-        )
-        if st.button(
-            "❓ Help",
-            key="ai_help_toggle",
-            use_container_width=True,
-            on_click=_open_ai_help,
-        ):
-            pass
+    # Pinned directly under the header, before the search card. The guide spans
+    # the full width again; AI Help now lives at the very bottom of the sidebar.
+    render_how_it_works()
 
     # The dedicated AI Help page renders after the sidebar, below.
 
@@ -7290,6 +7657,15 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
+    # ─── AI Help entry: the very last item in the sidebar ────────────────
+    st.markdown('<hr style="border-color: #21262D; margin: 12px 0;">', unsafe_allow_html=True)
+    st.button(
+        "🤖 AI Diet & Product Help",
+        key="sidebar_ai_help_btn",
+        use_container_width=True,
+        on_click=_open_ai_help,
+    )
+
 
 # ─────────────────────────────────────────────
 # Dedicated PWA Install page — replaces the entire main screen
@@ -7332,9 +7708,8 @@ if show_product_details:
     inspected_detail = details_map.get(inspected_name)
 
     if not inspected_detail:
-        # Stale state (e.g. a product removed from the CSV) → clean home.
-        st.session_state["inspect_product"] = None
-        st.session_state["_collapse_sidebar_for_details"] = False
+        # Stale state (e.g. a product removed from the CSV) → previous view.
+        navigate_back()
         st.rerun()
 
     # The one-shot mobile collapse flag is consumed by the deferred JS block.
