@@ -4997,11 +4997,11 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
 
 /* ── Sidebar section labels, saved expander, and toggle styles ── */
 .sidebar-section-label {
-    font-size: 11px !important;
+    font-size: 13.5px !important;
     font-weight: 700 !important;
-    letter-spacing: 0.08em !important;
-    color: #8B949E !important;
-    margin: 16px 0 6px 6px !important;
+    letter-spacing: 0.08em;
+    color: #9BA3AF;
+    margin: 18px 0 8px 6px;
     text-transform: uppercase !important;
     line-height: 1.2 !important;
 }
@@ -5012,7 +5012,7 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
 [data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) summary p,
 [data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) .streamlit-expanderHeader p {
     font-weight: 600 !important;
-    font-size: 16px !important;
+    font-size: 16.5px !important;
     color: #E6EDF3 !important;
 }
 
@@ -5392,73 +5392,56 @@ div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div
     }
 }
 
-/* 1. Force ALL sidebar buttons to left-align their inner flex container & text */
-section[data-testid="stSidebar"] div[data-testid="stButton"] button {
+/* 1. Secondary buttons = clean, left-aligned menu rows. */
+section[data-testid="stSidebar"] button[kind="secondary"] {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 10px 14px !important;
     display: flex !important;
     justify-content: flex-start !important;
     align-items: center !important;
     text-align: left !important;
     width: 100% !important;
-    background: transparent !important;
-    border: none !important;
-    border-radius: 10px !important;
-    padding: 10px 14px !important;
-    min-height: 42px !important;
+    box-shadow: none !important;
 }
-
-section[data-testid="stSidebar"] div[data-testid="stButton"] button > div,
-section[data-testid="stSidebar"] div[data-testid="stButton"] button p {
-    width: 100% !important;
-    text-align: left !important;
-    justify-content: flex-start !important;
-    font-size: 16px !important;
+section[data-testid="stSidebar"] button[kind="secondary"] > div,
+section[data-testid="stSidebar"] button[kind="secondary"] p {
+    font-size: 16.5px !important;
     font-weight: 600 !important;
     color: #E6EDF3 !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
     margin: 0 !important;
 }
 
-/* 2. Top Profile Card Button: clean dark card with border & two-line look */
-section[data-testid="stSidebar"] div[data-testid="stButton"]:first-of-type button {
-    background-color: #161B22 !important;
-    border: 1px solid #30363D !important;
-    border-radius: 14px !important;
-    padding: 12px 14px !important;
-    margin-bottom: 6px !important;
-}
-
-/* 3. Highlight the active "Home" button (or active nav item) with emerald tint & left bar */
-section[data-testid="stSidebar"] div[data-testid="stButton"]:nth-of-type(2) button {
-    background: rgba(46, 160, 67, 0.16) !important;
-    border-left: 3px solid #3FB950 !important;
-}
-section[data-testid="stSidebar"] div[data-testid="stButton"]:nth-of-type(2) button p {
-    color: #6EE798 !important;
-    font-weight: 700 !important;
-}
-
-/* 4. Bottom "🤖 AI Diet & Product Help" Button: glowing green pill CTA (centered text) */
-section[data-testid="stSidebar"] div[data-testid="stButton"]:last-of-type button {
+/* 2. Primary button = the single glowing AI Help CTA at the bottom. */
+section[data-testid="stSidebar"] button[kind="primary"] {
     background: linear-gradient(135deg, #2EA043 0%, #34D399 100%) !important;
     border: none !important;
     border-radius: 999px !important;
-    padding: 13px 18px !important;
+    padding: 14px 18px !important;
     margin-top: 14px !important;
     justify-content: center !important;
     box-shadow: 0 4px 18px rgba(52, 211, 153, 0.35) !important;
 }
-section[data-testid="stSidebar"] div[data-testid="stButton"]:last-of-type button > div,
-section[data-testid="stSidebar"] div[data-testid="stButton"]:last-of-type button p {
-    text-align: center !important;
-    justify-content: center !important;
+section[data-testid="stSidebar"] button[kind="primary"] > div,
+section[data-testid="stSidebar"] button[kind="primary"] p {
     color: #051B11 !important;
     font-size: 17px !important;
     font-weight: 800 !important;
+    text-align: center !important;
+    justify-content: center !important;
 }
 
-/* 5. Hover highlight on sidebar menu items */
 @media (hover: hover) {
-    section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
+    section[data-testid="stSidebar"] button[kind="secondary"]:hover {
         background-color: rgba(255, 255, 255, 0.06) !important;
+    }
+    section[data-testid="stSidebar"] button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #2EA043 0%, #34D399 100%) !important;
+        box-shadow: 0 6px 22px rgba(52, 211, 153, 0.48) !important;
     }
 }
 
@@ -5483,7 +5466,7 @@ section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stE
 section[data-testid="stSidebar"] div[data-testid="stExpander"] summary p,
 section[data-testid="stSidebar"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"] p,
 section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] p {
-    font-size: 16px !important;
+    font-size: 16.5px !important;
     font-weight: 600 !important;
     color: #E6EDF3 !important;
 }
@@ -5515,33 +5498,6 @@ section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="profile
     }
 }
 
-/* Bottom-of-sidebar AI Help pill: the single standout CTA in the drawer. */
-html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_ai_help_btn"] {
-    background: linear-gradient(135deg, #2EA043 0%, #34D399 100%) !important;
-    border: none !important;
-    border-radius: 999px !important;
-    padding: 13px 18px !important;
-    font-size: 17px !important;
-    font-weight: 800 !important;
-    color: #051B11 !important;
-    justify-content: center !important;
-    text-align: center !important;
-    box-shadow: 0 4px 18px rgba(52, 211, 153, 0.35) !important;
-    transition: none !important;
-}
-html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_ai_help_btn"] p {
-    font-size: 17px !important;
-    font-weight: 800 !important;
-    color: #051B11 !important;
-    text-align: center !important;
-}
-@media (hover: hover) {
-    html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_ai_help_btn"]:hover {
-        background: linear-gradient(135deg, #2EA043 0%, #34D399 100%) !important;
-        box-shadow: 0 6px 22px rgba(52, 211, 153, 0.48) !important;
-    }
-}
-
 /* The profile header keeps its own dark card; every other item above is a
    quiet row. This override wins over the generic row rules. */
 html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_profile_toggle"] {
@@ -5550,6 +5506,7 @@ html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[ke
     border: 1px solid #30363D !important;
     border-radius: 14px !important;
     padding: 12px 14px !important;
+    margin-bottom: 6px !important;
     min-height: 62px !important;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
     justify-content: flex-start !important;
@@ -5557,11 +5514,11 @@ html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[ke
     transition: none !important;
 }
 html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_profile_toggle"] p {
-    font-size: 15px !important;
+    font-size: 16px !important;
     font-weight: 700 !important;
     color: #E6EDF3 !important;
-    line-height: 1.35 !important;
-    white-space: pre-wrap !important;
+    line-height: 1.4 !important;
+    white-space: pre-line !important;
     text-align: left !important;
 }
 
@@ -7599,9 +7556,8 @@ with st.sidebar:
         '<div class="profile-toggle-marker" aria-hidden="true"></div>',
         unsafe_allow_html=True,
     )
-    _profile_caret = "⌃" if st.session_state.get("show_user_profile") else "⌄"
     st.button(
-        f"🟢  {user_name}\n     {CURRENT_USER_EMAIL}   {_profile_caret}",
+        f"🟢  {user_name}\n{CURRENT_USER_EMAIL}",
         key="sidebar_profile_toggle",
         use_container_width=True,
         type="secondary",
@@ -7665,6 +7621,7 @@ with st.sidebar:
     st.button(
         "🏠  Home",
         key="sidebar_home_btn",
+        type="secondary",
         use_container_width=True,
         on_click=go_home,
     )
@@ -7725,7 +7682,7 @@ with st.sidebar:
         )
         st.button(
             "💾 Save Target",
-            type="primary",
+            type="secondary",
             use_container_width=True,
             key="save_macro_target",
             on_click=_save_macro_target_callback,
@@ -7751,7 +7708,7 @@ with st.sidebar:
         # so the main filters show them on the same rerun the tap produces.
         st.button(
             "💾 Save Preferences",
-            type="primary",
+            type="secondary",
             use_container_width=True,
             key="save_preferences",
             on_click=_save_preferences_callback,
@@ -7775,6 +7732,7 @@ with st.sidebar:
     st.button(
         "🤖  AI Diet & Product Help",
         key="sidebar_ai_help_btn",
+        type="primary",
         use_container_width=True,
         on_click=_open_ai_help,
     )
