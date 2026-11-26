@@ -14,6 +14,7 @@ import io
 import html
 import base64
 import json
+import threading
 from datetime import datetime, timezone
 
 import numpy as np
@@ -1693,7 +1694,7 @@ def _resolve_api_base() -> str:
 
 
 API_BASE         = _resolve_api_base()
-GET_TIMEOUT      = 90   # seconds; Render's free tier can need 30-60 s to wake from sleep
+BACKEND_URL      = API_BASE  # alias used by the silent background wake-up ping
 POST_TIMEOUT     = 90   # seconds; includes the optional Claude call
 CITIES_FALLBACK   = ["Delhi", "Mumbai", "Bangalore", "Dehradun", "Pune"]
 
@@ -1713,6 +1714,31 @@ CITY_DISPLAY_ALIASES = {
     "Bengaluru": "Bangalore",
     "Greater Noida": "Delhi",
 }
+
+
+def _ping_backend_health() -> None:
+    """One-shot health request whose only job is to wake a sleeping backend."""
+    try:
+        requests.get(f"{BACKEND_URL}/health", timeout=1)
+    except requests.exceptions.RequestException:
+        # A cold backend normally times out here; the request still reaches it
+        # and starts the wake-up. No UI element depends on this response.
+        pass
+
+
+def _start_backend_wakeup() -> None:
+    """Fire the wake-up ping once per session, without blocking page render."""
+    if st.session_state.get("_backend_wakeup_started"):
+        return
+    st.session_state["_backend_wakeup_started"] = True
+    threading.Thread(
+        target=_ping_backend_health,
+        name="macromatch-backend-wakeup",
+        daemon=True,
+    ).start()
+
+
+_start_backend_wakeup()
 
 DIET_OPTIONS    = ["vegetarian", "vegan", "dairy_free", "gluten_free", "keto", "low_sugar"]
 ALLERGEN_OPTIONS= ["soy", "nuts", "dairy"]
@@ -3842,17 +3868,28 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
 @st.cache_data(ttl=60)
 def fetch_product_list() -> list[str]:
     """
-    Fetch all product names from GET /products.
+    Fetch all product names from GET /products with a 2.5 s probe timeout.
 
-    Raises BackendUnavailable on failure so the failure is never cached: the
-    next rerun retries the API instead of replaying a stale "unreachable" result.
+    Raises BackendUnavailable on failure so the failure is never cached; the
+    caller (`cached_all_foods`) switches to the bundled dataset immediately.
     """
     try:
-        resp = requests.get(f"{API_BASE}/products", timeout=GET_TIMEOUT)
+        resp = requests.get(f"{API_BASE}/products", timeout=2.5)
         resp.raise_for_status()
         return resp.json().get("products", [])
     except requests.exceptions.RequestException as exc:
         # Connection error, timeout, or non-2xx status.
+        raise BackendUnavailable(API_BASE) from exc
+
+
+@st.cache_data(ttl=60)
+def fetch_city_list() -> list[str]:
+    """Fetch destination cities from GET /cities with the same fast timeout."""
+    try:
+        resp = requests.get(f"{API_BASE}/cities", timeout=2.5)
+        resp.raise_for_status()
+        return resp.json().get("cities", [])
+    except requests.exceptions.RequestException as exc:
         raise BackendUnavailable(API_BASE) from exc
 
 
@@ -3885,16 +3922,45 @@ def load_city_list() -> list[str]:
     return sorted(cities, key=lambda name: (preferred.get(name, len(preferred)), name))
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=3600, show_spinner=False)
+def _local_food_list() -> list[str]:
+    """Bundled product names — the instant fallback when /products is slow."""
+    try:
+        df = load_product_csv()
+        names = [str(value).strip() for value in df["name"].dropna()]
+        names = [name for name in names if name]
+        if names:
+            return names
+    except Exception:
+        pass
+    # Last resort if data/products.csv is missing: canonical names from code.
+    return list(PRODUCT_SERVING_G) or list(PRODUCT_CAUTIONS)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
 def cached_all_foods() -> list[str]:
-    """Plain sorted Python list used for O(n) prefix autocomplete."""
-    return sorted(set(fetch_product_list()))
+    """Plain sorted list for O(n) autocomplete; never blocks on a cold API."""
+    try:
+        foods = fetch_product_list()
+    except Exception:
+        # Timeout, connection error, or a malformed response — all fall back.
+        foods = []
+    if not foods:
+        foods = _local_food_list()
+    return sorted(set(foods))
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=3600, show_spinner=False)
 def cached_all_cities() -> list[str]:
-    """Plain sorted Python list used for O(n) city autocomplete."""
-    return sorted(set(load_city_list() or CITIES_FALLBACK))
+    """Plain sorted list for O(n) city autocomplete; local fallback included."""
+    try:
+        cities = fetch_city_list()
+    except Exception:
+        # Same rule as foods: any API failure uses the bundled city list.
+        cities = []
+    if not cities:
+        cities = load_city_list() or CITIES_FALLBACK
+    return sorted(set(cities))
 
 
 def _reset_food_search_input() -> None:
@@ -4712,28 +4778,14 @@ with st.container(border=True):
         '</div>',
         unsafe_allow_html=True,
     )
-    try:
-        with st.spinner(
-            "Connecting to the backend — free hosting can take up to a minute to wake…"
-        ):
-            # Cached plain lists: built once, reused by every fragment rerun.
-            all_foods = cached_all_foods()
-            all_cities = cached_all_cities()
-    except BackendUnavailable:
-        st.error(
-            f"⚠️ Cannot reach the backend at `{API_BASE}`.\n\n"
-            "The free-tier API may be asleep or still starting. Retry in a "
-            "moment; locally, start it with:\n\n"
-            "`uvicorn backend.main:app --reload`"
-        )
-        if st.button("🔄 Retry", use_container_width=True):
-            fetch_product_list.clear()
-            cached_all_foods.clear()
-            st.rerun()
-        st.stop()
+    # Fast 2.5 s API probe with an instant local fallback and no spinner, so a
+    # sleeping free-tier backend never holds up the UI. The wake-up ping was
+    # already fired in a background thread when this page loaded.
+    all_foods = cached_all_foods()
+    all_cities = cached_all_cities()
 
     if not all_foods:
-        st.error("The backend returned an empty product list. Please try again.")
+        st.error("No food data is available. Check `data/products.csv`.")
         st.stop()
 
     # Only this small fragment reruns on typing or pill taps; the sidebar,

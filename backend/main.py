@@ -5,7 +5,9 @@ Exposes a REST API for finding nutritional substitutes.
 
 Endpoints:
     GET  /           → Health check / welcome message
+    GET  /health     → Lightweight health check for wake-up pings
     GET  /products   → List all available product names
+    GET  /cities     → List all available destination cities
     POST /suggest-alternative → Core matching endpoint
 
 Run with:
@@ -95,6 +97,12 @@ def root():
     }
 
 
+@app.get("/health", tags=["Health"], summary="Lightweight wake-up ping target")
+def health():
+    """Minimal response used by the frontend's non-blocking wake-up ping."""
+    return {"status": "ok"}
+
+
 # ─────────────────────────────────────────────
 # GET /products — List all product names
 # ─────────────────────────────────────────────
@@ -112,6 +120,26 @@ def list_products():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not load product data: {str(e)}")
+
+
+# ─────────────────────────────────────────────
+# GET /cities — List all destination cities
+# ─────────────────────────────────────────────
+
+@app.get("/cities", tags=["Data"], summary="List all available destination cities")
+def list_cities():
+    """Return every city named in the dataset's comma-separated `cities` column."""
+    try:
+        df = load_data()
+        cities = {
+            part.strip()
+            for value in df["cities"].dropna()
+            for part in str(value).split(",")
+            if part.strip()
+        }
+        return {"total": len(cities), "cities": sorted(cities)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not load city data: {str(e)}")
 
 
 # ─────────────────────────────────────────────
