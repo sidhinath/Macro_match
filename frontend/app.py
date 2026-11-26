@@ -282,7 +282,9 @@ st.markdown(f"<style>{_TOUCH_FIRST_CSS}</style>", unsafe_allow_html=True)
 _LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "macromatch_logo.png"
 
 
+@st.cache_resource(show_spinner=False)
 def _transparent_logo_data_url(path: Path) -> str:
+    """Cached base64 PNG data URI for the logo (used by PWA + app chrome)."""
     if not path.exists():
         return ""
     try:
@@ -309,6 +311,196 @@ def _transparent_logo_data_url(path: Path) -> str:
 
 
 LOGO_SRC = _transparent_logo_data_url(_LOGO_PATH)
+
+
+# ─────────────────────────────────────────────
+# PWA / Android APK packaging bootstrap
+# ─────────────────────────────────────────────
+# components.html renders in an iframe, so the tags are written into the parent
+# Streamlit document from JavaScript. This keeps the manifest installable while
+# still being injected from a single zero-height component.
+_PWA_HEAD_INJECTION_JS = ""
+_PWA_INSTALL_BUTTON_JS = ""
+
+if LOGO_SRC:
+    _PWA_MANIFEST = {
+        "name": "MacroMatch — Your macros, anywhere.",
+        "short_name": "MacroMatch",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#0D1117",
+        "theme_color": "#0D1117",
+        "icons": [
+            {
+                "src": LOGO_SRC,
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any maskable",
+            },
+            {
+                "src": LOGO_SRC,
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any maskable",
+            },
+        ],
+    }
+    _PWA_MANIFEST_HREF = "data:application/manifest+json;base64," + base64.b64encode(
+        json.dumps(_PWA_MANIFEST, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii")
+
+    _PWA_HEAD_INJECTION_JS = """
+    <script>
+    (function () {
+        var MANIFEST_HREF = __MM_MANIFEST_HREF__;
+        var ICON_HREF = __MM_ICON_HREF__;
+        var INSTALL_KEY = '__mmDeferredInstallPrompt';
+
+        function parentWindow() {
+            try {
+                return (window.parent && window.parent.document) ? window.parent : window;
+            } catch (e) {
+                return window;
+            }
+        }
+
+        function setMeta(name, content) {
+            var doc = parentWindow().document;
+            if (!doc || !doc.head) { return; }
+            var meta = doc.querySelector('meta[name="' + name + '"]');
+            if (!meta) {
+                meta = doc.createElement('meta');
+                meta.setAttribute('name', name);
+                doc.head.appendChild(meta);
+            }
+            if (meta.getAttribute('content') !== content) {
+                meta.setAttribute('content', content);
+            }
+        }
+
+        function setLink(rel, href) {
+            var doc = parentWindow().document;
+            if (!doc || !doc.head) { return; }
+            var link = doc.querySelector('link[rel="' + rel + '"]');
+            if (!link) {
+                link = doc.createElement('link');
+                link.setAttribute('rel', rel);
+                doc.head.appendChild(link);
+            }
+            if (link.getAttribute('href') !== href) {
+                link.setAttribute('href', href);
+            }
+            link.setAttribute('data-mm-pwa', '1');
+        }
+
+        setLink('manifest', MANIFEST_HREF);
+        setLink('apple-touch-icon', ICON_HREF);
+        setMeta('theme-color', '#0D1117');
+        setMeta('apple-mobile-web-app-capable', 'yes');
+
+        // Capture the Android install prompt once and stash it on the parent
+        // window; the sidebar button component reads it on the next rerun.
+        var parent = parentWindow();
+        if (!parent.__mmPwaInstallListener) {
+            parent.addEventListener('beforeinstallprompt', function (event) {
+                event.preventDefault();
+                parent[INSTALL_KEY] = event;
+                if (window !== parent) { window[INSTALL_KEY] = event; }
+            });
+            parent.__mmPwaInstallListener = true;
+        }
+        if (!parent.__mmPwaInstalledListener) {
+            parent.addEventListener('appinstalled', function () {
+                parent[INSTALL_KEY] = null;
+                if (window !== parent) { window[INSTALL_KEY] = null; }
+            });
+            parent.__mmPwaInstalledListener = true;
+        }
+    })();
+    </script>
+    """.replace(
+        "__MM_MANIFEST_HREF__", json.dumps(_PWA_MANIFEST_HREF)
+    ).replace("__MM_ICON_HREF__", json.dumps(LOGO_SRC))
+
+    _PWA_INSTALL_BUTTON_JS = """
+    <script>
+    (function () {
+        var KEY = '__mmDeferredInstallPrompt';
+        var SLOT_ID = 'mm-pwa-install-slot';
+        var BUTTON_ID = 'mm-native-install-button';
+
+        function parentWindow() {
+            try {
+                return (window.parent && window.parent.document) ? window.parent : window;
+            } catch (e) {
+                return window;
+            }
+        }
+
+        function ensureButton() {
+            var parent = parentWindow();
+            var doc = parent.document;
+            if (!doc) { return false; }
+            var slot = doc.getElementById(SLOT_ID);
+            if (!slot) { return false; }
+
+            var button = doc.getElementById(BUTTON_ID);
+            if (!button) {
+                button = doc.createElement('button');
+                button.id = BUTTON_ID;
+                button.type = 'button';
+                button.textContent = '📲 Install app';
+                button.style.cssText = [
+                    'width:100%',
+                    'min-height:42px',
+                    'margin-top:10px',
+                    'padding:8px 12px',
+                    'border-radius:10px',
+                    'border:1px solid #2EA043',
+                    'background:rgba(46,160,67,0.16)',
+                    'color:#A7F3D0',
+                    'font-weight:700',
+                    'cursor:pointer',
+                    'display:none'
+                ].join(';');
+                button.addEventListener('click', function () {
+                    var promptEvent = parent[KEY];
+                    if (!promptEvent || typeof promptEvent.prompt !== 'function') {
+                        button.textContent = 'Use your browser menu to install';
+                        return;
+                    }
+                    promptEvent.prompt();
+                    if (promptEvent.userChoice && typeof promptEvent.userChoice.then === 'function') {
+                        promptEvent.userChoice.then(function (choice) {
+                            parent[KEY] = null;
+                            button.style.display = 'none';
+                            if (choice && choice.outcome === 'accepted') {
+                                button.textContent = 'Installing…';
+                            }
+                        }).catch(function () {
+                            button.style.display = 'none';
+                        });
+                    }
+                });
+                slot.appendChild(button);
+            }
+
+            var canPrompt = !!(parent[KEY] && typeof parent[KEY].prompt === 'function');
+            button.style.display = canPrompt ? 'inline-flex' : 'none';
+            return true;
+        }
+
+        ensureButton();
+        var parent = parentWindow();
+        var tries = 0;
+        var timer = parent.setInterval(function () {
+            if (ensureButton() || ++tries > 100) { parent.clearInterval(timer); }
+        }, 100);
+    })();
+    </script>
+    """
+
+    components.html(_PWA_HEAD_INJECTION_JS, height=0, scrolling=False)
 
 
 # ─────────────────────────────────────────────
@@ -6255,6 +6447,20 @@ with st.sidebar:
                 "Preferences saved!",
             )
 
+    # ─── Mobile install helper (above the saved-matches summary) ──────
+    with st.expander("📲 Install Mobile App", expanded=False):
+        st.markdown(
+            "**Android (Chrome):** Tap **⋮ (Menu)** → "
+            "**Add to Home screen / Install app**  \n"
+            "**iPhone (Safari):** Tap **Share (⬆️)** → **Add to Home Screen**"
+        )
+        st.markdown(
+            '<div id="mm-pwa-install-slot"></div>',
+            unsafe_allow_html=True,
+        )
+        if _PWA_INSTALL_BUTTON_JS:
+            components.html(_PWA_INSTALL_BUTTON_JS, height=0, scrolling=False)
+
     # ─── Bottom activity footer ────────────────────────────────────────
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
     _saved_count = len(get_saved_matches(CURRENT_USER_ID) or [])
@@ -6333,9 +6539,11 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
     ]
     food_pick = st_searchbox(
         search_foods,
-        placeholder="🔍 Type food name (e.g., Cashews, Oats)...",
+        # The active choice lives in the placeholder, not in `default`, so the
+        # input stays empty at rest and typing/backspacing is never snapped back.
+        placeholder=f"🔍 {selected_product} (or type to search...)",
         default=None,
-        default_searchterm=st.session_state["food_search_input"],
+        default_searchterm="",
         default_options=food_defaults,
         edit_after_submit="option",
         clear_on_submit=False,
@@ -6431,9 +6639,11 @@ def render_search_controls(all_foods: list[str], all_cities: list[str]) -> None:
 
     city_pick = st_searchbox(
         search_cities,
-        placeholder="🔍 Type city name (e.g., Delhi, Mumbai)...",
+        # Same placeholder-driven pattern as the food box: show the current
+        # city at rest, but leave the field itself free for instant typing.
+        placeholder=f"🔍 {selected_city} (or type to search...)",
         default=None,
-        default_searchterm=st.session_state["city_search_input"],
+        default_searchterm="",
         default_options=city_defaults,
         edit_after_submit="option",
         clear_on_submit=False,

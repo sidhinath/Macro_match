@@ -45,23 +45,28 @@ nutrition data, constrained by availability, diet rules, and allergens.**
 - **LLM explanations with a safety net** — Claude describes *why* each match
   fits; authentication, rate-limit, network, and parsing failures fall back to
   deterministic, data-driven text.
-- **Interactive AI Diet & Product Help** — a top-bar **Help** button opens a
-  dedicated full-page assistant (no search form or other dashboard clutter) that
-  understands how-to, benefits, comparison, travel and macro-lookup intent in
-  English or Hinglish. It uses the 30-product catalogue plus current filters, and
-  its no-key fallback gives practical serving/best-time/tips guidance instead of
-  raw macro dumps.
-- **Persistent wishlist** — favorite foods are saved in Supabase Auth
-  `user_metadata` and rendered as the same rich product cards as the guide, with
-  one-tap **Select**, **View Details**, and **❤️** remove actions.
+- **Dedicated AI Diet & Product Help Page (`Help`)** — a full-screen interactive
+  nutrition assistant supporting both English and Hinglish queries (how to eat,
+  benefits, serving sizes, macro comparisons, and travel tips), backed by a smart
+  intent-aware fallback when no LLM API key is set.
+- **Full-Page Product Details Inspector (`View Details`)** — clicking "View
+  Details" on any product in the sidebar guide or wishlist opens a clean,
+  distraction-free nutrition & usage breakdown (serving size, best time to eat,
+  preparation tips, and allergen notes) with a top-left "Back to home" navigation
+  button.
+- **Persistent Wishlist (`❤️ My Wishlist`)** — users can bookmark favorite foods
+  with one tap; saved items render as rich visual cards in the sidebar with quick
+  `Select`, `View Details`, and remove actions, synced across devices via Supabase
+  Auth `user_metadata`.
+- **Fast Caching & Incremental Pagination** — global `@st.cache_resource` image
+  caching, session-cached Supabase queries, mobile touch-response optimizations,
+  and 3-at-a-time `"View More"` pagination in the 30-product sidebar guide for
+  instant load times.
 - **Rich Streamlit UI** — ranked cards with product thumbnails, macro comparison
-  tables, bar charts, and a dark, card-based layout. Touch targets remove the
-  mobile 300 ms tap delay and sticky hover lag, while cached images, CSV data and
-  saved-match state keep desktop clicks just as snappy.
+  tables, bar charts, and a dark, card-based layout.
 - **Product guide with photos** — the selected product and every catalogue item
   show a photo, category, macros per 100 g, diet/allergen badges and city
-  availability; **View Details** opens a dedicated full-page Product Overview
-  with serving-size macro math, tips, smart swaps, storage and caution notes.
+  availability in the same rich card style.
 - **Email/Password & Google OAuth Sign-In** — powered by Supabase Auth, with
   persistent user accounts (cloud-hosted; passwords are handled by Supabase and
   never stored locally) and **Saved Match History** protected by Row-Level
@@ -73,6 +78,10 @@ nutrition data, constrained by availability, diet rules, and allergens.**
   2. Destination, 3. Preferences), instant autocomplete searchboxes, quick-tap
   pills, an interactive 30-product visual sidebar guide, and mobile swipe
   gestures.
+- **Installable Mobile App (PWA)** — includes a Web App Manifest, custom app
+  icon, and a sidebar `"📲 Install Mobile App"` guide so users can install
+  MacroMatch directly onto their Android or iPhone home screen in standalone
+  full-screen mode.
 - **Auto-generated API docs** at `/docs` (Swagger UI) and `/redoc`.
 - **Test suite** covering city filtering, invalid products, vegan and allergen
   invariants, and weight sensitivity.
@@ -146,7 +155,7 @@ Macro_match/
 ├── tests/
 │   ├── test_matcher.py  # pytest suite (5 tests, no network)
 │   └── smoke_test.py    # manual live API check (run as a script)
-├── requirements.txt
+├── requirements.txt       # FastAPI, Streamlit, streamlit-searchbox, supabase
 ├── .env.example
 └── render.yaml          # optional Render blueprint for the API
 ```
@@ -163,6 +172,11 @@ Backend API (Render):
 
 Users can open the Streamlit URL in any browser and use the application
 directly without installing anything.
+
+**Mobile App Installation:** Open the Streamlit URL on Chrome (Android) or
+Safari (iOS) and tap **Add to Home Screen / Install App** (or follow the in-app
+**📲 Install Mobile App** guide in the sidebar) to use MacroMatch as a
+standalone mobile app.
 
 **Note:**
 
