@@ -2534,6 +2534,13 @@ def navigate_back() -> None:
     _apply_view_state(stack[-1])
 
 
+def go_home() -> None:
+    """Jump straight to the Home search screen from any dedicated view."""
+    st.session_state["nav_stack"] = [{"view": "home"}]
+    st.session_state.close_mobile_sidebar = True
+    _apply_view_state({"view": "home"})
+
+
 # Auth has already been enforced above, so it is safe to hydrate the signed-in
 # user's saved targets/preferences before any dashboard widgets are created.
 if st.session_state.get("supabase_user") is not None:
@@ -3575,6 +3582,16 @@ header[data-testid="stHeader"] button[kind="header"] {
     visibility: visible !important;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
     transition: none !important;
+}
+
+/* Give the collapsed-sidebar expand control (>>) a little breathing room below
+   the browser chrome on both mobile and desktop. */
+[data-testid="stExpandSidebarButton"],
+[data-testid="stSidebarCollapsedControl"] button,
+[data-testid="collapsedControl"] button,
+header[data-testid="stHeader"] button[kind="header"] {
+    margin-top: 10px !important;
+    margin-left: 6px !important;
 }
 
 [data-testid="stSidebarCollapseButton"] button svg,
@@ -5571,6 +5588,33 @@ section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar
         box-shadow: 0 0 26px rgba(16, 185, 129, 0.5) !important;
     }
 }
+
+/* Home launcher: same quiet dark-glass nav row as Wishlist / Catalogue, with
+   a slightly crisper emerald border so it reads as the primary way back. */
+section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_home_btn"] {
+    background-color: #161B22 !important;
+    border: 1px solid rgba(63, 185, 80, 0.5) !important;
+    border-radius: 12px !important;
+    padding: 12px 14px !important;
+    min-height: 48px !important;
+    font-size: 16.5px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+    text-align: left !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+    transition: none !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_home_btn"] p {
+    font-size: 16.5px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+}
+@media (hover: hover) {
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_home_btn"]:hover {
+        background-color: #1C2128 !important;
+        border-color: rgba(63, 185, 80, 0.75) !important;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -5916,34 +5960,22 @@ def _ai_system_prompt(context: dict, details: dict[str, dict]) -> str:
         f"Daily protein goal: {context['protein_goal']:g} g\n"
         f"Daily calorie goal: {context['calorie_goal']:g} kcal"
     )
-    return f"""You are the MacroMatch Nutrition & Product Assistant inside the
-MacroMatch food-swap app. Answer the user's question concisely and accurately,
-using ONLY the product facts and user context below. Macro values are per 100 g;
-simple arithmetic (for example, goal percentages) is allowed. Serving advice
-comes from the practical guide, not from guessing.
+    return f"""You are MacroMatch's friendly, encouraging personal nutrition buddy. Speak warmly in natural, conversational English (or natural Hinglish if the user writes in Hinglish/Hindi). Start with a friendly 1-line greeting or direct answer, explain nutrition clearly without robotic jargon, and end with a helpful follow-up tip or question.
 
-Rules:
-- Detect the user's intent first: how-to/serving, benefits, comparison, travel,
-  or general macro lookup. Answer that intent directly; never dump every macro.
-- Match the user's language. If they write Hinglish/Hindi (for example,
-  "kaise khaye", "fayde", "kitna"), reply in simple, friendly Hinglish with
-  clear bullets. Otherwise reply in natural English.
-- For how-to questions, use the food's Serving Size, Best Time and Tips &
-  Ways to Eat from the practical guide. Give simple numbered/bulleted steps and
-  end with one short macro line.
-- For benefits questions, highlight nutritional strengths and how much of the
-  user's daily protein goal one serving covers.
-- For comparisons, put the two named foods side by side on protein, carbs, fat,
-  fibre and calories, then give a one-line practical takeaway.
-- For travel questions, respect destination availability and suggest portable,
-  measured ways to eat the food.
-- Be brief: usually 2-5 short bullets or one short paragraph.
-- Only recommend foods from the catalogue below, and respect the active diet
-  rules and allergens whenever making suggestions.
-- Never invent foods, brands, prices, macros, availability, or health claims.
-- If the answer is not covered by the data, say so plainly and point to the
-  closest catalogue facts you do have.
-- Do not give medical advice. A short caution is fine only when clearly relevant.
+Use ONLY the product facts and user context below as evidence. Macro values are per 100 g; simple arithmetic (for example, goal percentages) is allowed. Serving advice comes from the practical guide, not from guessing.
+
+How to be helpful:
+- Answer the user's real intent first: how-to/serving, benefits, comparison, travel, diet picks, or a quick macro lookup. Never dump every macro uninvited.
+- Mirror the user's language and energy. Words like "kaise khaye", "fayde", "kitna", "batao", "mere liye" deserve simple, friendly Hinglish with easy bullets; otherwise use natural English.
+- For how-to questions, use the food's Serving Size, Best Time and Tips & Ways to Eat from the practical guide, then add one short macro line after the practical steps.
+- For benefits questions, highlight nutritional strengths and how much of the user's daily protein goal one serving covers.
+- For comparisons, put the two named foods side by side on protein, carbs, fat, fibre and calories, then give one practical, friendly takeaway.
+- For travel questions, respect destination availability and suggest portable, measured ways to eat the food.
+- For diet and high-protein asks, only recommend foods from the catalogue that fit the active diet rules and allergens.
+- Keep it short and human: usually 2-5 warm bullets plus a greeting and one follow-up tip or question. No canned headings or dry data lists.
+- Never invent foods, brands, prices, macros, availability, or health claims. If the data does not cover something, say so kindly and point to the closest catalogue facts you do have.
+- Do not give medical advice. A short, caring caution is fine only when clearly relevant.
+- If the question is unrelated to food or nutrition, politely redirect with a smile instead of listing random stats.
 
 USER CONTEXT
 {context_text}
@@ -6023,8 +6055,13 @@ _AI_TRAVEL_PHRASES = (
     "travel", "trip", "journey", "safar", "snack", "portable", "pack",
 )
 _AI_HINGLISH_PHRASES = (
-    "kaise", "khaye", "khaaye", "khana", "kitna", "kitni", "fayde",
-    "faayde", "fayda", "kya", "kab", "ya", "accha", "achha", "ke liye",
+    "kaise", "kya", "kyu", "kyun", "batao", "khaye", "khaaye", "khana",
+    "achha", "accha", "fayda", "fayde", "faayde", "kitna", "kitni",
+    "mere", "liye", "ke liye", "kab", "ya", "namaste",
+)
+_AI_GREETING_PHRASES = (
+    "hi", "hey", "hello", "how are you", "kaise ho", "kaise ho?",
+    "namaste", "good morning", "good evening",
 )
 
 
@@ -6166,6 +6203,72 @@ def _ai_strengths(detail: dict) -> list[str]:
     return strengths[:4]
 
 
+# ── Warm, human phrasing for the built-in fallback ──────────────────────
+_AI_GREETING_ANSWER = (
+    "Hey there! 👋 I'm doing great and ready to help you stay on top of your "
+    "nutrition! Whether you're travelling to a new city, looking for "
+    "high-protein swaps, or wondering how to include a food in your diet—"
+    "just ask away. What's on your mind today?"
+)
+_AI_UNCLEAR_ANSWER = (
+    "I'd love to help with that! 😊 I specialize in food nutrition, macro "
+    "comparisons, healthy eating tips, and travel food swaps across our 30 "
+    "foods. Try asking me things like 'How should I eat Paneer?', 'Best "
+    "high-protein vegan foods', or 'Compare Oats vs Quinoa'!"
+)
+_AI_PICKS_OPENER = (
+    "I've got you covered! 💪 Based on your preferences, here are some top "
+    "picks you'll love:"
+)
+_AI_PICKS_OPENER_HINGLISH = (
+    "Maine aapko cover kar liya! 💪 Aapki preferences ke hisaab se yahaan kuch "
+    "top picks hain jo aapko pasand aayenge:"
+)
+_AI_PICKS_CLOSER = "Want me to show you how to eat any of these, or compare two of them?"
+_AI_PICKS_CLOSER_HINGLISH = "Batao, inmein se kisi ko kaise khaye ya do ka comparison chahiye?"
+
+
+def _ai_greeting_answer(hinglish: bool) -> str:
+    """A real hello — never a nutrition data dump in reply to small talk."""
+    answer = _AI_GREETING_ANSWER
+    if hinglish:
+        answer += "\n\nBatao, aaj hum kya explore karein? 😊"
+    return answer
+
+
+def _ai_unclear_answer(hinglish: bool) -> str:
+    """Kindly redirect when the question has no food or nutrition intent."""
+    answer = _AI_UNCLEAR_ANSWER
+    if hinglish:
+        answer += "\n\nHinglish mein bhi poochh sakte ho — main yahin hoon! 😊"
+    return answer
+
+
+def _ai_has_clear_intent(
+    question: str, details: dict[str, dict], context: dict
+) -> bool:
+    """True when there is a food or nutrition thread worth answering."""
+    if _ai_food_mentions(question, details):
+        return True
+    if _ai_has_phrase(
+        question,
+        _AI_HOW_PHRASES + _AI_BENEFIT_PHRASES + _AI_COMPARE_PHRASES
+        + _AI_TRAVEL_PHRASES,
+    ):
+        return True
+    if _ai_has_phrase(
+        question,
+        (
+            "macro", "macros", "nutrition", "protein", "calorie", "calories",
+            "carb", "carbs", "fiber", "fibre", "fat", "food", "foods", "diet",
+            "meal", "vegan", "vegetarian", "eat", "eating", "swap", "swaps",
+        ),
+    ):
+        return True
+    city = context.get("selected_city") or ""
+    return bool(city and city.lower() in question)
+
+
 def _ai_how_to_answer(
     name: str, detail: dict, context: dict, hinglish: bool
 ) -> str:
@@ -6177,24 +6280,39 @@ def _ai_how_to_answer(
     if not tips:
         tips = ["Use a measured portion and pair it with your usual meal."]
 
-    heading = (
-        f"**{name} kaise khaye — easy guide:**"
+    opener = (
+        f"Bahut badhiya choice! **{name}** ko khane ka sabse aasan aur tasty "
+        "tareeka yahaan hai:"
         if hinglish
-        else f"**How to eat {name} — simple guide:**"
+        else f"Great choice! Here's the easiest and tastiest way to enjoy "
+        f"**{name}**:"
     )
     lines = [
-        heading,
-        f"1. **Serving size ({'kitna lein' if hinglish else 'how much'})**: {serving}",
-        f"2. **Best time ({'kab khaye' if hinglish else 'when'})**: {best_time}",
-        f"3. **{'Kaise use karein' if hinglish else 'Ways to eat'}**:",
+        opener,
+        "",
+        f"- **{'Kitna lein' if hinglish else 'Serving size'}:** {serving} — "
+        f"{'isse shuru karein, bas itna hi kaafi hai' if hinglish else 'a comfortable place to start'}.",
+        f"- **{'Kab khaye' if hinglish else 'Best time'}:** {best_time} — "
+        f"{'aapke din mein easily fit ho jayega' if hinglish else 'it fits neatly into your day'}.",
+        f"- **{'Kaise use karein' if hinglish else 'Easy ways to enjoy it'}:**",
     ]
-    lines.extend(f"   - {tip}" for tip in tips[:3])
+    lines.extend(f"  - {tip}" for tip in tips[:3])
     caution = PRODUCT_CAUTIONS.get(name)
     if caution:
-        lines.append(f"4. **Caution / {'savdhan' if hinglish else 'who should avoid'}**: {caution}")
+        lines.append(
+            f"- **{'Chhoti si savdhan' if hinglish else 'Quick heads-up'}:** {caution}"
+        )
     lines.append(
-        f"\nQuick macro line: {_ai_macro_summary(detail)}; "
-        f"{_ai_serving_summary(name, detail)}."
+        f"\n{'Numbers bhi dekh lein' if hinglish else 'And for the numbers'}: "
+        f"{_ai_macro_summary(detail)}; {_ai_serving_summary(name, detail)}."
+    )
+    lines.append(
+        "\n"
+        + (
+            "Isse kisi doosre food se compare karun ya iske macros check karun?"
+            if hinglish
+            else "Want me to compare it with another food or check its macros?"
+        )
     )
     return "\n".join(lines)
 
@@ -6204,43 +6322,63 @@ def _ai_benefits_answer(
 ) -> str:
     """Benefits-first answer that still ties back to the user's protein goal."""
     q = _ai_text(question)
-    heading = (
-        f"**{name} ke fayde — kyun accha hai:**"
+    opener = (
+        f"Bahut badhiya sawaal — **{name}** mein kuch waqaee achhi baatein hain:"
         if hinglish
-        else f"**Why {name} is a good pick:**"
+        else f"Love that you're curious about **{name}** — it has some "
+        "genuinely nice things going for it:"
     )
-    lines = [heading]
+    lines = [opener, ""]
     strengths = _ai_strengths(detail)
-    lines.extend(f"- {strength}" for strength in strengths or [
-        "It is a useful catalogue food that can fit a balanced day."
-    ])
+    lines.extend(
+        f"- {strength}"
+        for strength in strengths or [
+            "It's a handy food that can slot into a balanced day."
+        ]
+    )
 
     protein, percent, goal = _ai_protein_coverage(name, detail, context)
     lines.append(
-        f"- Protein goal: one {_ai_serving_grams(name)} g serving gives "
-        f"{protein:g} g protein — about {percent}% of your {goal:g} g daily goal."
+        f"- {'Aur sabse achhi baat' if hinglish else 'And here’s the best part'}: "
+        f"one {_ai_serving_grams(name)} g serving gives about "
+        f"**{protein:g} g protein** — roughly **{percent}%** of your "
+        f"{goal:g} g daily goal."
     )
     about = PRODUCT_ABOUT.get(name)
     if about:
         first_sentence = about.split(".")[0].strip()
-        lines.append(f"- In short: {first_sentence}.")
+        lines.append(f"- {'Mukhtasar mein' if hinglish else 'In short'}: {first_sentence}.")
     pairing = PRODUCT_PAIRINGS.get(name)
     if pairing:
-        lines.append(f"- Easy way to use it: {pairing}")
+        lines.append(
+            f"- {'Tasty idea' if hinglish else 'Easy, tasty idea'}: {pairing}"
+        )
 
     if _ai_has_phrase(q, ("weight loss", "fat loss", "weight")):
         lines.append(
-            "- For weight loss: keep the serving measured; protein and fibre "
-            "help you feel satisfied without overshooting calories."
+            "- For weight goals, just keep the serving measured — protein and "
+            "fibre keep you happily full without pushing calories too high."
         )
     if _ai_has_phrase(q, ("muscle", "workout", "gym")):
         lines.append(
-            "- For muscle goals: use it as a protein top-up alongside your "
-            "main meals and training routine."
+            "- Working on muscle? Use it as a friendly protein top-up alongside "
+            "your main meals and training."
         )
     caution = PRODUCT_CAUTIONS.get(name)
     if caution:
-        lines.append(f"- Caution: {caution}")
+        lines.append(
+            f"- {'Chhoti si savdhan' if hinglish else 'Quick heads-up'}: {caution}"
+        )
+    lines.append(
+        "\n"
+        + (
+            f"Chahein to **{name}** ko doosre food se compare karoon ya khane ka "
+            "tareeka bataoon?"
+            if hinglish
+            else f"Want me to compare **{name}** with another food, or show you "
+            "the easiest way to enjoy it?"
+        )
+    )
     return "\n".join(lines)
 
 
@@ -6259,19 +6397,33 @@ def _ai_compare_answer(
     elif selected:
         swaps = _smart_swaps(selected, details[selected], details, limit=1)
         if not swaps:
-            return "Tell me two catalogue foods to compare and I'll line up their macros."
+            return (
+                "Badiya! 😊 Do foods ka naam batao, main unke macros side by side "
+                "dikha dunga."
+                if hinglish
+                else "Happy to compare! 😊 Just tell me two foods from our catalogue "
+                "and I'll line up their macros side by side."
+            )
         first_name, second_name = selected, swaps[0]
     else:
-        return "Tell me two catalogue foods to compare and I'll line up their macros."
+        return (
+            "Badiya! 😊 Do foods ka naam batao, main unke macros side by side "
+            "dikha dunga."
+            if hinglish
+            else "Happy to compare! 😊 Just tell me two foods from our catalogue "
+            "and I'll line up their macros side by side."
+        )
 
     left, right = details[first_name], details[second_name]
-    heading = (
-        f"**{first_name} vs {second_name} — comparison:**"
+    opener = (
+        f"Badiya sawaal! **{first_name}** aur **{second_name}** ko side by side "
+        "dekhte hain:"
         if hinglish
-        else f"**{first_name} vs {second_name} (per 100 g):**"
+        else f"Fun one! Let's put **{first_name}** and **{second_name}** side by "
+        "side so you can see what each brings to the table:"
     )
     lines = [
-        heading,
+        opener,
         "",
         f"| Nutrient | {first_name} | {second_name} |",
         "|---|---:|---:|",
@@ -6294,8 +6446,16 @@ def _ai_compare_answer(
     elif float(left["calories"]) < float(right["calories"]):
         lines.append(f"- **{first_name}** is lower in calories per 100 g.")
     lines.append(
-        f"- Quick macro line: {first_name} — {_ai_macro_summary(left)}; "
-        f"{second_name} — {_ai_macro_summary(right)}."
+        f"- {'Numbers mein' if hinglish else 'For the numbers'}: {first_name} — "
+        f"{_ai_macro_summary(left)}; {second_name} — {_ai_macro_summary(right)}."
+    )
+    lines.append(
+        "\n"
+        + (
+            "Batao, inmein se kisi ek ko khane ka tarika chahiye? 😊"
+            if hinglish
+            else "Want me to show you the tastiest way to eat either one? 😊"
+        )
     )
     return "\n".join(lines)
 
@@ -6315,19 +6475,32 @@ def _ai_travel_answer(
             or ["Keep a measured portion in a small airtight container."]
         )[0]
         available = (
-            "Yes"
+            f"Haan, {city} mein available! ✅"
+            if hinglish and city and city in detail.get("cities", [])
+            else f"{city} mein listed nahi — doosre options dekhte hain."
+            if hinglish
+            else f"Yes, available in {city}! ✅"
             if city and city in detail.get("cities", [])
-            else f"Not listed for {city or 'your city'}"
+            else f"Not listed for {city or 'your city'} — but there are other options."
+        )
+        opener = (
+            f"Safar ka mood on! 🎒 **{name}** ko travel mein kaise saath rakhein:"
+            if hinglish
+            else f"Adventure mode on! 🎒 Here's how to keep **{name}** handy "
+            "wherever you're headed:"
         )
         lines = [
-            f"**{name} for travel — quick guide:**"
-            if not hinglish
-            else f"**{name} travel ke liye — quick guide:**",
-            f"- Serving: {how_to.get('serving') or f'{_ai_serving_grams(name)} g'}",
-            f"- Best time: {how_to.get('best_time') or 'Any time of day'}",
-            f"- Pack it: {tip}",
-            f"- Available in {city or 'your city'}: {available}",
-            f"- {_ai_serving_summary(name, detail)}",
+            opener,
+            "",
+            f"- **{'Kitna lein' if hinglish else 'Serving'}:** "
+            f"{how_to.get('serving') or f'{_ai_serving_grams(name)} g'}",
+            f"- **{'Kab khaye' if hinglish else 'Best time'}:** "
+            f"{how_to.get('best_time') or 'Any time of day'}",
+            f"- **{'Pack karein' if hinglish else 'Pack it'}:** {tip}",
+            f"- **{'Availability' if hinglish else 'Good to know'}:** {available}",
+            f"- **{'Numbers' if hinglish else 'Quick macro line'}:** "
+            f"{_ai_serving_summary(name, detail)}",
+            f"\n{('Doosre travel-friendly foods bhi batayein?' if hinglish else 'Want a couple more travel-friendly picks for your trip?')}",
         ]
         return "\n".join(lines)
 
@@ -6349,17 +6522,21 @@ def _ai_travel_answer(
     )
     if not pool:
         return (
-            "No catalogue food matches every filter you have set. "
-            "Remove one diet or allergen rule and I can suggest options."
+            "I really want to help here! 😊 No catalogue food matches every "
+            "filter you've set — loosen one diet or allergen rule and I'll "
+            "find some lovely travel-friendly options for you."
         )
-    heading = (
-        f"**Travel-friendly picks available in {city}:**"
-        if in_city and city and not hinglish
-        else "**Travel-friendly picks from the catalogue:**"
-        if not hinglish
-        else f"**Travel ke liye best picks — {city or 'catalogue'}:**"
+    opener = (
+        f"Travel ke liye kuch solid picks mil gaye hain — "
+        f"{f'{city} mein bhi available' if city else 'aapke liye ready'}: 😊"
+        if hinglish
+        else (
+            f"I've got you covered! 💪 Here are some travel-friendly picks "
+            f"{f'available in {city}' if city else 'from our catalogue'} "
+            "you'll love:"
+        )
     )
-    lines = [heading]
+    lines = [opener, ""]
     for name, detail in pool[:3]:
         how_to = PRODUCT_HOW_TO_USE.get(name, {})
         tip = (
@@ -6367,11 +6544,20 @@ def _ai_travel_answer(
             or ["Carry a measured portion in a small container."]
         )[0]
         lines.append(
-            f"- **{name}**: "
+            f"- **{name}:** "
             f"{how_to.get('serving') or f'{_ai_serving_grams(name)} g'} serving; "
             f"{tip} {_ai_serving_summary(name, detail)}"
         )
-    lines.append("- Tip: portion nut butters and nuts before leaving home.")
+    lines.append(
+        "\n"
+        + (
+            "Ek chhota tip: nut butters aur nuts ko ghar se pehle hi portion "
+            "kar lein. Aur batao, inmein se kisi ka tarika chahiye? 😊"
+            if hinglish
+            else "Little tip: pre-portion nut butters and nuts before you leave. "
+            "Want the easiest way to eat any of these? 😊"
+        )
+    )
     return "\n".join(lines)
 
 
@@ -6386,38 +6572,55 @@ def _ai_general_answer(
         tips = list(how_to.get("tips") or [])[:2]
         if not tips:
             tips = ["Use a measured portion.", "Pair it with a balanced meal."]
-        heading = (
-            f"**{name} — quick details:**"
+        opener = (
+            f"Khusi se! **{name}** ka quick overview yahaan hai:"
             if hinglish
-            else f"**{name} at a glance:**"
+            else f"Happy to help! Here's a friendly little look at **{name}**:"
         )
         lines = [
-            heading,
-            f"- Per 100 g: {_ai_macro_summary(detail)}",
-            f"- Per serving: {_ai_serving_summary(name, detail)}",
-            f"- Serving size: {how_to.get('serving') or f'{_ai_serving_grams(name)} g'}",
-            f"- Best time: {how_to.get('best_time') or 'Any time of day'}",
-            "- 2 quick tips:",
+            opener,
+            "",
+            f"- **{'100 g mein' if hinglish else 'Per 100 g'}:** "
+            f"{_ai_macro_summary(detail)}",
+            f"- **{'Ek serving mein' if hinglish else 'Per serving'}:** "
+            f"{_ai_serving_summary(name, detail)}",
+            f"- **{'Serving size' if hinglish else 'Serving size'}:** "
+            f"{how_to.get('serving') or f'{_ai_serving_grams(name)} g'}",
+            f"- **{'Kab khaye' if hinglish else 'Best time'}:** "
+            f"{how_to.get('best_time') or 'Any time of day'}",
+            f"- **{'Do easy tips' if hinglish else 'Two easy tips'}:**",
         ]
         lines.extend(f"  - {tip}" for tip in tips)
+        lines.append(
+            "\n"
+            + (
+                f"Chahein to main **{name}** ko khane ka tarika ya iske fayde "
+                "bhi bataoon? 😊"
+                if hinglish
+                else f"Want me to show you how to enjoy **{name}** or walk you "
+                "through its benefits? 😊"
+            )
+        )
         return "\n".join(lines)
 
     pool = [(n, d) for n, d in details.items() if _ai_allowed(d, context)]
     pool.sort(key=lambda item: float(item[1]["protein"]), reverse=True)
     if not pool:
         return (
-            "No catalogue food matches every filter you have set. "
-            "Try removing one diet or allergen rule."
+            "I'd love to suggest something! 😊 Nothing matches every filter "
+            "right now — try removing one diet or allergen rule."
         )
-    lines = [
-        "**Strongest protein options that fit your rules:**"
-        if not hinglish
-        else "**Aapke rules ke hisaab se best protein options:**"
-    ]
+    opener = (
+        _AI_PICKS_OPENER_HINGLISH
+        if hinglish
+        else "I've got you covered! 💪 Here are some protein-rich picks that "
+        "fit your rules:"
+    )
+    lines = [opener, ""]
     lines.extend(
         f"- **{n}** — {_ai_macro_summary(d)}" for n, d in pool[:3]
     )
-    lines.append("Ask me how to eat one, its benefits, or a comparison.")
+    lines.append("\n" + (_AI_PICKS_CLOSER_HINGLISH if hinglish else _AI_PICKS_CLOSER))
     return "\n".join(lines)
 
 
@@ -6427,6 +6630,12 @@ def _deterministic_ai_answer(
     """Intent-aware, data-backed answer that works with no API key/network."""
     q = _ai_text(question)
     hinglish = _ai_has_phrase(q, _AI_HINGLISH_PHRASES)
+    clear_intent = _ai_has_clear_intent(q, details, context)
+
+    # Small talk gets a real, warm hello — never a wall of product stats.
+    # A greeting attached to a real question still answers the question.
+    if _ai_has_phrase(q, _AI_GREETING_PHRASES) and not clear_intent:
+        return _ai_greeting_answer(hinglish)
 
     # Compare first so "almond butter vs peanut butter benefits" is not stolen
     # by the benefits or macro-lookup branches.
@@ -6483,17 +6692,21 @@ def _deterministic_ai_answer(
         pool.sort(key=lambda item: float(item[1]["protein"]), reverse=True)
         if not pool:
             return (
-                "No catalogue food matches every filter you have set. "
-                "Try removing one diet or allergen rule."
+                "I'd love to find something for you! 😊 Nothing matches every "
+                "filter right now — loosen one diet or allergen rule and I'll "
+                "dig up some great options."
             )
         heading = (
-            "Highest-protein vegan options"
-            if "vegan" in q
-            else "Highest-protein vegetarian options"
-            if "vegetarian" in q
-            else "Highest-protein options that fit your rules"
+            _AI_PICKS_OPENER_HINGLISH
+            if hinglish
+            else _AI_PICKS_OPENER
         )
-        return "\n".join([heading + " (per 100 g):", *lines_for(pool[:5])])
+        lines = [heading, ""]
+        lines.extend(lines_for(pool[:5]))
+        lines.append(
+            "\n" + (_AI_PICKS_CLOSER_HINGLISH if hinglish else _AI_PICKS_CLOSER)
+        )
+        return "\n".join(lines)
 
     if city and city.lower() in q:
         pool = [
@@ -6503,10 +6716,27 @@ def _deterministic_ai_answer(
         ]
         if pool:
             pool.sort(key=lambda item: float(item[1]["protein"]), reverse=True)
-            return "\n".join(
-                [f"Catalogue foods available in **{city}** (per 100 g):",
-                 *lines_for(pool[:5])]
+            opener = (
+                f"{city} mein bhi kuch achhe options mil gaye hain! 😊"
+                if hinglish
+                else f"Good news — here are some nice picks available in "
+                f"**{city}** that fit your rules:"
             )
+            lines = [opener, ""]
+            lines.extend(lines_for(pool[:5]))
+            lines.append(
+                "\n"
+                + (
+                    "Inmein se kisi ko kaise khaye, bataon? 😊"
+                    if hinglish
+                    else "Want me to show you the easiest way to eat any of these? 😊"
+                )
+            )
+            return "\n".join(lines)
+
+    # Unrelated small talk / out-of-scope asks never trigger a stats dump.
+    if not clear_intent:
+        return _ai_unclear_answer(hinglish)
 
     # Any product lookup now gets macros plus practical tips, never a bare dump.
     return _ai_general_answer(q, details, context, hinglish)
@@ -7444,6 +7674,18 @@ with st.sidebar:
             type="secondary",
             on_click=_profile_sign_out,
         )
+
+    # ─── Home launcher (one tap back to the main search screen) ──────────
+    st.markdown(
+        '<div class="home-open-marker" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
+    st.button(
+        "🏠  Home",
+        key="sidebar_home_btn",
+        use_container_width=True,
+        on_click=go_home,
+    )
 
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
