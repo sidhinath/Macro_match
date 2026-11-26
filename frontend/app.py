@@ -3831,39 +3831,6 @@ h1, h2, h3, .stHeading {
     color: inherit !important;
     text-decoration: none !important;
 }
-/* ── Sidebar bottom activity stats ── */
-.sidebar-stats {
-    background: rgba(11, 15, 25, 0.55);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 0.7rem 0.85rem;
-    margin-top: 0.75rem;
-}
-.sidebar-stats .stats-row {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.5rem;
-}
-.sidebar-stats .stats-label {
-    font-size: 0.82rem;
-    color: var(--text-body);
-    font-weight: 600;
-}
-.sidebar-stats .stats-value {
-    font-size: 1.1rem;
-    font-weight: 800;
-    color: #7EE2A8;
-    font-variant-numeric: tabular-nums;
-}
-.sidebar-stats .stats-tip {
-    margin-top: 0.45rem;
-    padding-top: 0.45rem;
-    border-top: 1px dashed var(--border);
-    font-size: 0.74rem;
-    line-height: 1.35;
-    color: #94A3B8;
-}
 @media (hover: hover) {
     .sidebar-welcome a:hover {
         color: inherit !important;
@@ -4979,9 +4946,7 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
     section[data-testid="stSidebar"] label,
     section[data-testid="stSidebar"] button,
     .sidebar-welcome .welcome-name,
-    .sidebar-welcome .welcome-email,
-    .sidebar-stats .stats-label,
-    .sidebar-stats .stats-tip {
+    .sidebar-welcome .welcome-email {
         font-size: 15.5px !important;
     }
 
@@ -5030,16 +4995,25 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
     .steps { grid-template-columns: 1fr !important; }
 }
 
-/* ── Sidebar headings, saved expander, toggle, and summary highlight ── */
+/* ── Sidebar section labels, saved expander, and toggle styles ── */
+.sidebar-section-label {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.08em !important;
+    color: #8B949E !important;
+    margin: 16px 0 6px 6px !important;
+    text-transform: uppercase !important;
+    line-height: 1.2 !important;
+}
 .saved-matches-marker {
     display: none !important;
 }
 [data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) [data-testid="stExpanderHeader"] p,
 [data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) summary p,
 [data-testid="stSidebar"] div[data-testid="stExpander"]:has(.saved-matches-marker) .streamlit-expanderHeader p {
-    font-weight: 700 !important;
+    font-weight: 600 !important;
     font-size: 16px !important;
-    color: #FFFFFF !important;
+    color: #E6EDF3 !important;
 }
 
 section[data-testid="stSidebar"] div[data-testid="stToggle"],
@@ -5058,67 +5032,34 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
     color: #6EE798 !important;
 }
 
-.sidebar-stats {
-    background: linear-gradient(135deg, rgba(46, 160, 67, 0.16), rgba(22, 27, 34, 0.95)) !important;
-    border: 1px solid rgba(46, 160, 67, 0.55) !important;
-    border-radius: 12px !important;
-    padding: 12px 14px !important;
-    box-shadow: 0 4px 14px rgba(46, 160, 67, 0.12) !important;
-}
-.sidebar-stats .stats-row {
-    align-items: center !important;
-}
-.sidebar-stats .stats-label {
-    font-weight: 800 !important;
-    color: #FFFFFF !important;
-    font-size: 16px !important;
-}
-.sidebar-stats .stats-value {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    min-width: 28px !important;
-    padding: 2px 9px !important;
-    border-radius: 999px !important;
-    background-color: rgba(46, 160, 67, 0.22) !important;
-    border: 1px solid rgba(46, 160, 67, 0.6) !important;
-    color: #6EE798 !important;
-    font-size: 16px !important;
-    font-weight: 800 !important;
-    font-variant-numeric: tabular-nums !important;
-}
-.sidebar-stats .stats-tip {
-    color: #C9D1D9 !important;
-    font-weight: 400 !important;
-    font-size: 14.5px !important;
-}
-.sidebar-stats .stats-tip strong {
-    color: #FBBF24 !important;
-    font-weight: 700 !important;
-}
-
-/* ── Sidebar profile pill + elevated glass card ── */
+/* ── Two-line profile header card ── */
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
     width: 100% !important;
-    background: linear-gradient(135deg, rgba(46, 160, 67, 0.22) 0%, rgba(22, 27, 34, 0.96) 100%) !important;
-    border: 1.5px solid rgba(63, 185, 80, 0.65) !important;
+    background-color: #161B22 !important;
+    border: 1px solid #30363D !important;
     border-radius: 14px !important;
-    padding: 14px 16px !important;
-    font-size: 16px !important;
+    padding: 12px 16px !important;
+    min-height: 62px !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+}
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
+    font-size: 15px !important;
     font-weight: 700 !important;
-    color: #FFFFFF !important;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35) !important;
-    min-height: 54px !important;
+    color: #E6EDF3 !important;
+    line-height: 1.35 !important;
+    white-space: pre-wrap !important;
     text-align: left !important;
 }
 .profile-card {
-    background: linear-gradient(135deg, rgba(46, 160, 67, 0.12) 0%, #161B22 100%) !important;
-    border: 1px solid rgba(63, 185, 80, 0.4) !important;
-    border-radius: 16px !important;
-    padding: 16px !important;
-    margin-top: 10px !important;
-    margin-bottom: 12px !important;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45) !important;
+    background-color: #161B22 !important;
+    border: 1px solid #30363D !important;
+    border-radius: 14px !important;
+    padding: 14px 16px !important;
+    margin-top: 8px !important;
+    margin-bottom: 6px !important;
+    box-shadow: none !important;
 }
 .profile-user-row {
     display: flex !important;
@@ -5170,6 +5111,7 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
 }
 
 /* ── Wishlist + catalogue + install launchers and dedicated full pages ── */
+.home-open-marker,
 .wishlist-open-marker,
 .catalogue-open-marker,
 .install-open-marker,
@@ -5190,23 +5132,30 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
     width: 100% !important;
-    background-color: #161B22 !important;
-    border: 1px solid rgba(63, 185, 80, 0.45) !important;
-    border-radius: 12px !important;
-    padding: 12px 14px !important;
-    font-weight: 700 !important;
-    font-size: 16.5px !important;
-    color: #FFFFFF !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
-    min-height: 48px !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 10px 14px !important;
+    font-weight: 600 !important;
+    font-size: 16px !important;
+    color: #E6EDF3 !important;
+    box-shadow: none !important;
+    min-height: 0 !important;
     text-align: left !important;
+    justify-content: flex-start !important;
+}
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p,
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p,
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: #E6EDF3 !important;
 }
 @media (hover: hover) {
     [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
     [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
     [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
-        background-color: #1C2128 !important;
-        border-color: rgba(63, 185, 80, 0.75) !important;
+        background: rgba(46, 160, 67, 0.12) !important;
         color: #FFFFFF !important;
     }
 }
@@ -5443,177 +5392,146 @@ div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div
     }
 }
 
-/* 1. Quiet dark-slate base so the few remaining sidebar buttons (e.g. the
-   Save Target / Save Preferences actions inside expanders) sit at the same
-   visual weight as the navigation rows instead of shouting bright green. */
+/* 1. Clean, left-aligned menu rows. No chip borders, no heavy fills — the
+   drawer groups them with muted section labels instead. */
 section[data-testid="stSidebar"] div[data-testid="stButton"] button {
-    background-color: #161B22 !important;
-    border: 1px solid rgba(63, 185, 80, 0.35) !important;
-    border-radius: 12px !important;
-    padding: 12px 16px !important;
-    min-height: 48px !important;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35) !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 10px 14px !important;
+    min-height: 0 !important;
+    box-shadow: none !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
     transition: none !important;
 }
 
 section[data-testid="stSidebar"] div[data-testid="stButton"] button p,
 section[data-testid="stSidebar"] div[data-testid="stButton"] button span {
-    font-size: 16.5px !important;
-    font-weight: 700 !important;
-    color: #FFFFFF !important;
-    letter-spacing: 0.02em !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: #E6EDF3 !important;
+    letter-spacing: 0 !important;
+    text-align: left !important;
 }
 
-/* 2. Dark-glass expanders (Saved matches, Daily Macro Target, Default Diet &
-   Allergens) share the exact surface and border of the navigation rows. */
+/* 2. Preference expanders are menu rows too: transparent, left-aligned and
+   border-free until hovered or opened. */
 section[data-testid="stSidebar"] div[data-testid="stExpander"] details {
-    background-color: #161B22 !important;
-    border: 1px solid rgba(63, 185, 80, 0.4) !important;
-    border-radius: 12px !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 10px !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stExpander"] summary,
 section[data-testid="stSidebar"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"],
 section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
-    background-color: #161B22 !important;
-    border: 1px solid rgba(63, 185, 80, 0.4) !important;
-    border-radius: 12px !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 10px 14px !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
 }
 
-section[data-testid="stSidebar"] div[data-testid="stExpander"] summary p {
+section[data-testid="stSidebar"] div[data-testid="stExpander"] summary p,
+section[data-testid="stSidebar"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"] p,
+section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] p {
     font-size: 16px !important;
-    font-weight: 700 !important;
-    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    color: #E6EDF3 !important;
+}
+/* Save actions inside expanders stay visibly actionable without becoming
+   another loud pill in the drawer. */
+html body section[data-testid="stSidebar"] div[data-testid="stExpander"] div[data-testid="stButton"] button,
+html body section[data-testid="stSidebar"] div[data-testid="stExpander"] div[data-testid="stButton"] button p {
+    background-color: #21262D !important;
+    border: 1px solid rgba(63, 185, 80, 0.35) !important;
+    color: #E6EDF3 !important;
+    font-weight: 600 !important;
+    border-radius: 10px !important;
 }
 
-/* 3. Distinct soft-crimson Sign Out button inside the expanded profile card */
+/* 3. Sign out stays distinct but still reads as a row inside the card. */
 section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="profile_card_signout"] {
-    background-color: rgba(248, 81, 73, 0.14) !important;
-    border: 1px solid rgba(248, 81, 73, 0.65) !important;
+    background-color: rgba(248, 81, 73, 0.12) !important;
+    border: 1px solid rgba(248, 81, 73, 0.55) !important;
+    border-radius: 10px !important;
+    padding: 10px 14px !important;
+    color: #FFA198 !important;
     box-shadow: none !important;
 }
 
 @media (hover: hover) {
     section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
-        background-color: #1C2128 !important;
-        border-color: rgba(63, 185, 80, 0.6) !important;
+        background: rgba(46, 160, 67, 0.10) !important;
     }
-}
-
-/* Reinforce the dark-glass values over the earlier widget-specific rules,
-   whose :has() selectors otherwise win the cascade with higher specificity. */
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    background: linear-gradient(135deg, rgba(46, 160, 67, 0.22) 0%, rgba(22, 27, 34, 0.96) 100%) !important;
-    border: 1.5px solid rgba(63, 185, 80, 0.65) !important;
-    border-radius: 14px !important;
-    padding: 14px 16px !important;
-    min-height: 54px !important;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35) !important;
-    font-size: 16px !important;
-    font-weight: 700 !important;
-    color: #FFFFFF !important;
-    text-align: left !important;
-}
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
-    font-size: 16px !important;
-    font-weight: 700 !important;
-    color: #FFFFFF !important;
-}
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-signout-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    background-color: rgba(248, 81, 73, 0.14) !important;
-    border: 1px solid rgba(248, 81, 73, 0.65) !important;
-    border-radius: 10px !important;
-    padding: 12px 14px !important;
-    min-height: 44px !important;
-    box-shadow: none !important;
-    font-size: 16px !important;
-    font-weight: 700 !important;
-    color: #FFA198 !important;
-}
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-signout-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
-    color: #FFA198 !important;
-    font-weight: 700 !important;
-}
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    background-color: #161B22 !important;
-    border: 1px solid rgba(63, 185, 80, 0.45) !important;
-    border-radius: 12px !important;
-    padding: 12px 14px !important;
-    min-height: 48px !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
-    font-size: 16.5px !important;
-    font-weight: 700 !important;
-    color: #FFFFFF !important;
-    text-align: left !important;
-}
-@media (hover: hover) {
-    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
-        background: linear-gradient(135deg, rgba(46, 160, 67, 0.30) 0%, rgba(22, 27, 34, 0.96) 100%) !important;
-        border-color: rgba(63, 185, 80, 0.85) !important;
-    }
-    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
-    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
-    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
-        background-color: #1C2128 !important;
-        border-color: rgba(63, 185, 80, 0.75) !important;
-    }
-    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-signout-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="profile_card_signout"]:hover {
         background-color: rgba(248, 81, 73, 0.2) !important;
-        border-color: rgba(248, 81, 73, 0.85) !important;
+        border-color: rgba(248, 81, 73, 0.8) !important;
     }
 }
 
-/* Bottom-of-sidebar AI Help pill: the single vibrant emerald CTA. Targeted by
-   key so none of the quiet dark-slate sidebar rules can override it. */
-section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_ai_help_btn"] {
-    background: linear-gradient(135deg, #2EA043 0%, #10B981 100%) !important;
-    border: 1.5px solid #6EE798 !important;
+/* Bottom-of-sidebar AI Help pill: the single standout CTA in the drawer. */
+html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_ai_help_btn"] {
+    background: linear-gradient(135deg, #2EA043 0%, #34D399 100%) !important;
+    border: none !important;
     border-radius: 999px !important;
     padding: 13px 18px !important;
     font-size: 17px !important;
     font-weight: 800 !important;
-    color: #FFFFFF !important;
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.35) !important;
+    color: #051B11 !important;
+    justify-content: center !important;
+    text-align: center !important;
+    box-shadow: 0 4px 18px rgba(52, 211, 153, 0.35) !important;
     transition: none !important;
 }
-section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_ai_help_btn"] p {
+html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_ai_help_btn"] p {
     font-size: 17px !important;
     font-weight: 800 !important;
-    color: #FFFFFF !important;
+    color: #051B11 !important;
+    text-align: center !important;
 }
 @media (hover: hover) {
-    section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_ai_help_btn"]:hover {
-        background: linear-gradient(135deg, #2EA043 0%, #10B981 100%) !important;
-        box-shadow: 0 0 26px rgba(16, 185, 129, 0.5) !important;
+    html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_ai_help_btn"]:hover {
+        background: linear-gradient(135deg, #2EA043 0%, #34D399 100%) !important;
+        box-shadow: 0 6px 22px rgba(52, 211, 153, 0.48) !important;
     }
 }
 
-/* Home launcher: same quiet dark-glass nav row as Wishlist / Catalogue, with
-   a slightly crisper emerald border so it reads as the primary way back. */
-section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_home_btn"] {
+/* The profile header keeps its own dark card; every other item above is a
+   quiet row. This override wins over the generic row rules. */
+html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_profile_toggle"] {
+    width: 100% !important;
     background-color: #161B22 !important;
-    border: 1px solid rgba(63, 185, 80, 0.5) !important;
-    border-radius: 12px !important;
-    padding: 12px 14px !important;
-    min-height: 48px !important;
-    font-size: 16.5px !important;
-    font-weight: 700 !important;
-    color: #FFFFFF !important;
+    border: 1px solid #30363D !important;
+    border-radius: 14px !important;
+    padding: 12px 16px !important;
+    min-height: 62px !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+    justify-content: flex-start !important;
     text-align: left !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
     transition: none !important;
 }
-section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_home_btn"] p {
-    font-size: 16.5px !important;
+html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_profile_toggle"] p {
+    font-size: 15px !important;
     font-weight: 700 !important;
-    color: #FFFFFF !important;
+    color: #E6EDF3 !important;
+    line-height: 1.35 !important;
+    white-space: pre-wrap !important;
+    text-align: left !important;
 }
-@media (hover: hover) {
-    section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_home_btn"]:hover {
-        background-color: #1C2128 !important;
-        border-color: rgba(63, 185, 80, 0.75) !important;
-    }
+
+/* Active view row: subtle emerald wash + a left accent bar. */
+html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.nav-active-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    background: rgba(46, 160, 67, 0.16) !important;
+    border: none !important;
+    border-left: 3px solid #3FB950 !important;
+    color: #6EE798 !important;
+    border-radius: 10px !important;
+}
+html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.nav-active-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
+    color: #6EE798 !important;
+    font-weight: 700 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -7637,9 +7555,9 @@ with st.sidebar:
         '<div class="profile-toggle-marker" aria-hidden="true"></div>',
         unsafe_allow_html=True,
     )
-    _profile_caret = "▴" if st.session_state.get("show_user_profile") else "▾"
+    _profile_caret = "⌃" if st.session_state.get("show_user_profile") else "⌄"
     st.button(
-        f"🟢  {user_name}  ({CURRENT_USER_EMAIL})   {_profile_caret}",
+        f"🟢  {user_name}\n     {CURRENT_USER_EMAIL}   {_profile_caret}",
         key="sidebar_profile_toggle",
         use_container_width=True,
         type="secondary",
@@ -7675,11 +7593,31 @@ with st.sidebar:
             on_click=_profile_sign_out,
         )
 
-    # ─── Home launcher (one tap back to the main search screen) ──────────
+    # ─── Grouped navigation, like a clean SaaS drawer ───────────────────
+    _active_view = (
+        (st.session_state.get("nav_stack") or [{"view": "home"}])[-1].get(
+            "view", "home"
+        )
+    )
+    _active_nav = {
+        "home": "home",
+        "swaps": "home",
+        "wishlist": "wishlist",
+        "all_products": "catalogue",
+        "details": "catalogue",
+        "install": "install",
+    }.get(_active_view)
+
+    def _nav_marker(name: str) -> str:
+        active_class = " nav-active-marker" if _active_nav == name else ""
+        return f'<div class="{name}-open-marker{active_class}" aria-hidden="true"></div>'
+
     st.markdown(
-        '<div class="home-open-marker" aria-hidden="true"></div>',
+        '<div class="sidebar-section-label">NAVIGATION</div>',
         unsafe_allow_html=True,
     )
+
+    st.markdown(_nav_marker("home"), unsafe_allow_html=True)
     st.button(
         "🏠  Home",
         key="sidebar_home_btn",
@@ -7687,13 +7625,34 @@ with st.sidebar:
         on_click=go_home,
     )
 
-    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    product_details = load_product_details()
+    st.markdown(_nav_marker("wishlist"), unsafe_allow_html=True)
+    st.button(
+        f"❤️  View Your Wishlist ({len(st.session_state['wishlist'])})",
+        key="open_wishlist_page",
+        use_container_width=True,
+        type="secondary",
+        on_click=_open_wishlist_page,
+    )
 
-    # ─── Per-user saved matches history (Supabase, user_id-keyed) ────────
-    # Open the expander automatically on the rerun right after a save so the
+    st.markdown(_nav_marker("catalogue"), unsafe_allow_html=True)
+    st.button(
+        f"📖  View All Products ({len(product_details)})",
+        key="open_catalogue_page",
+        use_container_width=True,
+        type="secondary",
+        on_click=_open_catalogue_page,
+    )
+
+    st.markdown(
+        '<div class="sidebar-section-label">PREFERENCES &amp; HISTORY</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Open the saved-matches expander automatically right after a save so the
     # newly inserted row is immediately visible.
     with st.expander(
-        "🕘 My saved matches",
+        "🕒  My saved matches",
         expanded=bool(st.session_state.get("saved_match_flash")),
     ):
         st.markdown(
@@ -7703,36 +7662,7 @@ with st.sidebar:
         saved_matches_slot = st.empty()
         render_saved_matches(saved_matches_slot)
 
-    # ─── Wishlist launcher (full page lives on the main screen) ──────────
-    product_details = load_product_details()
-    st.markdown(
-        '<div class="wishlist-open-marker" aria-hidden="true"></div>',
-        unsafe_allow_html=True,
-    )
-    st.button(
-        f"❤️  View Your Wishlist ({len(st.session_state['wishlist'])})   ›",
-        key="open_wishlist_page",
-        use_container_width=True,
-        type="secondary",
-        on_click=_open_wishlist_page,
-    )
-
-    # ─── Catalogue launcher (dedicated full page) ─────────────────────────
-    st.markdown(
-        '<div class="catalogue-open-marker" aria-hidden="true"></div>',
-        unsafe_allow_html=True,
-    )
-    st.button(
-        f"📖  View All Products ({len(product_details)})   ›",
-        key="open_catalogue_page",
-        use_container_width=True,
-        type="secondary",
-        on_click=_open_catalogue_page,
-    )
-
-    # ─── Daily macro goal ──────────────────────────────────────────────
-    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
-    with st.expander("🎯 Daily Macro Target", expanded=False):
+    with st.expander("🎯  Daily Macro Target", expanded=False):
         st.number_input(
             "Daily Protein Goal (g)",
             min_value=1,
@@ -7757,8 +7687,7 @@ with st.sidebar:
             on_click=_save_macro_target_callback,
         )
 
-    # ─── Reusable filter defaults ──────────────────────────────────────
-    with st.expander("⚙️ Default Diet & Allergens", expanded=False):
+    with st.expander("⚙️  Default Diet & Allergens", expanded=False):
         st.selectbox(
             "Default diet rule",
             options=["None", *DIET_LABELS.values()],
@@ -7784,40 +7713,23 @@ with st.sidebar:
             on_click=_save_preferences_callback,
         )
 
-    # ─── Mobile install launcher (full page lives on the main screen) ───
     st.markdown(
-        '<div class="install-open-marker" aria-hidden="true"></div>',
+        '<div class="sidebar-section-label">MORE</div>',
         unsafe_allow_html=True,
     )
+
+    st.markdown(_nav_marker("install"), unsafe_allow_html=True)
     st.button(
-        "📲  Install Mobile App   ›",
+        "📲  Install Mobile App",
         key="sidebar_install_app_btn",
         use_container_width=True,
         type="secondary",
         on_click=_open_install_page,
     )
 
-    # ─── Bottom activity footer ────────────────────────────────────────
-    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
-    st.markdown(
-        f"""
-        <div class="sidebar-stats">
-            <div class="stats-row">
-                <span class="stats-label">Saved matches</span>
-                <span class="stats-value">{_saved_count}</span>
-            </div>
-            <div class="stats-tip">
-                <div style="font-size: 14.5px; color: #C9D1D9; line-height: 1.45;"><strong style="color: #FBBF24;">💡 Tip:</strong> Open the product guide to load any food instantly.</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
     # ─── AI Help entry: the very last item in the sidebar ────────────────
-    st.markdown('<hr style="border-color: #21262D; margin: 12px 0;">', unsafe_allow_html=True)
     st.button(
-        "🤖 AI Diet & Product Help",
+        "🤖  AI Diet & Product Help",
         key="sidebar_ai_help_btn",
         use_container_width=True,
         on_click=_open_ai_help,
