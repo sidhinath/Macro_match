@@ -4995,6 +4995,18 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
     .steps { grid-template-columns: 1fr !important; }
 }
 
+/* Desktop: the brand lives in the sidebar, so hide the duplicate centered
+   hero banner and let the search card start high on the page. */
+@media (min-width: 769px) {
+    .hero-block,
+    .hero-divider {
+        display: none !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
+        margin-top: 0.25rem !important;
+    }
+}
+
 /* ── Sidebar section labels, saved expander, and toggle styles ── */
 .sidebar-section-label {
     font-size: 13.5px !important;
@@ -5032,26 +5044,7 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
     color: #6EE798 !important;
 }
 
-/* ── Two-line profile header card ── */
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    width: 100% !important;
-    background-color: #161B22 !important;
-    border: 1px solid #30363D !important;
-    border-radius: 14px !important;
-    padding: 12px 16px !important;
-    min-height: 62px !important;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
-    text-align: left !important;
-    justify-content: flex-start !important;
-}
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
-    font-size: 15px !important;
-    font-weight: 700 !important;
-    color: #E6EDF3 !important;
-    line-height: 1.35 !important;
-    white-space: pre-wrap !important;
-    text-align: left !important;
-}
+/* ── Two-line profile header card (styled with .sidebar-profile-box below) ── */
 .profile-card {
     background-color: #161B22 !important;
     border: 1px solid #30363D !important;
@@ -5115,6 +5108,8 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
 .wishlist-open-marker,
 .catalogue-open-marker,
 .install-open-marker,
+.sidebar-profile-box,
+.sidebar-nav-active,
 .wishlist-page-marker,
 .catalogue-page-marker,
 .install-page-marker,
@@ -5445,17 +5440,23 @@ section[data-testid="stSidebar"] button[kind="primary"] p {
     }
 }
 
-/* 2. Preference expanders are menu rows too: transparent, left-aligned and
-   border-free until hovered or opened. */
+/* 2. Preference expanders reuse the main page's dark-card surface. */
+section[data-testid="stSidebar"] div[data-testid="stExpander"] {
+    background-color: #161B22 !important;
+    border: 1px solid #30363D !important;
+    border-radius: 10px !important;
+    margin-bottom: 6px !important;
+    overflow: hidden !important;
+}
 section[data-testid="stSidebar"] div[data-testid="stExpander"] details {
-    background: transparent !important;
+    background-color: #161B22 !important;
     border: none !important;
     border-radius: 10px !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stExpander"] summary,
 section[data-testid="stSidebar"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"],
 section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
-    background: transparent !important;
+    background-color: #161B22 !important;
     border: none !important;
     border-radius: 10px !important;
     padding: 10px 14px !important;
@@ -5469,6 +5470,13 @@ section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stE
     font-size: 16.5px !important;
     font-weight: 600 !important;
     color: #E6EDF3 !important;
+}
+@media (hover: hover) {
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] summary:hover,
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"]:hover,
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"]:hover {
+        background-color: #1C2128 !important;
+    }
 }
 /* Save actions inside expanders stay visibly actionable without becoming
    another loud pill in the drawer. */
@@ -5498,39 +5506,52 @@ section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="profile
     }
 }
 
-/* The profile header keeps its own dark card; every other item above is a
-   quiet row. This override wins over the generic row rules. */
-html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_profile_toggle"] {
-    width: 100% !important;
+/* Profile wrapper: .sidebar-profile-box lives on a marker inside the actual
+   Streamlit container, so the wrapper (not just the button) is the dark card. */
+html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-profile-box) {
     background-color: #161B22 !important;
     border: 1px solid #30363D !important;
     border-radius: 14px !important;
     padding: 12px 14px !important;
     margin-bottom: 6px !important;
-    min-height: 62px !important;
+    white-space: pre-line !important;
+    line-height: 1.45 !important;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+}
+html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-profile-box) .stButton > button {
+    width: 100% !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    box-shadow: none !important;
     justify-content: flex-start !important;
     text-align: left !important;
+    white-space: pre-line !important;
+    line-height: 1.45 !important;
     transition: none !important;
 }
-html body section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_profile_toggle"] p {
-    font-size: 16px !important;
+html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-profile-box) .stButton > button p {
+    font-size: 16.5px !important;
     font-weight: 700 !important;
     color: #E6EDF3 !important;
-    line-height: 1.4 !important;
     white-space: pre-line !important;
+    line-height: 1.45 !important;
     text-align: left !important;
 }
 
-/* Active view row: subtle emerald wash + a left accent bar. */
-html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.nav-active-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+/* Active nav wrapper: the marker carries .sidebar-nav-active on the current
+   view, and the adjacent button gets the emerald card treatment. */
+html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.sidebar-nav-active) + div[data-testid="stVerticalBlockElement"] .stButton > button {
     background: rgba(46, 160, 67, 0.16) !important;
-    border: none !important;
-    border-left: 3px solid #3FB950 !important;
-    color: #6EE798 !important;
+    border: 1px solid rgba(63, 185, 80, 0.45) !important;
+    border-left: 4px solid #3FB950 !important;
     border-radius: 10px !important;
+    box-shadow: none !important;
+    color: #6EE798 !important;
 }
-html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.nav-active-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
+html body section[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.sidebar-nav-active) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
     color: #6EE798 !important;
     font-weight: 700 !important;
 }
@@ -7552,17 +7573,18 @@ with st.sidebar:
     _wishlist_count = len(_normalize_wishlist(st.session_state.get("wishlist", [])))
     _saved_count = len(get_saved_matches(CURRENT_USER_ID) or [])
 
-    st.markdown(
-        '<div class="profile-toggle-marker" aria-hidden="true"></div>',
-        unsafe_allow_html=True,
-    )
-    st.button(
-        f"🟢  {user_name}\n{CURRENT_USER_EMAIL}",
-        key="sidebar_profile_toggle",
-        use_container_width=True,
-        type="secondary",
-        on_click=_toggle_user_profile,
-    )
+    with st.container(border=True):
+        st.markdown(
+            '<div class="profile-toggle-marker sidebar-profile-box" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        st.button(
+            f"🟢  {user_name}\n{CURRENT_USER_EMAIL}",
+            key="sidebar_profile_toggle",
+            use_container_width=True,
+            type="secondary",
+            on_click=_toggle_user_profile,
+        )
 
     if st.session_state.get("show_user_profile"):
         st.markdown(
@@ -7609,7 +7631,7 @@ with st.sidebar:
     }.get(_active_view)
 
     def _nav_marker(name: str) -> str:
-        active_class = " nav-active-marker" if _active_nav == name else ""
+        active_class = " sidebar-nav-active" if _active_nav == name else ""
         return f'<div class="{name}-open-marker{active_class}" aria-hidden="true"></div>'
 
     st.markdown(
