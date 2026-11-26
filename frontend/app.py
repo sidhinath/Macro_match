@@ -34,7 +34,7 @@ load_dotenv()
 
 # Zero-height component that installs mobile sidebar gestures once per session.
 # It listens on window.parent.document so a swipe from anywhere closes the
-# sidebar, and it also closes the sidebar after a guide/wishlist "Select" tap.
+# sidebar, and it also closes the sidebar after any card "Select" tap.
 # "View Details" uses the dedicated collapse component below instead.
 _MOBILE_SIDEBAR_TOGGLE_JS = """
 <script>
@@ -143,7 +143,7 @@ _MOBILE_SIDEBAR_TOGGLE_JS = """
                              { passive: true, capture: true });
     }
 
-    // Product-guide / wishlist Select buttons are Streamlit widgets that
+    // Wishlist / catalogue Select buttons are Streamlit widgets that
     // trigger a full rerun; a delegated parent-document listener is the
     // reliable place to collapse the mobile sidebar right after the tap.
     // View Details uses the dedicated details-view collapse component instead.
@@ -276,6 +276,37 @@ st.set_page_config(
 # interaction defaults ahead of the theme CSS that follows.
 st.markdown(f"<style>{_TOUCH_FIRST_CSS}</style>", unsafe_allow_html=True)
 
+# Publish the viewport width into the URL so Python callbacks can pick the
+# right catalogue page size (4 cards on phones, 6 on desktop) from the tap.
+_VIEWPORT_DETECT_JS = """
+<script>
+(function () {
+    function publish() {
+        try {
+            var win = window.parent || window;
+            var mobile = win.innerWidth <= 768 ? "1" : "0";
+            var url = new URL(win.location.href);
+            if (url.searchParams.get("mm_mobile") !== mobile) {
+                url.searchParams.set("mm_mobile", mobile);
+                win.history.replaceState(win.history.state, "", url.toString());
+                // Streamlit syncs st.query_params from the parent URL on popstate.
+                win.dispatchEvent(
+                    new PopStateEvent("popstate", { state: win.history.state })
+                );
+            }
+        } catch (e) { /* non-browser preview: keep the desktop default */ }
+    }
+    var win = window.parent || window;
+    publish();
+    if (!win.__mmViewportListener) {
+        win.addEventListener("resize", publish);
+        win.__mmViewportListener = true;
+    }
+})();
+</script>
+"""
+components.html(_VIEWPORT_DETECT_JS, height=0, scrolling=False)
+
 # ── Brand logo ──────────────────────────────────────────────────────────────
 # The source PNG has a baked-in white background. Convert it to true alpha so
 # it blends into dark surfaces (auth card and dashboard header) cleanly.
@@ -399,7 +430,7 @@ if LOGO_SRC:
         setMeta('apple-mobile-web-app-capable', 'yes');
 
         // Capture the Android install prompt once and stash it on the parent
-        // window; the sidebar button component reads it on the next rerun.
+        // window; both the sidebar tap and the install page can trigger it.
         var parent = parentWindow();
         if (!parent.__mmPwaInstallListener) {
             parent.addEventListener('beforeinstallprompt', function (event) {
@@ -412,9 +443,56 @@ if LOGO_SRC:
         if (!parent.__mmPwaInstalledListener) {
             parent.addEventListener('appinstalled', function () {
                 parent[INSTALL_KEY] = null;
+                parent.__mmInstallPromptActive = false;
                 if (window !== parent) { window[INSTALL_KEY] = null; }
             });
             parent.__mmPwaInstalledListener = true;
+        }
+
+        if (!parent.__mmTriggerInstallPrompt) {
+            parent.__mmTriggerInstallPrompt = function () {
+                if (parent.__mmInstallPromptActive) { return false; }
+                var promptEvent = parent[INSTALL_KEY];
+                if (!promptEvent || typeof promptEvent.prompt !== 'function') {
+                    return false;
+                }
+                parent.__mmInstallPromptActive = true;
+                var finish = function () {
+                    parent[INSTALL_KEY] = null;
+                    parent.__mmInstallPromptActive = false;
+                    if (window !== parent) { window[INSTALL_KEY] = null; }
+                };
+                try {
+                    var choicePromise = promptEvent.prompt();
+                    if (choicePromise && typeof choicePromise.then === 'function') {
+                        choicePromise.then(finish).catch(finish);
+                    } else if (promptEvent.userChoice && typeof promptEvent.userChoice.then === 'function') {
+                        promptEvent.userChoice.then(finish).catch(finish);
+                    } else {
+                        finish();
+                    }
+                    return true;
+                } catch (e) {
+                    parent.__mmInstallPromptActive = false;
+                    return false;
+                }
+            };
+        }
+
+        // The sidebar button is a Streamlit widget, so a capture-phase listener
+        // on the parent document keeps the native prompt inside the user tap.
+        if (!parent.__mmSidebarInstallBound) {
+            parent.__mmSidebarInstallBound = true;
+            parent.document.addEventListener('click', function (event) {
+                var target = event.target && event.target.closest
+                    ? event.target.closest('button')
+                    : null;
+                if (!target || !target.textContent) { return; }
+                if (target.textContent.indexOf('Install Mobile App') < 0) { return; }
+                if (typeof parent.__mmTriggerInstallPrompt === 'function') {
+                    parent.__mmTriggerInstallPrompt();
+                }
+            }, true);
         }
     })();
     </script>
@@ -464,23 +542,13 @@ if LOGO_SRC:
                     'display:none'
                 ].join(';');
                 button.addEventListener('click', function () {
-                    var promptEvent = parent[KEY];
-                    if (!promptEvent || typeof promptEvent.prompt !== 'function') {
-                        button.textContent = 'Use your browser menu to install';
-                        return;
+                    if (typeof parent.__mmTriggerInstallPrompt === 'function') {
+                        if (parent.__mmTriggerInstallPrompt()) {
+                            button.textContent = 'Installing…';
+                            return;
+                        }
                     }
-                    promptEvent.prompt();
-                    if (promptEvent.userChoice && typeof promptEvent.userChoice.then === 'function') {
-                        promptEvent.userChoice.then(function (choice) {
-                            parent[KEY] = null;
-                            button.style.display = 'none';
-                            if (choice && choice.outcome === 'accepted') {
-                                button.textContent = 'Installing…';
-                            }
-                        }).catch(function () {
-                            button.style.display = 'none';
-                        });
-                    }
+                    button.textContent = 'Use your browser menu to install';
                 });
                 slot.appendChild(button);
             }
@@ -490,8 +558,19 @@ if LOGO_SRC:
             return true;
         }
 
-        ensureButton();
         var parent = parentWindow();
+        ensureButton();
+
+        // Opening the dedicated install page attempts the native prompt too;
+        // if the browser requires another user gesture, the button above is
+        // the visible fallback.
+        if (!parent.__mmInstallAutoTried) {
+            parent.__mmInstallAutoTried = true;
+            if (typeof parent.__mmTriggerInstallPrompt === 'function') {
+                parent.__mmTriggerInstallPrompt();
+            }
+        }
+
         var tries = 0;
         var timer = parent.setInterval(function () {
             if (ensureButton() || ++tries > 100) { parent.clearInterval(timer); }
@@ -1950,6 +2029,14 @@ def load_saved_match(match):
     }
     st.session_state["show_swaps_results"] = True
     st.session_state["inspect_product"] = None
+    st.session_state["show_ai_help"] = False
+    st.session_state["show_wishlist_page"] = False
+    st.session_state["show_all_products_page"] = False
+    st.session_state["show_install_page"] = False
+    st.session_state["_collapse_sidebar_for_details"] = False
+    st.session_state["_collapse_sidebar_for_wishlist"] = False
+    st.session_state["_collapse_sidebar_for_catalogue"] = False
+    st.session_state["_collapse_sidebar_for_install"] = False
 
 
 @st.fragment(key="saved_matches")
@@ -2085,12 +2172,23 @@ if "city_box_ver" not in st.session_state:
 # browser's cached open state so every pick reliably closes the list.
 st.session_state.setdefault("food_browse_ver", 0)
 st.session_state.setdefault("city_browse_ver", 0)
-# Sidebar product guide shows 3 cards at a time; "View More" adds three more.
-GUIDE_PAGE_SIZE = 3
-st.session_state.setdefault("guide_visible_count", GUIDE_PAGE_SIZE)
 # Top-bar AI assistant panel and its in-session conversation history.
 st.session_state.setdefault("show_ai_help", False)
 st.session_state.setdefault("ai_chat_history", [])
+# The wishlist owns the whole main screen when opened from the sidebar button.
+st.session_state.setdefault("show_wishlist_page", False)
+st.session_state.setdefault("_collapse_sidebar_for_wishlist", False)
+# Dedicated catalogue page: six cards at a time on desktop, four on phones.
+CATALOGUE_PAGE_SIZE = 6
+st.session_state.setdefault("show_all_products_page", False)
+st.session_state.setdefault("_collapse_sidebar_for_catalogue", False)
+st.session_state.setdefault("catalogue_visible_count", CATALOGUE_PAGE_SIZE)
+st.session_state.setdefault("catalogue_initial_count", CATALOGUE_PAGE_SIZE)
+# Dedicated PWA install page opened from the sidebar button.
+st.session_state.setdefault("show_install_page", False)
+st.session_state.setdefault("_collapse_sidebar_for_install", False)
+# Sidebar profile pill expands the elevated glass card in place.
+st.session_state.setdefault("show_user_profile", False)
 # Home is clean by default; Find Alternatives switches to the ranked swaps
 # view, while View Details opens a full product card on the main screen.
 if "show_swaps_results" not in st.session_state:
@@ -2107,9 +2205,6 @@ if "default_diet_select" not in st.session_state:
 if "default_allergens_select" not in st.session_state:
     st.session_state["default_allergens_select"] = []
 st.session_state.setdefault("wishlist", [])
-# Wishlist cards use the same 3-at-a-time paging as the sidebar product guide.
-WISHLIST_PAGE_SIZE = 3
-st.session_state.setdefault("wishlist_visible_count", WISHLIST_PAGE_SIZE)
 
 # Auth has already been enforced above, so it is safe to hydrate the signed-in
 # user's saved targets/preferences before any dashboard widgets are created.
@@ -2120,6 +2215,9 @@ if st.session_state.get("supabase_user") is not None:
 # Help toggle, and no search form until the user taps "⌂ Back to home".
 show_product_details = st.session_state.get("inspect_product") is not None
 show_ai_help = st.session_state.get("show_ai_help", False)
+show_wishlist_page = st.session_state.get("show_wishlist_page", False)
+show_all_products_page = st.session_state.get("show_all_products_page", False)
+show_install_page = st.session_state.get("show_install_page", False)
 
 
 def _canonical_value(label: str, aliases: dict[str, str]) -> str:
@@ -2287,7 +2385,13 @@ def _reset_swaps_view() -> None:
     st.session_state["show_swaps_results"] = False
     st.session_state["inspect_product"] = None
     st.session_state["show_ai_help"] = False
+    st.session_state["show_wishlist_page"] = False
+    st.session_state["show_all_products_page"] = False
+    st.session_state["show_install_page"] = False
     st.session_state["_collapse_sidebar_for_details"] = False
+    st.session_state["_collapse_sidebar_for_wishlist"] = False
+    st.session_state["_collapse_sidebar_for_catalogue"] = False
+    st.session_state["_collapse_sidebar_for_install"] = False
     st.session_state.pop("match_result_data", None)
 
 
@@ -2296,13 +2400,124 @@ def _open_swaps_results() -> None:
     st.session_state["show_swaps_results"] = True
     st.session_state["inspect_product"] = None
     st.session_state["show_ai_help"] = False
+    st.session_state["show_wishlist_page"] = False
+    st.session_state["show_all_products_page"] = False
+    st.session_state["show_install_page"] = False
     st.session_state["_collapse_sidebar_for_details"] = False
+    st.session_state["_collapse_sidebar_for_wishlist"] = False
+    st.session_state["_collapse_sidebar_for_catalogue"] = False
+    st.session_state["_collapse_sidebar_for_install"] = False
     st.session_state.pop("match_result_data", None)
 
 
 def _close_ai_help() -> None:
     """AI Help back-button callback (the button supplies the single rerun)."""
     st.session_state["show_ai_help"] = False
+    st.session_state["show_wishlist_page"] = False
+    st.session_state["show_all_products_page"] = False
+    st.session_state["show_install_page"] = False
+    st.session_state["_collapse_sidebar_for_wishlist"] = False
+    st.session_state["_collapse_sidebar_for_catalogue"] = False
+    st.session_state["_collapse_sidebar_for_install"] = False
+
+
+def _open_wishlist_page() -> None:
+    """Sidebar button callback: hand the main screen to the wishlist view."""
+    st.session_state["show_wishlist_page"] = True
+    st.session_state["inspect_product"] = None
+    st.session_state["show_swaps_results"] = False
+    st.session_state["show_ai_help"] = False
+    st.session_state["show_all_products_page"] = False
+    st.session_state["show_install_page"] = False
+    st.session_state["_collapse_sidebar_for_details"] = False
+    st.session_state["_collapse_sidebar_for_wishlist"] = True
+    st.session_state["_collapse_sidebar_for_catalogue"] = False
+    st.session_state["_collapse_sidebar_for_install"] = False
+    st.session_state.pop("match_result_data", None)
+
+
+def _close_wishlist_page() -> None:
+    """Wishlist back-button callback (the button supplies the single rerun)."""
+    st.session_state["show_wishlist_page"] = False
+    st.session_state["_collapse_sidebar_for_wishlist"] = False
+    st.session_state["show_install_page"] = False
+    st.session_state["_collapse_sidebar_for_install"] = False
+
+
+def _open_catalogue_page() -> None:
+    """Sidebar button callback: hand the main screen to the product catalogue."""
+    mobile = str(st.query_params.get("mm_mobile", "0")) in ("1", "true", "True")
+    page_size = 4 if mobile else CATALOGUE_PAGE_SIZE
+    st.session_state["show_all_products_page"] = True
+    st.session_state["show_wishlist_page"] = False
+    st.session_state["inspect_product"] = None
+    st.session_state["show_swaps_results"] = False
+    st.session_state["show_ai_help"] = False
+    st.session_state["show_install_page"] = False
+    st.session_state["catalogue_initial_count"] = page_size
+    st.session_state["catalogue_visible_count"] = page_size
+    st.session_state["_collapse_sidebar_for_details"] = False
+    st.session_state["_collapse_sidebar_for_wishlist"] = False
+    st.session_state["_collapse_sidebar_for_catalogue"] = True
+    st.session_state["_collapse_sidebar_for_install"] = False
+    st.session_state.pop("match_result_data", None)
+
+
+def _close_catalogue_page() -> None:
+    """Catalogue back-button callback (the button supplies the single rerun)."""
+    st.session_state["show_all_products_page"] = False
+    st.session_state["_collapse_sidebar_for_catalogue"] = False
+    st.session_state["show_install_page"] = False
+    st.session_state["_collapse_sidebar_for_install"] = False
+
+
+def _show_more_catalogue_products() -> None:
+    """Catalogue View More callback; reveal six more product cards."""
+    st.session_state["catalogue_visible_count"] += CATALOGUE_PAGE_SIZE
+
+
+def _show_less_catalogue_products() -> None:
+    """Catalogue Show Less callback; restore the device's starting page size."""
+    st.session_state["catalogue_visible_count"] = st.session_state[
+        "catalogue_initial_count"
+    ]
+
+
+def _open_install_page() -> None:
+    """Sidebar button callback: hand the main screen to the PWA install guide."""
+    st.session_state["show_install_page"] = True
+    st.session_state["show_wishlist_page"] = False
+    st.session_state["show_all_products_page"] = False
+    st.session_state["inspect_product"] = None
+    st.session_state["show_swaps_results"] = False
+    st.session_state["show_ai_help"] = False
+    st.session_state["_collapse_sidebar_for_details"] = False
+    st.session_state["_collapse_sidebar_for_wishlist"] = False
+    st.session_state["_collapse_sidebar_for_catalogue"] = False
+    st.session_state["_collapse_sidebar_for_install"] = True
+    st.session_state.pop("match_result_data", None)
+
+
+def _close_install_page() -> None:
+    """Install-page back-button callback (the button supplies the single rerun)."""
+    st.session_state["show_install_page"] = False
+    st.session_state["_collapse_sidebar_for_install"] = False
+
+
+def _toggle_user_profile() -> None:
+    """Sidebar pill callback: expand or collapse the elevated profile card."""
+    st.session_state["show_user_profile"] = not st.session_state.get(
+        "show_user_profile", False
+    )
+
+
+def _profile_sign_out() -> None:
+    """Sign out from the profile card and clear the whole app session."""
+    try:
+        supabase.auth.sign_out()
+    except Exception:
+        pass
+    st.session_state.clear()
 
 
 def _render_back_to_home(key: str) -> None:
@@ -2322,43 +2537,46 @@ def _render_back_to_home(key: str) -> None:
         )
 
 
-def _reset_guide_pagination() -> None:
-    """Restart the product guide at three cards each time the toggle turns on."""
-    if st.session_state.get("show_product_guide"):
-        st.session_state["guide_visible_count"] = GUIDE_PAGE_SIZE
-
-
-def _show_more_guide_products() -> None:
-    """View More callback; the button's own rerun repaints the next three cards."""
-    st.session_state["guide_visible_count"] += GUIDE_PAGE_SIZE
-
-
-def _show_less_guide_products() -> None:
-    """Show Less callback; reset in one pass before the automatic rerun."""
-    st.session_state["guide_visible_count"] = GUIDE_PAGE_SIZE
-
-
-def _normalize_wishlist_pagination(item_count: int) -> None:
-    """Keep the visible count valid after adds/removes and across reruns."""
-    if item_count < WISHLIST_PAGE_SIZE:
-        st.session_state["wishlist_visible_count"] = item_count
-        return
-    current = int(
-        st.session_state.get("wishlist_visible_count", WISHLIST_PAGE_SIZE)
+def _render_wishlist_back_to_home(key: str) -> None:
+    """Top-left dark-emerald back pill for the dedicated wishlist page."""
+    st.markdown(
+        '<div class="ai-help-back-marker" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
     )
-    st.session_state["wishlist_visible_count"] = min(
-        max(WISHLIST_PAGE_SIZE, current), item_count
+    st.button(
+        "⌂ Back to home",
+        key=key,
+        help="Return to the start page",
+        on_click=_close_wishlist_page,
     )
 
 
-def _show_more_wishlist_items() -> None:
-    """View More callback; reveal three more saved food cards."""
-    st.session_state["wishlist_visible_count"] += WISHLIST_PAGE_SIZE
+def _render_catalogue_back_to_home(key: str) -> None:
+    """Top-left dark-emerald back pill for the dedicated catalogue page."""
+    st.markdown(
+        '<div class="ai-help-back-marker" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
+    st.button(
+        "⌂ Back to home",
+        key=key,
+        help="Return to the start page",
+        on_click=_close_catalogue_page,
+    )
 
 
-def _show_less_wishlist_items() -> None:
-    """Show Less callback; collapse back to the first three saved cards."""
-    st.session_state["wishlist_visible_count"] = WISHLIST_PAGE_SIZE
+def _render_install_back_to_home(key: str) -> None:
+    """Top-left dark-emerald back pill for the dedicated install page."""
+    st.markdown(
+        '<div class="ai-help-back-marker" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
+    st.button(
+        "⌂ Back to home",
+        key=key,
+        help="Return to the start page",
+        on_click=_close_install_page,
+    )
 
 
 def _sync_food_selection(canonical: str, search_value: str | None = None) -> None:
@@ -2405,6 +2623,12 @@ def select_food_value_callback(product: str) -> None:
     _sync_food_selection(product, product)
     st.session_state["inspect_product"] = None
     _reset_swaps_view()
+    st.session_state["show_wishlist_page"] = False
+    st.session_state["show_all_products_page"] = False
+    st.session_state["show_install_page"] = False
+    st.session_state["_collapse_sidebar_for_wishlist"] = False
+    st.session_state["_collapse_sidebar_for_catalogue"] = False
+    st.session_state["_collapse_sidebar_for_install"] = False
     st.session_state["food_box_ver"] = st.session_state.get("food_box_ver", 0) + 1
 
 
@@ -2415,7 +2639,13 @@ def inspect_food_value_callback(product: str) -> None:
     st.session_state["inspect_product"] = product
     st.session_state["show_swaps_results"] = False
     st.session_state["show_ai_help"] = False
+    st.session_state["show_wishlist_page"] = False
+    st.session_state["show_all_products_page"] = False
+    st.session_state["show_install_page"] = False
     st.session_state["_collapse_sidebar_for_details"] = True
+    st.session_state["_collapse_sidebar_for_wishlist"] = False
+    st.session_state["_collapse_sidebar_for_catalogue"] = False
+    st.session_state["_collapse_sidebar_for_install"] = False
     st.session_state.pop("match_result_data", None)
 
 
@@ -4218,44 +4448,12 @@ div[data-testid="stExpander"]:has(.filters-expander-marker) .stRadio div[role="r
     color: var(--text-muted) !important;
     margin-top: 0.35rem !important;
 }
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.guide-card) .stButton > button {
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.guide-card) .stButton > button {
     min-height: 32px !important;
     padding: 0.3rem 0.6rem !important;
     font-size: 0.78rem !important;
     border-radius: 8px !important;
     margin-top: 0.55rem !important;
-}
-
-/* ── Sidebar guide pagination — premium emerald "View More" button ── */
-.guide-view-more-marker, .guide-show-less-marker { display: none !important; }
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.guide-view-more-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    background: linear-gradient(135deg, rgba(46, 160, 67, 0.2), rgba(22, 27, 34, 0.95)) !important;
-    border: 1px solid rgba(46, 160, 67, 0.65) !important;
-    color: #6EE798 !important;
-    font-weight: 700 !important;
-    font-size: 15px !important;
-    letter-spacing: 0.03em !important;
-    border-radius: 10px !important;
-    padding: 9px 16px !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-    margin-top: 0.4rem !important;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
-}
-@media (hover: hover) {
-    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.guide-view-more-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
-        background: rgba(46, 160, 67, 0.32) !important;
-        border-color: #3FB950 !important;
-        color: #FFFFFF !important;
-    }
-}
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.guide-show-less-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    min-height: 30px !important;
-    padding: 0.2rem 0.5rem !important;
-    font-size: 0.75rem !important;
-    color: var(--text-muted) !important;
-    border: 1px solid #30363D !important;
-    border-radius: 8px !important;
-    margin-top: 0.3rem !important;
 }
 
 .selected-value {
@@ -4654,6 +4852,302 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
 .sidebar-stats .stats-tip strong {
     color: #FBBF24 !important;
     font-weight: 700 !important;
+}
+
+/* ── Sidebar profile pill + elevated glass card ── */
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    width: 100% !important;
+    background: linear-gradient(135deg, rgba(46, 160, 67, 0.18), rgba(22, 27, 34, 0.96)) !important;
+    border: 1.5px solid #3FB950 !important;
+    border-radius: 999px !important;
+    padding: 11px 18px !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 0 16px rgba(63, 185, 80, 0.28) !important;
+    min-height: 46px !important;
+}
+.profile-card {
+    background-color: #161B22 !important;
+    border: 1px solid #30363D !important;
+    border-radius: 16px !important;
+    padding: 16px !important;
+    margin-top: 10px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45) !important;
+}
+.profile-user-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+.profile-avatar {
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 50% !important;
+    background: linear-gradient(135deg, #2EA043, #2563EB) !important;
+    color: #FFFFFF !important;
+    font-weight: 800 !important;
+    font-size: 18px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+}
+.profile-name {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+    line-height: 1.25 !important;
+}
+.profile-email {
+    font-size: 13px !important;
+    color: #8B949E !important;
+    line-height: 1.35 !important;
+    margin-top: 2px !important;
+}
+.profile-stat-pill {
+    background-color: #1C2128 !important;
+    border: 1px solid #30363D !important;
+    border-radius: 999px !important;
+    padding: 7px 14px !important;
+    font-size: 14px !important;
+    color: #E6EDF3 !important;
+    margin-top: 8px !important;
+    text-align: center !important;
+}
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-signout-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    background-color: rgba(248, 81, 73, 0.12) !important;
+    border: 1px solid rgba(248, 81, 73, 0.65) !important;
+    color: #FFA198 !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    margin-top: 12px !important;
+}
+
+/* ── Wishlist + catalogue + install launchers and dedicated full pages ── */
+.wishlist-open-marker,
+.catalogue-open-marker,
+.install-open-marker,
+.wishlist-page-marker,
+.catalogue-page-marker,
+.install-page-marker,
+.install-steps-marker,
+.profile-toggle-marker,
+.profile-signout-marker,
+.wishlist-grid-marker,
+.catalogue-grid-marker {
+    display: none !important;
+}
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    width: 100% !important;
+    background: linear-gradient(135deg, rgba(46, 160, 67, 0.14), rgba(22, 27, 34, 0.95)) !important;
+    border: 1px solid rgba(46, 160, 67, 0.65) !important;
+    border-radius: 12px !important;
+    padding: 10px 14px !important;
+    font-weight: 700 !important;
+    font-size: 16px !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+    min-height: 46px !important;
+}
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    background: linear-gradient(135deg, rgba(46, 160, 67, 0.16), rgba(22, 27, 34, 0.95)) !important;
+}
+@media (hover: hover) {
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+        background: linear-gradient(135deg, rgba(46, 160, 67, 0.24), rgba(76, 20, 45, 0.82)) !important;
+        border-color: rgba(251, 113, 133, 0.75) !important;
+        color: #FFFFFF !important;
+    }
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.wishlist-page-marker),
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.catalogue-page-marker),
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.install-page-marker) {
+    background: linear-gradient(145deg, rgba(22, 27, 34, 0.98), rgba(13, 17, 23, 0.98)) !important;
+    border: 1px solid rgba(46, 160, 67, 0.35) !important;
+    border-radius: 16px !important;
+    padding: 16px !important;
+}
+.wishlist-page-heading {
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 1.7rem !important;
+    font-weight: 800 !important;
+    color: #FFFFFF !important;
+    margin: 0 0 14px !important;
+    letter-spacing: -0.02em !important;
+}
+.wishlist-page-heading span {
+    color: #FB7185 !important;
+}
+.catalogue-page-heading {
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 1.7rem !important;
+    font-weight: 800 !important;
+    color: #FFFFFF !important;
+    margin: 0 0 14px !important;
+    letter-spacing: -0.02em !important;
+}
+.catalogue-page-heading span {
+    color: #6EE798 !important;
+}
+.install-page-heading {
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 1.7rem !important;
+    font-weight: 800 !important;
+    color: #FFFFFF !important;
+    margin: 0 0 8px !important;
+    letter-spacing: -0.02em !important;
+}
+.install-page-subtitle {
+    color: #C9D1D9 !important;
+    font-size: 15px !important;
+    line-height: 1.5 !important;
+    margin: 0 0 18px !important;
+}
+@media (max-width: 768px) {
+    .wishlist-page-heading,
+    .catalogue-page-heading,
+    .install-page-heading {
+        font-size: 1.35rem !important;
+    }
+}
+.wishlist-empty-card {
+    border: 1px dashed rgba(46, 160, 67, 0.5) !important;
+    border-radius: 14px !important;
+    background: rgba(46, 160, 67, 0.08) !important;
+    padding: 28px 20px !important;
+    text-align: center !important;
+    color: #C9D1D9 !important;
+}
+.wishlist-empty-card .empty-icon {
+    display: block !important;
+    font-size: 2.4rem !important;
+    margin-bottom: 10px !important;
+}
+.wishlist-empty-card .empty-title {
+    display: block !important;
+    font-size: 1.15rem !important;
+    font-weight: 700 !important;
+    color: #F8FAFC !important;
+    margin-bottom: 6px !important;
+}
+
+/* ── Dedicated install page — clean two-step platform cards ── */
+div[data-testid="stVerticalBlockElement"]:has(.install-steps-marker) + div[data-testid="stHorizontalBlock"] {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+    align-items: stretch !important;
+}
+div[data-testid="stVerticalBlockElement"]:has(.install-steps-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    width: auto !important;
+    min-width: 0 !important;
+}
+@media (max-width: 768px) {
+    div[data-testid="stVerticalBlockElement"]:has(.install-steps-marker) + div[data-testid="stHorizontalBlock"] {
+        grid-template-columns: 1fr !important;
+    }
+}
+.install-step-card {
+    height: 100% !important;
+    background: linear-gradient(145deg, rgba(46, 160, 67, 0.14), rgba(22, 27, 34, 0.95)) !important;
+    border: 1px solid rgba(46, 160, 67, 0.5) !important;
+    border-radius: 14px !important;
+    padding: 18px !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22) !important;
+}
+.install-step-num {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 999px !important;
+    background: rgba(46, 160, 67, 0.25) !important;
+    border: 1px solid rgba(46, 160, 67, 0.7) !important;
+    color: #6EE798 !important;
+    font-weight: 800 !important;
+    margin-bottom: 10px !important;
+}
+.install-step-title {
+    font-size: 1.1rem !important;
+    font-weight: 800 !important;
+    color: #FFFFFF !important;
+    margin-bottom: 8px !important;
+}
+.install-step-body {
+    color: #C9D1D9 !important;
+    font-size: 14.5px !important;
+    line-height: 1.6 !important;
+}
+.install-step-body strong {
+    color: #6EE798 !important;
+    font-weight: 700 !important;
+}
+.install-native-note {
+    color: #8B949E !important;
+    font-size: 13px !important;
+    margin-top: 14px !important;
+}
+div[data-testid="stVerticalBlockElement"]:has(.install-page-marker) #mm-pwa-install-slot {
+    margin-top: 12px !important;
+}
+
+div[data-testid="stVerticalBlockElement"]:has(.wishlist-grid-marker) + div[data-testid="stHorizontalBlock"],
+div[data-testid="stVerticalBlockElement"]:has(.catalogue-grid-marker) + div[data-testid="stHorizontalBlock"] {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 16px !important;
+    align-items: start !important;
+}
+div[data-testid="stVerticalBlockElement"]:has(.wishlist-grid-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"],
+div[data-testid="stVerticalBlockElement"]:has(.catalogue-grid-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    width: auto !important;
+    min-width: 0 !important;
+}
+@media (max-width: 768px) {
+    div[data-testid="stVerticalBlockElement"]:has(.wishlist-grid-marker) + div[data-testid="stHorizontalBlock"],
+    div[data-testid="stVerticalBlockElement"]:has(.catalogue-grid-marker) + div[data-testid="stHorizontalBlock"] {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* ── Catalogue pagination — emerald-outlined buttons on the main screen ── */
+.catalogue-view-more-marker,
+.catalogue-show-less-marker {
+    display: none !important;
+}
+div[data-testid="stVerticalBlockElement"]:has(.catalogue-view-more-marker) + div[data-testid="stVerticalBlockElement"],
+div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div[data-testid="stVerticalBlockElement"] {
+    display: flex !important;
+    justify-content: center !important;
+}
+div[data-testid="stVerticalBlockElement"]:has(.catalogue-view-more-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
+div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
+    background: linear-gradient(135deg, rgba(46, 160, 67, 0.2), rgba(22, 27, 34, 0.95)) !important;
+    border: 1px solid rgba(46, 160, 67, 0.65) !important;
+    color: #6EE798 !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;
+    letter-spacing: 0.03em !important;
+    border-radius: 10px !important;
+    padding: 10px 20px !important;
+    min-width: 150px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    margin-top: 0.5rem !important;
+}
+@media (hover: hover) {
+    div[data-testid="stVerticalBlockElement"]:has(.catalogue-view-more-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
+    div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+        background: rgba(46, 160, 67, 0.32) !important;
+        border-color: #3FB950 !important;
+        color: #FFFFFF !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -5634,7 +6128,13 @@ def _open_ai_help() -> None:
     st.session_state["show_ai_help"] = True
     st.session_state["inspect_product"] = None
     st.session_state["show_swaps_results"] = False
+    st.session_state["show_wishlist_page"] = False
+    st.session_state["show_all_products_page"] = False
+    st.session_state["show_install_page"] = False
     st.session_state["_collapse_sidebar_for_details"] = False
+    st.session_state["_collapse_sidebar_for_wishlist"] = False
+    st.session_state["_collapse_sidebar_for_catalogue"] = False
+    st.session_state["_collapse_sidebar_for_install"] = False
     st.session_state.pop("match_result_data", None)
 
 
@@ -5707,6 +6207,201 @@ def _render_ai_help() -> None:
             # chat_input already returns through a rerun; this second pass only
             # renders the freshly appended user/assistant pair in order.
             st.rerun()
+
+
+def _render_wishlist_page() -> None:
+    """Dedicated full-page wishlist with a responsive 3-column card grid."""
+    if not st.session_state.get("show_wishlist_page"):
+        return
+
+    # One-shot mobile collapse requested by the sidebar launcher.
+    if st.session_state.pop("_collapse_sidebar_for_wishlist", False):
+        components.html(_MOBILE_DETAILS_COLLAPSE_JS, height=0, scrolling=False)
+
+    _render_wishlist_back_to_home("wishlist_back_to_home")
+    wishlist_items = _normalize_wishlist(st.session_state.get("wishlist", []))
+
+    with st.container(border=True):
+        st.markdown(
+            '<div class="wishlist-page-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="wishlist-page-heading">❤️ Your Saved Wishlist '
+            f'<span>({len(wishlist_items)})</span></div>',
+            unsafe_allow_html=True,
+        )
+
+        if not wishlist_items:
+            st.markdown(
+                '<div class="wishlist-empty-card">'
+                '<span class="empty-icon">💚</span>'
+                '<span class="empty-title">Nothing saved yet</span>'
+                "Tap <strong>🤍 Wishlist</strong> on any food card to keep it "
+                "here for quick access."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            return
+
+        details = load_product_details()
+        st.markdown(
+            '<div class="wishlist-grid-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        grid_cols = st.columns(3, gap="medium")
+        for index, food_name in enumerate(wishlist_items):
+            with grid_cols[index % 3]:
+                detail = details.get(food_name)
+                if detail is None:
+                    st.caption(f"⚠️ {food_name} is no longer in the catalogue.")
+                    continue
+                _render_sidebar_product_card(
+                    food_name,
+                    detail,
+                    key_prefix="wish_page",
+                    wishlist_label="🗑️ Remove",
+                    on_wishlist_click=_remove_wishlist_item,
+                )
+
+
+def _render_catalogue_page() -> None:
+    """Dedicated full-page catalogue with a responsive 3-column card grid."""
+    if not st.session_state.get("show_all_products_page"):
+        return
+
+    # One-shot mobile collapse requested by the sidebar launcher.
+    if st.session_state.pop("_collapse_sidebar_for_catalogue", False):
+        components.html(_MOBILE_DETAILS_COLLAPSE_JS, height=0, scrolling=False)
+
+    _render_catalogue_back_to_home("catalogue_back_to_home")
+    details = load_product_details()
+    all_products = sorted(details)
+    initial_count = int(
+        st.session_state.get("catalogue_initial_count", CATALOGUE_PAGE_SIZE)
+    )
+    visible_count = min(
+        int(st.session_state.get("catalogue_visible_count", CATALOGUE_PAGE_SIZE)),
+        len(all_products),
+    )
+    st.session_state["catalogue_visible_count"] = visible_count
+
+    with st.container(border=True):
+        st.markdown(
+            '<div class="catalogue-page-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="catalogue-page-heading">📖 All Available Products '
+            f'<span>({len(all_products)})</span></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="catalogue-grid-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        grid_cols = st.columns(3, gap="medium")
+        for index, item_name in enumerate(all_products[:visible_count]):
+            with grid_cols[index % 3]:
+                _render_sidebar_product_card(
+                    item_name,
+                    details[item_name],
+                    key_prefix="catalogue",
+                )
+
+        st.caption(f"Showing {visible_count} of {len(all_products)} products")
+
+        if visible_count < len(all_products):
+            st.markdown(
+                '<div class="catalogue-view-more-marker" aria-hidden="true"></div>',
+                unsafe_allow_html=True,
+            )
+            st.button(
+                "View More",
+                key="catalogue_view_more",
+                use_container_width=False,
+                on_click=_show_more_catalogue_products,
+            )
+
+        if visible_count > initial_count:
+            st.markdown(
+                '<div class="catalogue-show-less-marker" aria-hidden="true"></div>',
+                unsafe_allow_html=True,
+            )
+            st.button(
+                "Show Less",
+                key="catalogue_show_less",
+                use_container_width=False,
+                on_click=_show_less_catalogue_products,
+            )
+
+
+def _render_install_page() -> None:
+    """Dedicated full-page install guide with native-prompt fallback."""
+    if not st.session_state.get("show_install_page"):
+        return
+
+    # One-shot mobile collapse requested by the sidebar launcher.
+    if st.session_state.pop("_collapse_sidebar_for_install", False):
+        components.html(_MOBILE_DETAILS_COLLAPSE_JS, height=0, scrolling=False)
+
+    _render_install_back_to_home("install_back_to_home")
+
+    with st.container(border=True):
+        st.markdown(
+            '<div class="install-page-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="install-page-heading">📲 Install MacroMatch Mobile App</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="install-page-subtitle">Keep MacroMatch on your home '
+            "screen for one-tap access to swaps, macros and your wishlist."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            '<div class="install-steps-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        android_col, iphone_col = st.columns(2, gap="medium")
+        with android_col:
+            st.markdown(
+                '<div class="install-step-card">'
+                '<div class="install-step-num">1</div>'
+                '<div class="install-step-title">🤖 Android — Chrome</div>'
+                '<div class="install-step-body">Tap the <strong>⋮ menu</strong>, '
+                "then choose <strong>Install app</strong> or "
+                "<strong>Add to Home screen</strong>.</div>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with iphone_col:
+            st.markdown(
+                '<div class="install-step-card">'
+                '<div class="install-step-num">2</div>'
+                '<div class="install-step-title">🍎 iPhone — Safari</div>'
+                '<div class="install-step-body">Tap <strong>Share (⬆️)</strong>, '
+                "then choose <strong>Add to Home Screen</strong>.</div>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown(
+            '<div id="mm-pwa-install-slot"></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="install-native-note">If your browser supports a one-tap '
+            "install, the button appears above automatically. Otherwise follow "
+            "the steps for your device.</div>",
+            unsafe_allow_html=True,
+        )
+        if _PWA_INSTALL_BUTTON_JS:
+            components.html(_PWA_INSTALL_BUTTON_JS, height=0, scrolling=False)
 
 
 def _macro_line(detail: dict, serving_g: int | None = None) -> str:
@@ -6058,7 +6753,7 @@ def _render_sidebar_product_card(
     wishlist_label: str | None = None,
     on_wishlist_click=None,
 ) -> None:
-    """Shared dark card for the product guide and the My Wishlist section."""
+    """Shared dark card for the full-page wishlist and product catalogue."""
     image_src = product_image_src(item_name)
     if image_src:
         image_html = (
@@ -6092,9 +6787,8 @@ def _render_sidebar_product_card(
             "</div>",
             unsafe_allow_html=True,
         )
-        # Identical 3-button row in both surfaces. "Select" is auto-collapsed
-        # on mobile by the parent-document listener; "View Details" triggers
-        # the one-shot collapse on the dedicated details page.
+        # Identical 3-button row on both full-page surfaces. "Select" is
+        # auto-collapsed on mobile; "View Details" opens the dedicated guide.
         col_sel, col_det, col_wish = st.columns([1, 1.15, 1])
         with col_sel:
             st.button(
@@ -6131,44 +6825,6 @@ def _render_sidebar_product_card(
                     args=(item_name,),
                     help=f"Remove {item_name} from wishlist",
                 )
-
-
-def render_product_guide(details: dict[str, dict]) -> None:
-    """Compact, paginated one-column catalogue tailored to the sidebar width."""
-    all_products = sorted(details)
-    visible_products = all_products[:st.session_state["guide_visible_count"]]
-    for item_name in visible_products:
-        _render_sidebar_product_card(
-            item_name,
-            details[item_name],
-            key_prefix="guide",
-        )
-
-    st.caption(f"Showing {len(visible_products)} of {len(all_products)} products")
-
-    if st.session_state["guide_visible_count"] < len(all_products):
-        st.markdown(
-            '<div class="guide-view-more-marker" aria-hidden="true"></div>',
-            unsafe_allow_html=True,
-        )
-        st.button(
-            "View More",
-            key="guide_view_more",
-            use_container_width=True,
-            on_click=_show_more_guide_products,
-        )
-
-    if st.session_state["guide_visible_count"] > GUIDE_PAGE_SIZE:
-        st.markdown(
-            '<div class="guide-show-less-marker" aria-hidden="true"></div>',
-            unsafe_allow_html=True,
-        )
-        st.button(
-            "Show Less",
-            key="guide_show_less",
-            use_container_width=True,
-            on_click=_show_less_guide_products,
-        )
 
 
 def call_api(payload: dict) -> requests.Response | None:
@@ -6262,7 +6918,13 @@ def render_how_it_works() -> None:
         )
 
 
-if not show_product_details and not show_ai_help:
+if (
+    not show_product_details
+    and not show_ai_help
+    and not show_wishlist_page
+    and not show_all_products_page
+    and not show_install_page
+):
     # ─────────────────────────────────────────────
     # Hero header (home + results only)
     # ─────────────────────────────────────────────
@@ -6314,36 +6976,67 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # ─── Signed-in welcome + sign out (Supabase Auth) ───────────────
+    # ─── Profile pill + elevated glass card (Supabase Auth) ─────────────
     _auth_user = st.session_state.get("supabase_user")
     _metadata = getattr(_auth_user, "user_metadata", None) or {}
     _email_local = CURRENT_USER_EMAIL.split("@")[0] if CURRENT_USER_EMAIL else "there"
-    _raw_name = _metadata.get("full_name") or _email_local
-    _display_name = html.escape(str(_raw_name).strip() or _email_local)
-    _display_email = html.escape(CURRENT_USER_EMAIL)
-    st.markdown(f"""
-    <div class="sidebar-welcome">
-        <div class="welcome-name">Welcome, {_display_name}</div>
-        <div class="welcome-email">{_display_email}</div>
-    </div>
-    """, unsafe_allow_html=True)
-    if st.button("🚪 Sign out", key="supabase_sign_out"):
-        try:
-            supabase.auth.sign_out()
-        except Exception:
-            pass
-        st.session_state["supabase_user"] = None
-        st.session_state["supabase_access_token"] = None
-        st.session_state["supabase_refresh_token"] = None
-        st.session_state["supabase_user_name"] = None
-        st.session_state["supabase_recovery_mode"] = False
-        st.session_state.pop("_preferences_user_id", None)
-        st.session_state.pop("_preferences_filters_pending", None)
-        st.session_state.pop("_saved_matches_cache_user", None)
-        for _key in list(st.session_state):
-            if str(_key).startswith("saved_matches::"):
-                st.session_state.pop(_key, None)
-        st.rerun()
+    user_name = str(_metadata.get("full_name") or _email_local).strip() or _email_local
+    _safe_user_name = html.escape(user_name)
+    _safe_email = html.escape(CURRENT_USER_EMAIL)
+    _profile_initial = html.escape(user_name[0].upper())
+    try:
+        _protein_goal = int(st.session_state.get("daily_protein_goal", 120))
+    except (TypeError, ValueError):
+        _protein_goal = 120
+    try:
+        _calorie_goal = int(st.session_state.get("daily_calorie_goal", 2000))
+    except (TypeError, ValueError):
+        _calorie_goal = 2000
+    _wishlist_count = len(_normalize_wishlist(st.session_state.get("wishlist", [])))
+    _saved_count = len(get_saved_matches(CURRENT_USER_ID) or [])
+
+    st.markdown(
+        '<div class="profile-toggle-marker" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
+    _profile_caret = "▴" if st.session_state.get("show_user_profile") else "▾"
+    st.button(
+        f"🟢  {user_name}   {_profile_caret}",
+        key="sidebar_profile_toggle",
+        use_container_width=True,
+        type="secondary",
+        on_click=_toggle_user_profile,
+    )
+
+    if st.session_state.get("show_user_profile"):
+        st.markdown(
+            f"""
+            <div class="profile-card">
+                <div class="profile-user-row">
+                    <div class="profile-avatar">{_profile_initial}</div>
+                    <div>
+                        <div class="profile-name">{_safe_user_name}</div>
+                        <div class="profile-email">{_safe_email}</div>
+                    </div>
+                </div>
+                <div class="profile-stat-pill">🎯 {_protein_goal}g Protein · {_calorie_goal} kcal</div>
+                <div class="profile-stat-pill">❤️ {_wishlist_count} Wishlist  ·  🕒 {_saved_count} Swaps</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="profile-signout-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        st.button(
+            "🚪 Sign out",
+            key="profile_card_signout",
+            use_container_width=True,
+            type="secondary",
+            on_click=_profile_sign_out,
+        )
+
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
     # ─── Per-user saved matches history (Supabase, user_id-keyed) ────────
@@ -6360,80 +7053,40 @@ with st.sidebar:
         saved_matches_slot = st.empty()
         render_saved_matches(saved_matches_slot)
 
-    # ─── Per-user wishlist (persisted in Supabase Auth user_metadata) ────
-    # Loaded here so wishlist cards and the product guide share one renderer.
+    # ─── Wishlist launcher (full page lives on the main screen) ──────────
     product_details = load_product_details()
-    wishlist_items = _normalize_wishlist(st.session_state.get("wishlist", []))
-    _normalize_wishlist_pagination(len(wishlist_items))
-    visible_wishlist = wishlist_items[
-        : st.session_state["wishlist_visible_count"]
-    ]
-    with st.expander(
-        f"❤️ My Wishlist ({len(wishlist_items)})", expanded=False
-    ):
-        st.markdown(
-            '<div class="wishlist-marker" aria-hidden="true"></div>',
-            unsafe_allow_html=True,
-        )
-        if not wishlist_items:
-            st.caption("No favorite foods saved yet. Tap 🤍 Wishlist on any product!")
-        else:
-            for food_name in visible_wishlist:
-                wishlist_detail = product_details.get(food_name)
-                if wishlist_detail is None:
-                    st.caption(f"⚠️ {food_name} is no longer in the catalogue.")
-                    continue
-                _render_sidebar_product_card(
-                    food_name,
-                    wishlist_detail,
-                    key_prefix="wish",
-                    wishlist_label="❤️",
-                    on_wishlist_click=_remove_wishlist_item,
-                )
+    st.markdown(
+        '<div class="wishlist-open-marker" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
+    st.button(
+        f"❤️ View Your Wishlist ({len(st.session_state['wishlist'])})",
+        key="open_wishlist_page",
+        use_container_width=True,
+        type="secondary",
+        on_click=_open_wishlist_page,
+    )
 
-            st.caption(
-                f"Showing {len(visible_wishlist)} of {len(wishlist_items)} saved items"
-            )
-
-            if st.session_state["wishlist_visible_count"] < len(wishlist_items):
-                st.markdown(
-                    '<div class="guide-view-more-marker" aria-hidden="true"></div>',
-                    unsafe_allow_html=True,
-                )
-                st.button(
-                    "View More",
-                    key="wishlist_view_more",
-                    use_container_width=True,
-                    on_click=_show_more_wishlist_items,
-                )
-
-            if st.session_state["wishlist_visible_count"] > WISHLIST_PAGE_SIZE:
-                st.markdown(
-                    '<div class="guide-show-less-marker" aria-hidden="true"></div>',
-                    unsafe_allow_html=True,
-                )
-                st.button(
-                    "Show Less",
-                    key="wishlist_show_less",
-                    use_container_width=True,
-                    on_click=_show_less_wishlist_items,
-                )
-
-    # ─── Product guide (moved here from the bottom of the main page) ─────
+    # ─── Product guide (opens the dedicated full-page catalogue) ─────────
     st.markdown(
         '<div class="sidebar-section-title">📖 Product guide</div>',
         unsafe_allow_html=True,
     )
     st.caption(
-        "New to a food? Browse the catalogue to see what it looks like, "
-        "its macros per 100 g, diet rules and allergens."
+        "Browse every food with its photo, macros per 100 g, diet rules and "
+        "allergens on a full page."
     )
-    if st.toggle(
-        f"**Show all {len(product_details)} products**",
-        key="show_product_guide",
-        on_change=_reset_guide_pagination,
-    ):
-        render_product_guide(product_details)
+    st.markdown(
+        '<div class="catalogue-open-marker" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
+    st.button(
+        f"📖 View All Products ({len(product_details)})",
+        key="open_catalogue_page",
+        use_container_width=True,
+        type="secondary",
+        on_click=_open_catalogue_page,
+    )
 
     # ─── Daily macro goal ──────────────────────────────────────────────
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
@@ -6505,23 +7158,21 @@ with st.sidebar:
                 "Preferences saved!",
             )
 
-    # ─── Mobile install helper (above the saved-matches summary) ──────
-    with st.expander("📲 Install Mobile App", expanded=False):
-        st.markdown(
-            "**Android (Chrome):** Tap **⋮ (Menu)** → "
-            "**Add to Home screen / Install app**  \n"
-            "**iPhone (Safari):** Tap **Share (⬆️)** → **Add to Home Screen**"
-        )
-        st.markdown(
-            '<div id="mm-pwa-install-slot"></div>',
-            unsafe_allow_html=True,
-        )
-        if _PWA_INSTALL_BUTTON_JS:
-            components.html(_PWA_INSTALL_BUTTON_JS, height=0, scrolling=False)
+    # ─── Mobile install launcher (full page lives on the main screen) ───
+    st.markdown(
+        '<div class="install-open-marker" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
+    st.button(
+        "📲 Install Mobile App",
+        key="sidebar_install_app_btn",
+        use_container_width=True,
+        type="secondary",
+        on_click=_open_install_page,
+    )
 
     # ─── Bottom activity footer ────────────────────────────────────────
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
-    _saved_count = len(get_saved_matches(CURRENT_USER_ID) or [])
     st.markdown(
         f"""
         <div class="sidebar-stats">
@@ -6530,12 +7181,36 @@ with st.sidebar:
                 <span class="stats-value">{_saved_count}</span>
             </div>
             <div class="stats-tip">
-                <div style="font-size: 14.5px; color: #C9D1D9; line-height: 1.45;"><strong style="color: #FBBF24;">💡 Tip:</strong> Click any product in the guide to load it instantly.</div>
+                <div style="font-size: 14.5px; color: #C9D1D9; line-height: 1.45;"><strong style="color: #FBBF24;">💡 Tip:</strong> Open the product guide to load any food instantly.</div>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+
+# ─────────────────────────────────────────────
+# Dedicated PWA Install page — replaces the entire main screen
+# ─────────────────────────────────────────────
+if show_install_page:
+    _render_install_page()
+    st.stop()
+
+
+# ─────────────────────────────────────────────
+# Dedicated Product Catalogue page — replaces the entire main screen
+# ─────────────────────────────────────────────
+if show_all_products_page:
+    _render_catalogue_page()
+    st.stop()
+
+
+# ─────────────────────────────────────────────
+# Dedicated Wishlist page — replaces the entire main screen
+# ─────────────────────────────────────────────
+if show_wishlist_page:
+    _render_wishlist_page()
+    st.stop()
 
 
 # ─────────────────────────────────────────────
