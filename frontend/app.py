@@ -177,7 +177,7 @@ _MOBILE_SIDEBAR_CLOSE_JS = """
 # Touch-first defaults shared by the logged-out and signed-in screens.
 # ``touch-action: manipulation`` removes the mobile 300 ms double-tap zoom wait,
 # and the mobile media query drops GPU-heavy blur/transitions on low-end phones.
-_TOUCH_FIRST_CSS = """
+_TOUCH_FIRST_CSS = r"""
 /* Zero-height JS helper iframes are invisible but still cover parts of the
    page; they must never swallow a finger tap aimed at a button underneath.
    The searchbox is a real visible component, so restore it explicitly. */
@@ -196,12 +196,21 @@ iframe[data-testid="stIFrame"][title="streamlit_searchbox.searchbox"] {
 }
 
 /* Every visible button stays above decorative layers and reacts on the first
-   tap instead of waiting for a sticky hover state. */
-button {
+   tap instead of waiting for a sticky hover state. ``:not(#\9)`` only raises
+   specificity so this wins over the more specific themed button rules below;
+   it matches every real button. No transition means no 300 ms tap delay and
+   no animation before the click event is dispatched. */
+button,
+button:not(#\9),
+html body button:not(#\9),
+html body [data-baseweb="tab"]:not(#\9),
+html body [role="button"]:not(#\9) {
     position: relative;
     z-index: 10;
     pointer-events: auto !important;
     touch-action: manipulation !important;
+    transition: none !important;
+    -webkit-transition: none !important;
 }
 
 button,
@@ -860,8 +869,15 @@ def _stop_after_deferred_components() -> None:
 # ─────────────────────────────────────────────
 
 
+@st.cache_resource(show_spinner=False)
 def get_supabase_client() -> Client:
-    """Create a Supabase client from st.secrets (Cloud) or env vars (local dev)."""
+    """Return the process-wide Supabase client (built once, never on a tap).
+
+    ``create_client`` builds HTTP clients and loads keys, so recreating it on
+    every rerun added measurable latency to every button click. The client is
+    safe to share because auth is attached per call via ``set_session`` before
+    any query (see ``get_authenticated_supabase``).
+    """
     url = st.secrets.get("SUPABASE_URL", "") if hasattr(st, "secrets") else ""
     key = (
         st.secrets.get("SUPABASE_ANON_KEY", "") if hasattr(st, "secrets") else ""
@@ -978,11 +994,12 @@ def _load_user_preferences(user) -> None:
 
 
 def _ensure_supabase_session() -> None:
-    """Attach stored tokens to the client on EVERY rerun.
+    """Attach the stored tokens to the shared client on every rerun.
 
-    get_supabase_client() creates a fresh client each script run. Without
-    calling set_session() again, PostgREST requests are anonymous and RLS
-    policies (`auth.uid() = user_id`) reject the saved-matches queries.
+    The client itself is now cached, but the active JWT still has to be bound
+    before any query: otherwise PostgREST requests are anonymous and RLS
+    policies (`auth.uid() = user_id`) reject saved-matches queries. This is a
+    local operation, not a network call.
     """
     access = st.session_state["supabase_access_token"]
     refresh = st.session_state["supabase_refresh_token"]
@@ -1027,13 +1044,13 @@ def _ensure_supabase_session() -> None:
 
 
 def get_authenticated_supabase() -> Client:
-    """Return a fresh Supabase client with this user's JWT attached.
+    """Return the cached Supabase client with this user's JWT attached.
 
     RLS policies on `saved_matches` compare `auth.uid()` with `user_id`. A
-    client created without a session talks to PostgREST as `anon`, which is
-    why inserts from other signed-in users fail with 42501. Building the
-    client per call and explicitly attaching the stored access token keeps
-    every query authenticated, even after reruns or on another device.
+    client without a bound session talks to PostgREST as `anon`, which is why
+    inserts from other signed-in users fail with 42501. Reusing the cached
+    client and attaching the stored access token on each call keeps every
+    query authenticated without rebuilding HTTP clients on every tap.
     """
     client = get_supabase_client()
     access = st.session_state.get("supabase_access_token")
@@ -1468,7 +1485,7 @@ header[data-testid="stHeader"] {
         font-size: 0.95rem !important;
         font-weight: 700 !important;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
-        transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease !important;
+        transition: none !important;
     }
     @media (hover: hover) {
         div[data-testid="stVerticalBlockElement"]:has(.auth-google-slot) + div[data-testid="stVerticalBlockElement"] button:hover {
@@ -1521,7 +1538,7 @@ header[data-testid="stHeader"] {
         color: var(--auth-muted) !important;
         background: rgba(148, 163, 184, 0.06) !important;
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
-        transition: background-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease !important;
+        transition: none !important;
     }
     @media (hover: hover) {
         .stTabs button[data-baseweb="tab"]:hover {
@@ -1603,7 +1620,7 @@ header[data-testid="stHeader"] {
         width: 100% !important;
         min-height: 52px !important;
         box-shadow: 0 12px 28px rgba(46, 160, 67, 0.28), 0 0 20px rgba(46, 160, 67, 0.16) !important;
-        transition: transform 0.18s ease, box-shadow 0.18s ease !important;
+        transition: none !important;
     }
     @media (hover: hover) {
         div.stButton > button[kind="primary"]:hover,
@@ -1631,7 +1648,7 @@ header[data-testid="stHeader"] {
         font-size: 0.86rem !important;
         font-weight: 600 !important;
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
-        transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease !important;
+        transition: none !important;
     }
     @media (hover: hover) {
         div[data-testid="column"]:has(.auth-brand) button[kind="secondary"]:hover,
@@ -3557,7 +3574,7 @@ header[data-testid="stHeader"] button[kind="header"] {
     opacity: 1 !important;
     visibility: visible !important;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
-    transition: all 0.15s ease !important;
+    transition: none !important;
 }
 
 [data-testid="stSidebarCollapseButton"] button svg,
@@ -3932,7 +3949,7 @@ button[kind="primary"] p {
     font-weight: 700 !important;
     letter-spacing: 0.3px !important;
     border-radius: 10px !important;
-    transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease !important;
+    transition: none !important;
     box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
 }
 /* Touch devices must get a clean first tap: hover effects are desktop-only. */
@@ -4446,7 +4463,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) .stButton >
     background: rgba(46, 160, 67, 0.12) !important;
     border: 1px solid rgba(46, 160, 67, 0.35) !important;
     border-radius: 999px !important;
-    transition: all 0.15s ease !important;
+    transition: none !important;
 }
 @media (hover: hover) {
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) .stButton > button:hover {
@@ -4722,7 +4739,7 @@ button[data-baseweb="pill"] {
     color: #CBD5E1 !important;
     font-weight: 600 !important;
     padding: 0.45rem 0.85rem !important;
-    transition: background-color 0.12s ease, border-color 0.12s ease !important;
+    transition: none !important;
 }
 div[data-testid="stPills"] button[aria-pressed="true"],
 div[data-testid="stPills"] button[aria-checked="true"],
@@ -4794,7 +4811,7 @@ div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-t
     font-size: 15px !important;
     line-height: 1.2 !important;
     box-shadow: none !important;
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+    transition: none !important;
 }
 div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] .stButton > button p,
 div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"] p {
@@ -5008,18 +5025,6 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
     color: #FFFFFF !important;
 }
 
-.sidebar-section-title {
-    font-size: 18px !important;
-    font-weight: 800 !important;
-    color: #4ADE80 !important;
-    background-color: rgba(46, 160, 67, 0.14);
-    border-left: 3px solid #2EA043;
-    padding: 4px 10px;
-    border-radius: 6px;
-    display: inline-block;
-    margin: 0.4rem 0 0.3rem !important;
-}
-
 section[data-testid="stSidebar"] div[data-testid="stToggle"],
 section[data-testid="stSidebar"] div[data-testid="stCheckbox"] {
     background-color: rgba(46, 160, 67, 0.12) !important;
@@ -5078,19 +5083,20 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
 /* ── Sidebar profile pill + elevated glass card ── */
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
     width: 100% !important;
-    background: linear-gradient(135deg, rgba(46, 160, 67, 0.18), rgba(22, 27, 34, 0.96)) !important;
-    border: 1.5px solid #3FB950 !important;
-    border-radius: 999px !important;
-    padding: 11px 18px !important;
+    background: linear-gradient(135deg, rgba(46, 160, 67, 0.22) 0%, rgba(22, 27, 34, 0.96) 100%) !important;
+    border: 1.5px solid rgba(63, 185, 80, 0.65) !important;
+    border-radius: 14px !important;
+    padding: 14px 16px !important;
     font-size: 16px !important;
     font-weight: 700 !important;
     color: #FFFFFF !important;
-    box-shadow: 0 0 16px rgba(63, 185, 80, 0.28) !important;
-    min-height: 46px !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35) !important;
+    min-height: 54px !important;
+    text-align: left !important;
 }
 .profile-card {
-    background-color: #161B22 !important;
-    border: 1px solid #30363D !important;
+    background: linear-gradient(135deg, rgba(46, 160, 67, 0.12) 0%, #161B22 100%) !important;
+    border: 1px solid rgba(63, 185, 80, 0.4) !important;
     border-radius: 16px !important;
     padding: 16px !important;
     margin-top: 10px !important;
@@ -5138,7 +5144,7 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
     text-align: center !important;
 }
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-signout-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    background-color: rgba(248, 81, 73, 0.12) !important;
+    background-color: rgba(248, 81, 73, 0.14) !important;
     border: 1px solid rgba(248, 81, 73, 0.65) !important;
     color: #FFA198 !important;
     border-radius: 10px !important;
@@ -5167,25 +5173,23 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
     width: 100% !important;
-    background: linear-gradient(135deg, rgba(46, 160, 67, 0.14), rgba(22, 27, 34, 0.95)) !important;
-    border: 1px solid rgba(46, 160, 67, 0.65) !important;
+    background-color: #161B22 !important;
+    border: 1px solid rgba(63, 185, 80, 0.45) !important;
     border-radius: 12px !important;
-    padding: 10px 14px !important;
+    padding: 12px 14px !important;
     font-weight: 700 !important;
-    font-size: 16px !important;
+    font-size: 16.5px !important;
     color: #FFFFFF !important;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
-    min-height: 46px !important;
-}
-[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    background: linear-gradient(135deg, rgba(46, 160, 67, 0.16), rgba(22, 27, 34, 0.95)) !important;
+    min-height: 48px !important;
+    text-align: left !important;
 }
 @media (hover: hover) {
     [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
     [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
     [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
-        background: linear-gradient(135deg, rgba(46, 160, 67, 0.24), rgba(76, 20, 45, 0.82)) !important;
-        border-color: rgba(251, 113, 133, 0.75) !important;
+        background-color: #1C2128 !important;
+        border-color: rgba(63, 185, 80, 0.75) !important;
         color: #FFFFFF !important;
     }
 }
@@ -5422,37 +5426,39 @@ div[data-testid="stVerticalBlockElement"]:has(.catalogue-show-less-marker) + div
     }
 }
 
-/* 1. Rich emerald gradient & larger bold text for all sidebar buttons */
+/* 1. Quiet dark-slate base so the few remaining sidebar buttons (e.g. the
+   Save Target / Save Preferences actions inside expanders) sit at the same
+   visual weight as the navigation rows instead of shouting bright green. */
 section[data-testid="stSidebar"] div[data-testid="stButton"] button {
-    background: linear-gradient(135deg, rgba(46, 160, 67, 0.26) 0%, rgba(15, 58, 37, 0.65) 100%) !important;
-    border: 1.5px solid #3FB950 !important;
-    border-radius: 14px !important;
-    padding: 13px 16px !important;
-    min-height: 50px !important;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 10px rgba(63, 185, 80, 0.15) !important;
-    transition: all 0.15s ease !important;
+    background-color: #161B22 !important;
+    border: 1px solid rgba(63, 185, 80, 0.35) !important;
+    border-radius: 12px !important;
+    padding: 12px 16px !important;
+    min-height: 48px !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35) !important;
+    transition: none !important;
 }
 
 section[data-testid="stSidebar"] div[data-testid="stButton"] button p,
 section[data-testid="stSidebar"] div[data-testid="stButton"] button span {
-    font-size: 17px !important;
+    font-size: 16.5px !important;
     font-weight: 700 !important;
     color: #FFFFFF !important;
     letter-spacing: 0.02em !important;
 }
 
-/* 2. Top User Profile button: brighter pill shape with emerald glow */
-section[data-testid="stSidebar"] div[data-testid="stButton"]:first-of-type button {
-    background: linear-gradient(135deg, #217A3E 0%, #134725 100%) !important;
-    border: 1.5px solid #4ADE80 !important;
-    border-radius: 999px !important;
-    box-shadow: 0 0 18px rgba(74, 222, 128, 0.3) !important;
-}
-
-/* 3. Matching subtle emerald border on sidebar expanders (Saved matches, Daily Macro Target, Default Diet & Allergens) */
+/* 2. Dark-glass expanders (Saved matches, Daily Macro Target, Default Diet &
+   Allergens) share the exact surface and border of the navigation rows. */
 section[data-testid="stSidebar"] div[data-testid="stExpander"] details {
-    background: linear-gradient(135deg, rgba(46, 160, 67, 0.10), rgba(22, 27, 34, 0.95)) !important;
-    border: 1px solid rgba(63, 185, 80, 0.5) !important;
+    background-color: #161B22 !important;
+    border: 1px solid rgba(63, 185, 80, 0.4) !important;
+    border-radius: 12px !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stExpander"] summary,
+section[data-testid="stSidebar"] div[data-testid="stExpander"] button[data-testid="stExpanderHeader"],
+section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
+    background-color: #161B22 !important;
+    border: 1px solid rgba(63, 185, 80, 0.4) !important;
     border-radius: 12px !important;
 }
 
@@ -5462,88 +5468,108 @@ section[data-testid="stSidebar"] div[data-testid="stExpander"] summary p {
     color: #FFFFFF !important;
 }
 
-/* 4. Distinct soft-crimson Sign Out button inside the expanded profile card */
+/* 3. Distinct soft-crimson Sign Out button inside the expanded profile card */
 section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="profile_card_signout"] {
-    background: linear-gradient(135deg, rgba(248, 81, 73, 0.25), rgba(110, 28, 28, 0.55)) !important;
-    border: 1.5px solid rgba(248, 81, 73, 0.75) !important;
+    background-color: rgba(248, 81, 73, 0.14) !important;
+    border: 1px solid rgba(248, 81, 73, 0.65) !important;
     box-shadow: none !important;
 }
 
 @media (hover: hover) {
     section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
-        background: linear-gradient(135deg, rgba(46, 160, 67, 0.42) 0%, rgba(22, 92, 56, 0.75) 100%) !important;
-        border-color: #4ADE80 !important;
-        transform: translateY(-1px) !important;
+        background-color: #1C2128 !important;
+        border-color: rgba(63, 185, 80, 0.6) !important;
     }
 }
 
-/* Reinforce the upgraded values over the earlier widget-specific rules, whose
-   :has() selectors otherwise win the cascade with higher specificity. */
+/* Reinforce the dark-glass values over the earlier widget-specific rules,
+   whose :has() selectors otherwise win the cascade with higher specificity. */
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    background: linear-gradient(135deg, #217A3E 0%, #134725 100%) !important;
-    border: 1.5px solid #4ADE80 !important;
-    border-radius: 999px !important;
-    padding: 13px 16px !important;
-    min-height: 50px !important;
-    box-shadow: 0 0 18px rgba(74, 222, 128, 0.3) !important;
-    font-size: 17px !important;
+    background: linear-gradient(135deg, rgba(46, 160, 67, 0.22) 0%, rgba(22, 27, 34, 0.96) 100%) !important;
+    border: 1.5px solid rgba(63, 185, 80, 0.65) !important;
+    border-radius: 14px !important;
+    padding: 14px 16px !important;
+    min-height: 54px !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35) !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+    text-align: left !important;
+}
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
+    font-size: 16px !important;
     font-weight: 700 !important;
     color: #FFFFFF !important;
 }
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-signout-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    background: linear-gradient(135deg, rgba(248, 81, 73, 0.25), rgba(110, 28, 28, 0.55)) !important;
-    border: 1.5px solid rgba(248, 81, 73, 0.75) !important;
-    border-radius: 14px !important;
-    padding: 13px 16px !important;
-    min-height: 50px !important;
+    background-color: rgba(248, 81, 73, 0.14) !important;
+    border: 1px solid rgba(248, 81, 73, 0.65) !important;
+    border-radius: 10px !important;
+    padding: 12px 14px !important;
+    min-height: 44px !important;
     box-shadow: none !important;
-    font-size: 17px !important;
+    font-size: 16px !important;
     font-weight: 700 !important;
     color: #FFA198 !important;
+}
+[data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-signout-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p {
+    color: #FFA198 !important;
+    font-weight: 700 !important;
 }
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    background: linear-gradient(135deg, rgba(46, 160, 67, 0.26) 0%, rgba(15, 58, 37, 0.65) 100%) !important;
-    border: 1.5px solid #3FB950 !important;
-    border-radius: 14px !important;
-    padding: 13px 16px !important;
-    min-height: 50px !important;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 10px rgba(63, 185, 80, 0.15) !important;
-    font-size: 17px !important;
+    background-color: #161B22 !important;
+    border: 1px solid rgba(63, 185, 80, 0.45) !important;
+    border-radius: 12px !important;
+    padding: 12px 14px !important;
+    min-height: 48px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+    font-size: 16.5px !important;
     font-weight: 700 !important;
     color: #FFFFFF !important;
+    text-align: left !important;
 }
 @media (hover: hover) {
-    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+        background: linear-gradient(135deg, rgba(46, 160, 67, 0.30) 0%, rgba(22, 27, 34, 0.96) 100%) !important;
+        border-color: rgba(63, 185, 80, 0.85) !important;
+    }
     [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.wishlist-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
     [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.catalogue-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
     [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.install-open-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
-        background: linear-gradient(135deg, rgba(46, 160, 67, 0.42) 0%, rgba(22, 92, 56, 0.75) 100%) !important;
-        border-color: #4ADE80 !important;
-        transform: translateY(-1px) !important;
-    }
-    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
-        background: linear-gradient(135deg, #217A3E 0%, #134725 100%) !important;
+        background-color: #1C2128 !important;
+        border-color: rgba(63, 185, 80, 0.75) !important;
     }
     [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.profile-signout-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
-        background: linear-gradient(135deg, rgba(248, 81, 73, 0.35), rgba(110, 28, 28, 0.65)) !important;
-        border-color: rgba(248, 81, 73, 0.9) !important;
+        background-color: rgba(248, 81, 73, 0.2) !important;
+        border-color: rgba(248, 81, 73, 0.85) !important;
     }
 }
 
-/* Bottom-of-sidebar AI Help pill: targeted so the generic sidebar button
-   rules (which have their own !important declarations) cannot override it. */
+/* Bottom-of-sidebar AI Help pill: the single vibrant emerald CTA. Targeted by
+   key so none of the quiet dark-slate sidebar rules can override it. */
 section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_ai_help_btn"] {
-    background: linear-gradient(135deg, #1E7E48 0%, #0F4C5C 100%) !important;
-    border: 1.5px solid #4ADE80 !important;
+    background: linear-gradient(135deg, #2EA043 0%, #10B981 100%) !important;
+    border: 1.5px solid #6EE798 !important;
     border-radius: 999px !important;
     padding: 13px 18px !important;
     font-size: 17px !important;
-    font-weight: 700 !important;
+    font-weight: 800 !important;
     color: #FFFFFF !important;
-    box-shadow: 0 0 20px rgba(74, 222, 128, 0.35) !important;
-    transition: all 0.15s ease !important;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.35) !important;
+    transition: none !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_ai_help_btn"] p {
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    color: #FFFFFF !important;
+}
+@media (hover: hover) {
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button[key="sidebar_ai_help_btn"]:hover {
+        background: linear-gradient(135deg, #2EA043 0%, #10B981 100%) !important;
+        box-shadow: 0 0 26px rgba(16, 185, 129, 0.5) !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -7383,7 +7409,7 @@ with st.sidebar:
     )
     _profile_caret = "▴" if st.session_state.get("show_user_profile") else "▾"
     st.button(
-        f"🟢  {user_name}   {_profile_caret}",
+        f"🟢  {user_name}  ({CURRENT_USER_EMAIL})   {_profile_caret}",
         key="sidebar_profile_toggle",
         use_container_width=True,
         type="secondary",
@@ -7442,28 +7468,20 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     st.button(
-        f"❤️ View Your Wishlist ({len(st.session_state['wishlist'])})",
+        f"❤️  View Your Wishlist ({len(st.session_state['wishlist'])})   ›",
         key="open_wishlist_page",
         use_container_width=True,
         type="secondary",
         on_click=_open_wishlist_page,
     )
 
-    # ─── Product guide (opens the dedicated full-page catalogue) ─────────
-    st.markdown(
-        '<div class="sidebar-section-title">📖 Product guide</div>',
-        unsafe_allow_html=True,
-    )
-    st.caption(
-        "Browse every food with its photo, macros per 100 g, diet rules and "
-        "allergens on a full page."
-    )
+    # ─── Catalogue launcher (dedicated full page) ─────────────────────────
     st.markdown(
         '<div class="catalogue-open-marker" aria-hidden="true"></div>',
         unsafe_allow_html=True,
     )
     st.button(
-        f"📖 View All Products ({len(product_details)})",
+        f"📖  View All Products ({len(product_details)})   ›",
         key="open_catalogue_page",
         use_container_width=True,
         type="secondary",
@@ -7530,7 +7548,7 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     st.button(
-        "📲 Install Mobile App",
+        "📲  Install Mobile App   ›",
         key="sidebar_install_app_btn",
         use_container_width=True,
         type="secondary",
