@@ -2107,6 +2107,9 @@ if "default_diet_select" not in st.session_state:
 if "default_allergens_select" not in st.session_state:
     st.session_state["default_allergens_select"] = []
 st.session_state.setdefault("wishlist", [])
+# Wishlist cards use the same 3-at-a-time paging as the sidebar product guide.
+WISHLIST_PAGE_SIZE = 3
+st.session_state.setdefault("wishlist_visible_count", WISHLIST_PAGE_SIZE)
 
 # Auth has already been enforced above, so it is safe to hydrate the signed-in
 # user's saved targets/preferences before any dashboard widgets are created.
@@ -2333,6 +2336,29 @@ def _show_more_guide_products() -> None:
 def _show_less_guide_products() -> None:
     """Show Less callback; reset in one pass before the automatic rerun."""
     st.session_state["guide_visible_count"] = GUIDE_PAGE_SIZE
+
+
+def _normalize_wishlist_pagination(item_count: int) -> None:
+    """Keep the visible count valid after adds/removes and across reruns."""
+    if item_count < WISHLIST_PAGE_SIZE:
+        st.session_state["wishlist_visible_count"] = item_count
+        return
+    current = int(
+        st.session_state.get("wishlist_visible_count", WISHLIST_PAGE_SIZE)
+    )
+    st.session_state["wishlist_visible_count"] = min(
+        max(WISHLIST_PAGE_SIZE, current), item_count
+    )
+
+
+def _show_more_wishlist_items() -> None:
+    """View More callback; reveal three more saved food cards."""
+    st.session_state["wishlist_visible_count"] += WISHLIST_PAGE_SIZE
+
+
+def _show_less_wishlist_items() -> None:
+    """Show Less callback; collapse back to the first three saved cards."""
+    st.session_state["wishlist_visible_count"] = WISHLIST_PAGE_SIZE
 
 
 def _sync_food_selection(canonical: str, search_value: str | None = None) -> None:
@@ -6338,6 +6364,10 @@ with st.sidebar:
     # Loaded here so wishlist cards and the product guide share one renderer.
     product_details = load_product_details()
     wishlist_items = _normalize_wishlist(st.session_state.get("wishlist", []))
+    _normalize_wishlist_pagination(len(wishlist_items))
+    visible_wishlist = wishlist_items[
+        : st.session_state["wishlist_visible_count"]
+    ]
     with st.expander(
         f"❤️ My Wishlist ({len(wishlist_items)})", expanded=False
     ):
@@ -6348,7 +6378,7 @@ with st.sidebar:
         if not wishlist_items:
             st.caption("No favorite foods saved yet. Tap 🤍 Wishlist on any product!")
         else:
-            for food_name in wishlist_items:
+            for food_name in visible_wishlist:
                 wishlist_detail = product_details.get(food_name)
                 if wishlist_detail is None:
                     st.caption(f"⚠️ {food_name} is no longer in the catalogue.")
@@ -6359,6 +6389,34 @@ with st.sidebar:
                     key_prefix="wish",
                     wishlist_label="❤️",
                     on_wishlist_click=_remove_wishlist_item,
+                )
+
+            st.caption(
+                f"Showing {len(visible_wishlist)} of {len(wishlist_items)} saved items"
+            )
+
+            if st.session_state["wishlist_visible_count"] < len(wishlist_items):
+                st.markdown(
+                    '<div class="guide-view-more-marker" aria-hidden="true"></div>',
+                    unsafe_allow_html=True,
+                )
+                st.button(
+                    "View More",
+                    key="wishlist_view_more",
+                    use_container_width=True,
+                    on_click=_show_more_wishlist_items,
+                )
+
+            if st.session_state["wishlist_visible_count"] > WISHLIST_PAGE_SIZE:
+                st.markdown(
+                    '<div class="guide-show-less-marker" aria-hidden="true"></div>',
+                    unsafe_allow_html=True,
+                )
+                st.button(
+                    "Show Less",
+                    key="wishlist_show_less",
+                    use_container_width=True,
+                    on_click=_show_less_wishlist_items,
                 )
 
     # ─── Product guide (moved here from the bottom of the main page) ─────
