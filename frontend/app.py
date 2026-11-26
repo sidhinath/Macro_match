@@ -305,7 +305,8 @@ _VIEWPORT_DETECT_JS = """
 })();
 </script>
 """
-components.html(_VIEWPORT_DETECT_JS, height=0, scrolling=False)
+# The viewport component is rendered by _render_deferred_components() at the
+# bottom so it never introduces blank space above a dedicated page's controls.
 
 # ── Brand logo ──────────────────────────────────────────────────────────────
 # The source PNG has a baked-in white background. Convert it to true alpha so
@@ -579,7 +580,40 @@ if LOGO_SRC:
     </script>
     """
 
-    components.html(_PWA_HEAD_INJECTION_JS, height=0, scrolling=False)
+# All zero-height JS components are rendered in one deferred block at the very
+# end of the script (or immediately before an early stop). Keeping them out of
+# the page body prevents blank vertical gaps above the top-right back button.
+_DEFERRED_COLLAPSE_FLAGS = (
+    "_collapse_sidebar_for_details",
+    "_collapse_sidebar_for_wishlist",
+    "_collapse_sidebar_for_catalogue",
+    "_collapse_sidebar_for_install",
+)
+
+
+def _render_deferred_components() -> None:
+    """Render every parent-document JS helper after the visible page content."""
+    components.html(_VIEWPORT_DETECT_JS, height=0, scrolling=False)
+
+    if _PWA_HEAD_INJECTION_JS:
+        components.html(_PWA_HEAD_INJECTION_JS, height=0, scrolling=False)
+
+    components.html(_MOBILE_SIDEBAR_TOGGLE_JS, height=0, scrolling=False)
+
+    collapse_requested = [
+        st.session_state.pop(flag, False) for flag in _DEFERRED_COLLAPSE_FLAGS
+    ]
+    if any(collapse_requested):
+        components.html(_MOBILE_DETAILS_COLLAPSE_JS, height=0, scrolling=False)
+
+    if st.session_state.get("show_install_page", False) and _PWA_INSTALL_BUTTON_JS:
+        components.html(_PWA_INSTALL_BUTTON_JS, height=0, scrolling=False)
+
+
+def _stop_after_deferred_components() -> None:
+    """Flush deferred JS helpers, then halt this Streamlit run."""
+    _render_deferred_components()
+    st.stop()
 
 
 # ─────────────────────────────────────────────
@@ -605,7 +639,7 @@ def get_supabase_client() -> Client:
             "⚠️ Supabase is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY "
             "to .streamlit/secrets.toml (or set them as environment variables)."
         )
-        st.stop()
+        _stop_after_deferred_components()
     return create_client(url, key)
 
 
@@ -932,7 +966,7 @@ def _begin_google_sign_in() -> None:
             unsafe_allow_html=True,
         )
         st.success("Redirecting to Google…")
-        st.stop()
+        _stop_after_deferred_components()
     except Exception as exc:
         st.error(f"Google sign-in could not start: {exc}")
 
@@ -980,7 +1014,12 @@ if show_auth_ui:
         pointer-events: none !important;
     }
 
-    header[data-testid="stHeader"] { background: transparent !important; }
+    /* Keep the Streamlit top header transparent and compact without pushing content down */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    height: 2.6rem !important;
+    min-height: 2.6rem !important;
+}
 
     /* Keep the control interactive, then apply the custom "☰ Menu" styling. */
     [data-testid="stSidebarCollapsedControl"],
@@ -1834,10 +1873,9 @@ if show_auth_ui:
 # Protect the rest of the app: a recovery session must finish the reset form
 # before the dashboard is allowed to render.
 if show_auth_ui:
-    st.stop()
+    _stop_after_deferred_components()
 
-# Install the mobile swipe/guide-select sidebar helpers for the dashboard only.
-components.html(_MOBILE_SIDEBAR_TOGGLE_JS, height=0, scrolling=False)
+# Mobile swipe/guide-select sidebar helpers are installed by the deferred block.
 
 
 # ─────────────────────────────────────────────
@@ -2520,63 +2558,40 @@ def _profile_sign_out() -> None:
     st.session_state.clear()
 
 
+def _render_top_right_back_button(key: str, on_click) -> None:
+    """Render the shared top-right back pill on every dedicated page."""
+    # The invisible marker reserves header height in the normal flow while CSS
+    # pins the actual button to the top-right, opposite the sidebar control.
+    st.markdown(
+        '<div class="back-home-top-right" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
+    st.button(
+        "⌂ Back to home",
+        key=key,
+        help="Return to the start page",
+        on_click=on_click,
+    )
+
+
 def _render_back_to_home(key: str) -> None:
-    """Sleek centred back button shared by the details and swaps views."""
-    _back_left, btn_col, _back_right = st.columns([2, 1, 2])
-    with btn_col:
-        # No bordered container: only the styled button renders in this column.
-        st.markdown(
-            '<div class="back-home-marker" aria-hidden="true"></div>',
-            unsafe_allow_html=True,
-        )
-        st.button(
-            "⌂ Back to home",
-            key=key,
-            help="Return to the start page",
-            on_click=_reset_swaps_view,
-        )
+    """Top-right back button shared by the details and swaps views."""
+    _render_top_right_back_button(key, _reset_swaps_view)
 
 
 def _render_wishlist_back_to_home(key: str) -> None:
-    """Top-left dark-emerald back pill for the dedicated wishlist page."""
-    st.markdown(
-        '<div class="ai-help-back-marker" aria-hidden="true"></div>',
-        unsafe_allow_html=True,
-    )
-    st.button(
-        "⌂ Back to home",
-        key=key,
-        help="Return to the start page",
-        on_click=_close_wishlist_page,
-    )
+    """Top-right dark-emerald back pill for the dedicated wishlist page."""
+    _render_top_right_back_button(key, _close_wishlist_page)
 
 
 def _render_catalogue_back_to_home(key: str) -> None:
-    """Top-left dark-emerald back pill for the dedicated catalogue page."""
-    st.markdown(
-        '<div class="ai-help-back-marker" aria-hidden="true"></div>',
-        unsafe_allow_html=True,
-    )
-    st.button(
-        "⌂ Back to home",
-        key=key,
-        help="Return to the start page",
-        on_click=_close_catalogue_page,
-    )
+    """Top-right dark-emerald back pill for the dedicated catalogue page."""
+    _render_top_right_back_button(key, _close_catalogue_page)
 
 
 def _render_install_back_to_home(key: str) -> None:
-    """Top-left dark-emerald back pill for the dedicated install page."""
-    st.markdown(
-        '<div class="ai-help-back-marker" aria-hidden="true"></div>',
-        unsafe_allow_html=True,
-    )
-    st.button(
-        "⌂ Back to home",
-        key=key,
-        help="Return to the start page",
-        on_click=_close_install_page,
-    )
+    """Top-right dark-emerald back pill for the dedicated install page."""
+    _render_top_right_back_button(key, _close_install_page)
 
 
 def _sync_food_selection(canonical: str, search_value: str | None = None) -> None:
@@ -3240,7 +3255,12 @@ a[href*="streamlit.io/cloud"] {
     pointer-events: none !important;
 }
 
-header[data-testid="stHeader"] { background: transparent !important; }
+/* Keep the Streamlit top header transparent and compact without pushing content down */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    height: 2.6rem !important;
+    min-height: 2.6rem !important;
+}
 /* Keep the control interactive, then apply the custom "☰ Menu" styling. */
 [data-testid="stSidebarCollapsedControl"],
 [data-testid="collapsedControl"] {
@@ -3359,9 +3379,23 @@ span[data-testid="collapsedControl"] button::after {
     white-space: nowrap !important;
     padding: 2px 4px !important;
 }
-/* Balanced top spacing below the transparent header */
-section.main > div[data-testid="stMainBlockContainer"],
-.block-container { padding-top: 2.8rem !important; }
+/* Remove excessive blank top space on both mobile and desktop */
+.block-container,
+[data-testid="stAppViewBlockContainer"],
+.main .block-container,
+section.main > div[data-testid="stMainBlockContainer"] {
+    padding-top: 1.2rem !important;
+    margin-top: 0 !important;
+}
+
+@media (max-width: 768px) {
+    .block-container,
+    [data-testid="stAppViewBlockContainer"],
+    .main .block-container,
+    section.main > div[data-testid="stMainBlockContainer"] {
+        padding-top: 0.75rem !important;
+    }
+}
 
 /* ── Base typography ── */
 html, body, [class*="css"] {
@@ -4150,7 +4184,7 @@ div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-test
 }
 
 /* ── Top-bar Help toggle + dedicated dark glass AI page ── */
-.ai-help-toggle-marker, .ai-help-marker, .ai-help-back-marker {
+.ai-help-toggle-marker, .ai-help-marker {
     display: none !important;
 }
 div[data-testid="stVerticalBlockElement"]:has(.ai-help-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
@@ -4498,94 +4532,75 @@ button[data-baseweb="pill"][data-selected="true"] {
     }
 }
 
-/* ── Back-to-home pill — centered above the Top 3 Swaps container ── */
-.back-home-marker {
-    display: none !important;
-}
-/* The marker lives directly in the centered column; no border wrapper exists. */
-div[data-testid="stColumn"]:has(.back-home-marker) div[data-testid="stButton"],
-div[data-testid="stHorizontalBlock"]:has(.back-home-marker) > div:nth-child(2) div[data-testid="stButton"] {
-    display: flex !important;
-    justify-content: center !important;
-}
-div[data-testid="stColumn"]:has(.back-home-marker) .stButton > button,
-div[data-testid="stColumn"]:has(.back-home-marker) button[data-testid="stBaseButton-secondary"],
-div[data-testid="stHorizontalBlock"]:has(.back-home-marker) > div:nth-child(2) .stButton > button,
-div[data-testid="stHorizontalBlock"]:has(.back-home-marker) > div:nth-child(2) button[data-testid="stBaseButton-secondary"] {
-    background-color: rgba(46, 160, 67, 0.12) !important;
-    border: 1px solid rgba(46, 160, 67, 0.55) !important;
-    border-radius: 10px !important;
-    padding: 8px 20px !important;
-    color: #6EE798 !important;
-    font-size: 15px !important;
-    font-weight: 500 !important;
-    line-height: 1.2 !important;
-    box-shadow: none !important;
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
-}
-div[data-testid="stColumn"]:has(.back-home-marker) .stButton > button p,
-div[data-testid="stColumn"]:has(.back-home-marker) button[data-testid="stBaseButton-secondary"] p,
-div[data-testid="stHorizontalBlock"]:has(.back-home-marker) > div:nth-child(2) .stButton > button p,
-div[data-testid="stHorizontalBlock"]:has(.back-home-marker) > div:nth-child(2) button[data-testid="stBaseButton-secondary"] p {
-    color: #6EE798 !important;
-    font-size: 15px !important;
-    font-weight: 500 !important;
+/* ── Back-to-home pill — pinned top-right on every dedicated page ── */
+div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) {
+    height: 2.6rem !important;
+    min-height: 2.6rem !important;
     margin: 0 !important;
+    padding: 0 !important;
 }
-@media (hover: hover) {
-    div[data-testid="stColumn"]:has(.back-home-marker) .stButton > button:hover,
-    div[data-testid="stColumn"]:has(.back-home-marker) button[data-testid="stBaseButton-secondary"]:hover,
-    div[data-testid="stHorizontalBlock"]:has(.back-home-marker) > div:nth-child(2) .stButton > button:hover,
-    div[data-testid="stHorizontalBlock"]:has(.back-home-marker) > div:nth-child(2) button[data-testid="stBaseButton-secondary"]:hover {
-        background-color: rgba(46, 160, 67, 0.22) !important;
-        border-color: #3FB950 !important;
-        color: #FFFFFF !important;
-    }
-    div[data-testid="stColumn"]:has(.back-home-marker) .stButton > button:hover p,
-    div[data-testid="stColumn"]:has(.back-home-marker) button[data-testid="stBaseButton-secondary"]:hover p,
-    div[data-testid="stHorizontalBlock"]:has(.back-home-marker) > div:nth-child(2) .stButton > button:hover p,
-    div[data-testid="stHorizontalBlock"]:has(.back-home-marker) > div:nth-child(2) button[data-testid="stBaseButton-secondary"]:hover p {
-        color: #FFFFFF !important;
-    }
+.back-home-top-right {
+    display: block !important;
+    visibility: hidden !important;
+    height: 2.6rem !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
-
-/* ── AI Help back pill — same styling as details, but top-left aligned ── */
-.ai-help-back-marker { display: none !important; }
-div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] {
-    display: flex !important;
-    justify-content: flex-start !important;
-}
-div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
-div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"] {
-    background-color: rgba(46, 160, 67, 0.12) !important;
-    border: 1px solid rgba(46, 160, 67, 0.55) !important;
-    border-radius: 10px !important;
-    padding: 8px 20px !important;
-    color: #6EE798 !important;
-    font-size: 15px !important;
-    font-weight: 500 !important;
-    line-height: 1.2 !important;
+/* The button element is removed from normal flow and pinned opposite the
+   fixed ☰ Menu / >> control at the top-left. */
+div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] {
+    position: fixed !important;
+    top: 16px !important;
+    right: 16px !important;
+    left: auto !important;
+    z-index: 999999 !important;
+    display: block !important;
     width: auto !important;
-    margin: 0.25rem 0 0.85rem !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: right !important;
+}
+div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] div[data-testid="stButton"] {
+    display: block !important;
+    width: auto !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+}
+div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] .stButton > button,
+div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"] {
+    background-color: rgba(46, 160, 67, 0.14) !important;
+    border: 1px solid rgba(46, 160, 67, 0.65) !important;
+    border-radius: 10px !important;
+    color: #6EE798 !important;
+    font-weight: 600 !important;
+    padding: 6px 16px !important;
+    width: auto !important;
+    display: block !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    font-size: 15px !important;
+    line-height: 1.2 !important;
     box-shadow: none !important;
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p,
-div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"] p {
+div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] .stButton > button p,
+div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"] p {
     color: #6EE798 !important;
     font-size: 15px !important;
-    font-weight: 500 !important;
+    font-weight: 600 !important;
     margin: 0 !important;
 }
 @media (hover: hover) {
-    div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
-    div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"]:hover {
+    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
+    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"]:hover {
         background-color: rgba(46, 160, 67, 0.22) !important;
         border-color: #3FB950 !important;
         color: #FFFFFF !important;
     }
-    div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover p,
-    div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"]:hover p {
+    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover p,
+    div[data-testid="stVerticalBlockElement"]:has(.back-home-top-right) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"]:hover p {
         color: #FFFFFF !important;
     }
 }
@@ -4665,7 +4680,6 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
     section.main > div[data-testid="stMainBlockContainer"],
     .block-container {
         max-width: 1120px !important;
-        padding-top: 3.2rem !important;
         margin-left: auto !important;
         margin-right: auto !important;
     }
@@ -4734,11 +4748,7 @@ div[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] > div[data-tes
 
 /* Lightweight mobile layout — no backdrop blur, tighter spacing. */
 @media (max-width: 768px) {
-    /* Keep the fixed ☰ Menu button from covering the centered brand header. */
-    section.main > div[data-testid="stMainBlockContainer"],
-    .block-container {
-        padding-top: 3.6rem !important;
-    }
+    /* Top padding is set globally above; keep the compact header clear here. */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.search-card-title) {
         padding: 0.85rem !important;
         border-radius: 14px !important;
@@ -6139,21 +6149,12 @@ def _open_ai_help() -> None:
 
 
 def _render_ai_back_to_home(key: str) -> None:
-    """Top-left dark-emerald back button for the dedicated AI help page."""
-    st.markdown(
-        '<div class="ai-help-back-marker" aria-hidden="true"></div>',
-        unsafe_allow_html=True,
-    )
-    st.button(
-        "⌂ Back to home",
-        key=key,
-        help="Return to the start page",
-        on_click=_close_ai_help,
-    )
+    """Top-right dark-emerald back button for the dedicated AI help page."""
+    _render_top_right_back_button(key, _close_ai_help)
 
 
 def _render_ai_help() -> None:
-    """Dedicated full-page AI assistant with a top-left back button."""
+    """Dedicated full-page AI assistant with a top-right back button."""
     if not st.session_state.get("show_ai_help"):
         return
 
@@ -6214,10 +6215,7 @@ def _render_wishlist_page() -> None:
     if not st.session_state.get("show_wishlist_page"):
         return
 
-    # One-shot mobile collapse requested by the sidebar launcher.
-    if st.session_state.pop("_collapse_sidebar_for_wishlist", False):
-        components.html(_MOBILE_DETAILS_COLLAPSE_JS, height=0, scrolling=False)
-
+    # The one-shot mobile collapse flag is consumed by the deferred JS block.
     _render_wishlist_back_to_home("wishlist_back_to_home")
     wishlist_items = _normalize_wishlist(st.session_state.get("wishlist", []))
 
@@ -6270,10 +6268,7 @@ def _render_catalogue_page() -> None:
     if not st.session_state.get("show_all_products_page"):
         return
 
-    # One-shot mobile collapse requested by the sidebar launcher.
-    if st.session_state.pop("_collapse_sidebar_for_catalogue", False):
-        components.html(_MOBILE_DETAILS_COLLAPSE_JS, height=0, scrolling=False)
-
+    # The one-shot mobile collapse flag is consumed by the deferred JS block.
     _render_catalogue_back_to_home("catalogue_back_to_home")
     details = load_product_details()
     all_products = sorted(details)
@@ -6341,10 +6336,7 @@ def _render_install_page() -> None:
     if not st.session_state.get("show_install_page"):
         return
 
-    # One-shot mobile collapse requested by the sidebar launcher.
-    if st.session_state.pop("_collapse_sidebar_for_install", False):
-        components.html(_MOBILE_DETAILS_COLLAPSE_JS, height=0, scrolling=False)
-
+    # The one-shot mobile collapse flag is consumed by the deferred JS block.
     _render_install_back_to_home("install_back_to_home")
 
     with st.container(border=True):
@@ -6400,8 +6392,8 @@ def _render_install_page() -> None:
             "the steps for your device.</div>",
             unsafe_allow_html=True,
         )
-        if _PWA_INSTALL_BUTTON_JS:
-            components.html(_PWA_INSTALL_BUTTON_JS, height=0, scrolling=False)
+        # The native-install button helper runs in the deferred JS block so it
+        # cannot add blank space above the top-right back button.
 
 
 def _macro_line(detail: dict, serving_g: int | None = None) -> str:
@@ -7194,7 +7186,7 @@ with st.sidebar:
 # ─────────────────────────────────────────────
 if show_install_page:
     _render_install_page()
-    st.stop()
+    _stop_after_deferred_components()
 
 
 # ─────────────────────────────────────────────
@@ -7202,7 +7194,7 @@ if show_install_page:
 # ─────────────────────────────────────────────
 if show_all_products_page:
     _render_catalogue_page()
-    st.stop()
+    _stop_after_deferred_components()
 
 
 # ─────────────────────────────────────────────
@@ -7210,7 +7202,7 @@ if show_all_products_page:
 # ─────────────────────────────────────────────
 if show_wishlist_page:
     _render_wishlist_page()
-    st.stop()
+    _stop_after_deferred_components()
 
 
 # ─────────────────────────────────────────────
@@ -7218,7 +7210,7 @@ if show_wishlist_page:
 # ─────────────────────────────────────────────
 if show_ai_help:
     _render_ai_help()
-    st.stop()
+    _stop_after_deferred_components()
 
 
 # ─────────────────────────────────────────────
@@ -7235,10 +7227,7 @@ if show_product_details:
         st.session_state["_collapse_sidebar_for_details"] = False
         st.rerun()
 
-    # One-shot mobile collapse requested by View Details / wishlist-name taps.
-    if st.session_state.pop("_collapse_sidebar_for_details", False):
-        components.html(_MOBILE_DETAILS_COLLAPSE_JS, height=0, scrolling=False)
-
+    # The one-shot mobile collapse flag is consumed by the deferred JS block.
     _render_back_to_home("back_to_home_details")
     st.markdown("### 🥗 Product Overview")
     details_context = _ai_current_context()
@@ -7248,7 +7237,7 @@ if show_product_details:
         keto="keto" in details_context["diets"],
         all_details=details_map,
     )
-    st.stop()
+    _stop_after_deferred_components()
 
 
 @st.fragment(key="search_controls")
@@ -7464,7 +7453,7 @@ with st.container(border=True):
 
     if not all_foods:
         st.error("No food data is available. Check `data/products.csv`.")
-        st.stop()
+        _stop_after_deferred_components()
 
     # Only this small fragment reruns on typing or pill taps; the sidebar,
     # Supabase queries, filters, and results below stay untouched. The fragment
@@ -7535,7 +7524,7 @@ with st.container(border=True):
 # Details mode already returned above, so the search form is fully hidden.
 if not show_swaps_results:
     render_footer()
-    st.stop()
+    _stop_after_deferred_components()
 
 
 # ── Back to home ──────────────────────────────
@@ -7563,7 +7552,7 @@ if "match_result_data" not in st.session_state:
             "URL may be wrong. Wait a minute and try again."
         )
         st.caption("Local dev: `python -m uvicorn backend.main:app --reload`")
-        st.stop()
+        _stop_after_deferred_components()
 
     if response.status_code == 404:
         detail = response.json().get("detail", {})
@@ -7576,18 +7565,18 @@ if "match_result_data" not in st.session_state:
             st.warning(f"🔍 **No alternatives found:** {msg}")
         else:
             st.error(f"❌ {msg}")
-        st.stop()
+        _stop_after_deferred_components()
 
     if response.status_code == 422:
         # FastAPI validation errors arrive as a list of {loc, msg, type} objects.
         st.error("❌ **Invalid input.** Check your selections and try again.")
         with st.expander("Details"):
             st.json(response.json().get("detail", response.text))
-        st.stop()
+        _stop_after_deferred_components()
 
     if response.status_code != 200:
         st.error(f"❌ Unexpected error ({response.status_code}): {response.text}")
-        st.stop()
+        _stop_after_deferred_components()
 
     st.session_state["match_result_data"] = response.json()
 
@@ -7953,3 +7942,6 @@ with st.container(border=True):
 
 st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 render_footer()
+
+# Defer every zero-height JS component until all visible content is rendered.
+_render_deferred_components()
