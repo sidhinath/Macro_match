@@ -34,8 +34,8 @@ load_dotenv()
 
 # Zero-height component that installs mobile sidebar gestures once per session.
 # It listens on window.parent.document so a swipe from anywhere closes the
-# sidebar, and it also closes the sidebar after a Product guide "Select" /
-# "👁️ View Details" tap or a wishlist food-name tap.
+# sidebar, and it also closes the sidebar after a guide/wishlist "Select" tap.
+# "View Details" uses the dedicated collapse component below instead.
 _MOBILE_SIDEBAR_TOGGLE_JS = """
 <script>
 (function () {
@@ -143,10 +143,10 @@ _MOBILE_SIDEBAR_TOGGLE_JS = """
                              { passive: true, capture: true });
     }
 
-    // Product-guide Select / View Details buttons and wishlist food-name rows
-    // are Streamlit widgets that trigger a full rerun; a delegated
-    // parent-document listener is the reliable place to collapse the mobile
-    // sidebar right after the tap.
+    // Product-guide / wishlist Select buttons are Streamlit widgets that
+    // trigger a full rerun; a delegated parent-document listener is the
+    // reliable place to collapse the mobile sidebar right after the tap.
+    // View Details uses the dedicated details-view collapse component instead.
     if (!host.__mmGuideSelectBound) {
         host.__mmGuideSelectBound = true;
         host.__mmGuideSelectHandler = function (event) {
@@ -155,11 +155,7 @@ _MOBILE_SIDEBAR_TOGGLE_JS = """
                 ? event.target.closest('button') : null;
             if (!target) { return; }
             var label = (target.textContent || '').trim();
-            if (label !== 'Select' && label.indexOf('View Details') === -1) {
-                // Wishlist food-name buttons carry a hidden marker in their column.
-                var wishCol = target.closest('[data-testid="stColumn"]');
-                if (!wishCol || !wishCol.querySelector('.wishlist-name-marker')) { return; }
-            }
+            if (label !== 'Select') { return; }
             var sidebar = doc.querySelector('[data-testid="stSidebar"]');
             if (!sidebar || !sidebar.contains(target)) { return; }
             // Retry once only if Streamlit has not swapped in the collapse
@@ -172,6 +168,43 @@ _MOBILE_SIDEBAR_TOGGLE_JS = """
     }
 })();
 </script>
+"""
+
+# Fired once on the rerun that opens a Product Details page. The guide tap
+# listener above is intentionally limited to "Select" so it cannot double-fire.
+_MOBILE_DETAILS_COLLAPSE_JS = """
+<script>
+if (window.parent.innerWidth <= 768) {
+    const btn = window.parent.document.querySelector(
+        '[data-testid="stSidebarCollapseButton"] button, ' +
+        '[data-testid="stSidebar"] button[kind="header"]'
+    );
+    if (btn) btn.click();
+}
+</script>
+"""
+
+# Touch-first defaults shared by the logged-out and signed-in screens.
+# ``touch-action: manipulation`` removes the mobile 300 ms double-tap zoom wait,
+# and the mobile media query drops GPU-heavy blur/transitions on low-end phones.
+_TOUCH_FIRST_CSS = """
+button,
+[data-baseweb="tab"],
+div[data-testid="stCheckbox"] label {
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+@media (max-width: 768px) {
+    html body *,
+    html body *::before,
+    html body *::after {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        transition: none !important;
+    }
+}
 """
 
 # Dark theme for the streamlit-searchbox component. These values are passed
@@ -194,7 +227,12 @@ _SEARCHBOX_STYLE_OVERRIDES = {
             "borderRadius": "10px",
             "minHeight": "46px",
             "boxShadow": "none",
-            "&:hover": {"border": "1px solid #2EA043"},
+            "touchAction": "manipulation",
+            "WebkitTapHighlightColor": "transparent",
+            "userSelect": "none",
+            # Keep the searchbox hover desktop-only; phones fire the click on
+            # the first tap instead of burning it on a sticky hover state.
+            "@media (hover: hover)": {"&:hover": {"border": "1px solid #2EA043"}},
             "&:focus-within": {
                 "border": "1px solid #2EA043",
                 "boxShadow": "0 0 0 1px #2EA043, 0 0 14px rgba(46, 160, 67, 0.35)",
@@ -233,6 +271,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# Injected once for every screen (auth + dashboard); ``!important`` keeps these
+# interaction defaults ahead of the theme CSS that follows.
+st.markdown(f"<style>{_TOUCH_FIRST_CSS}</style>", unsafe_allow_html=True)
 
 # ── Brand logo ──────────────────────────────────────────────────────────────
 # The source PNG has a baked-in white background. Convert it to true alpha so
@@ -561,6 +603,11 @@ _ensure_supabase_session()
 # Normalise stale values from earlier deployments so forms never disappear.
 if st.session_state.get("auth_view") not in ("signin", "forgot", "reset"):
     st.session_state.auth_view = "signin"
+
+
+def _set_auth_view(view: str) -> None:
+    """Auth navigation callback; st.button supplies the single rerun."""
+    st.session_state.auth_view = view
 
 
 def _oauth_redirect_url() -> str:
@@ -1182,6 +1229,9 @@ if show_auth_ui:
     </style>
     """, unsafe_allow_html=True)
 
+    # Last word on touch behaviour for the auth screen as well.
+    st.markdown(f"<style>{_TOUCH_FIRST_CSS}</style>", unsafe_allow_html=True)
+
     # One card: every element below is inside card_col.
     _, card_col, _ = st.columns([1.4, 1.3, 1.4])
 
@@ -1264,13 +1314,19 @@ if show_auth_ui:
                 )
                 col1, col2 = st.columns(2, gap="small")
                 with col1:
-                    if st.button("Forgot Password", key="forgot_link"):
-                        st.session_state.auth_view = "forgot"
-                        st.rerun()
+                    st.button(
+                        "Forgot Password",
+                        key="forgot_link",
+                        on_click=_set_auth_view,
+                        args=("forgot",),
+                    )
                 with col2:
-                    if st.button("Reset Password", key="reset_link"):
-                        st.session_state.auth_view = "reset"
-                        st.rerun()
+                    st.button(
+                        "Reset Password",
+                        key="reset_link",
+                        on_click=_set_auth_view,
+                        args=("reset",),
+                    )
 
             # ─────────────── VIEW: forgot ───────────────
             elif st.session_state.auth_view == "forgot":
@@ -1314,9 +1370,12 @@ if show_auth_ui:
                                 except Exception as e:
                                     st.error(f"Error: {e}")
 
-                if st.button("← Back to Sign in", key="back_from_forgot"):
-                    st.session_state.auth_view = "signin"
-                    st.rerun()
+                st.button(
+                    "← Back to Sign in",
+                    key="back_from_forgot",
+                    on_click=_set_auth_view,
+                    args=("signin",),
+                )
 
             # ─────────────── VIEW: reset ───────────────
             elif st.session_state.auth_view == "reset":
@@ -1401,9 +1460,12 @@ if show_auth_ui:
                             except Exception as e:
                                 st.error(f"Error: {e}")
 
-                if st.button("← Back to Sign in", key="back_from_reset"):
-                    st.session_state.auth_view = "signin"
-                    st.rerun()
+                st.button(
+                    "← Back to Sign in",
+                    key="back_from_reset",
+                    on_click=_set_auth_view,
+                    args=("signin",),
+                )
 
         # ════════════════════════════════════════════════════════════
         # SIGN UP TAB — backend logic unchanged
@@ -1553,19 +1615,20 @@ def save_match(user_id, product, city, diet_rules, allergens, priority, alternat
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
         ).execute()
-        get_saved_matches.clear()  # sidebar refresh on the automatic button rerun
+        # Refresh only on save: normal widget clicks read from session state.
+        get_saved_matches(auth_user_id, force_refresh=True)
         return True
     except Exception as e:
         st.error(f"Save failed: {e}")
         return False
 
 
-@st.cache_data(ttl=60)
-def get_saved_matches(user_id):
-    """Return this user's rows from public.saved_matches, newest first.
+def _saved_matches_cache_key(user_id) -> str:
+    return f"saved_matches::{user_id}"
 
-    Cached for 60s; the cache is cleared only on save/delete.
-    """
+
+def _fetch_saved_matches_from_supabase(user_id) -> list[dict]:
+    """Single Supabase read for this user's saved matches."""
     client = get_authenticated_supabase()
     try:
         result = (
@@ -1579,6 +1642,27 @@ def get_saved_matches(user_id):
     except Exception as e:
         st.error(f"Could not load saved matches: {e}")
         return []
+
+
+def get_saved_matches(user_id, force_refresh: bool = False) -> list[dict]:
+    """Session-cached saved matches; Supabase is read only on login/save/delete."""
+    key = _saved_matches_cache_key(user_id)
+    if force_refresh or key not in st.session_state:
+        st.session_state[key] = _fetch_saved_matches_from_supabase(user_id)
+    return list(st.session_state[key] or [])
+
+
+def _prime_saved_matches_for_user(user_id) -> None:
+    """Hydrate the session cache once, when the signed-in user changes."""
+    user_key = "_saved_matches_cache_user"
+    if st.session_state.get(user_key) == user_id:
+        return
+    st.session_state[user_key] = user_id
+    st.session_state.pop(_saved_matches_cache_key(user_id), None)
+    get_saved_matches(user_id, force_refresh=True)
+
+
+_prime_saved_matches_for_user(CURRENT_USER_ID)
 
 
 # Shared diet label map (defined here so the sidebar can restore saved pills
@@ -1604,7 +1688,7 @@ def delete_saved_match(match_id):
         client.table("saved_matches").delete().eq("id", match_id).eq(
             "user_id", str(current_user.id)
         ).execute()
-        get_saved_matches.clear()
+        get_saved_matches(str(current_user.id), force_refresh=True)
         return True
     except Exception as e:
         st.error(f"Delete failed: {e}")
@@ -1614,6 +1698,27 @@ def delete_saved_match(match_id):
 def _delete_saved_match_callback(match_id):
     """Widget callback: delete a row; the fragment redraws on the same click."""
     delete_saved_match(match_id)
+
+
+def _save_match_callback(
+    product, city, diet_rules, allergens, priority, alternatives
+) -> None:
+    """Save in the widget's single callback pass; no second st.rerun()."""
+    if save_match(
+        CURRENT_USER_ID,
+        product,
+        city,
+        diet_rules,
+        allergens,
+        priority,
+        alternatives,
+    ):
+        st.session_state["saved_match_flash"] = True
+
+
+def _load_saved_match_callback(match) -> None:
+    """Restore a saved match in one pass; the button supplies the rerun."""
+    load_saved_match(match)
 
 
 def load_saved_match(match):
@@ -1653,7 +1758,6 @@ def load_saved_match(match):
     }
     st.session_state["show_swaps_results"] = True
     st.session_state["inspect_product"] = None
-    st.rerun()
 
 
 @st.fragment(key="saved_matches")
@@ -1672,12 +1776,13 @@ def render_saved_matches(container):
         )
         col1, col2 = st.columns([4, 1])
         with col1:
-            if st.button(
+            st.button(
                 label,
                 key=f"load_match_{match['id']}",
                 use_container_width=True,
-            ):
-                load_saved_match(match)
+                on_click=_load_saved_match_callback,
+                args=(match,),
+            )
         with col2:
             st.button(
                 "🗑️",
@@ -1788,8 +1893,9 @@ if "city_box_ver" not in st.session_state:
 # browser's cached open state so every pick reliably closes the list.
 st.session_state.setdefault("food_browse_ver", 0)
 st.session_state.setdefault("city_browse_ver", 0)
-# Sidebar product guide shows 5 cards at a time; "View More" adds five more.
-st.session_state.setdefault("guide_visible_count", 5)
+# Sidebar product guide shows 3 cards at a time; "View More" adds three more.
+GUIDE_PAGE_SIZE = 3
+st.session_state.setdefault("guide_visible_count", GUIDE_PAGE_SIZE)
 # Top-bar AI assistant panel and its in-session conversation history.
 st.session_state.setdefault("show_ai_help", False)
 st.session_state.setdefault("ai_chat_history", [])
@@ -1798,6 +1904,8 @@ st.session_state.setdefault("ai_chat_history", [])
 if "show_swaps_results" not in st.session_state:
     st.session_state["show_swaps_results"] = False
 st.session_state.setdefault("inspect_product", None)
+# Set by View Details / wishlist-name taps and consumed on the details rerun.
+st.session_state.setdefault("_collapse_sidebar_for_details", False)
 if "daily_protein_goal" not in st.session_state:
     st.session_state["daily_protein_goal"] = 120
 if "daily_calorie_goal" not in st.session_state:
@@ -1812,6 +1920,11 @@ st.session_state.setdefault("wishlist", [])
 # user's saved targets/preferences before any dashboard widgets are created.
 if st.session_state.get("supabase_user") is not None:
     _load_user_preferences(st.session_state["supabase_user"])
+
+# Dedicated views own the whole main area: no hero, no how-it-works bar, no
+# Help toggle, and no search form until the user taps "⌂ Back to home".
+show_product_details = st.session_state.get("inspect_product") is not None
+show_ai_help = st.session_state.get("show_ai_help", False)
 
 
 def _canonical_value(label: str, aliases: dict[str, str]) -> str:
@@ -1900,6 +2013,19 @@ def _save_user_metadata(updates: dict, success_message: str) -> None:
         st.error(f"Could not save your settings: {exc}")
 
 
+def _toggle_wishlist_callback(product_name: str) -> None:
+    """Widget callback: persist a wishlist change in the button's own pass."""
+    toggle_wishlist(product_name)
+
+
+def _remove_wishlist_item(product_name: str) -> None:
+    """Remove one saved food, persist it immediately; the tap supplies the rerun."""
+    if not product_name:
+        return
+    if product_name in _normalize_wishlist(st.session_state.get("wishlist", [])):
+        toggle_wishlist(product_name)
+
+
 def toggle_wishlist(product_name: str) -> None:
     """Add/remove a food and persist the list to Supabase Auth user_metadata."""
     if not product_name:
@@ -1938,14 +2064,14 @@ def render_wishlist_button(
     product_name: str, key: str, use_container_width: bool = False
 ) -> None:
     """Reusable wishlist toggle for guide, spotlight and swap cards."""
-    if st.button(
+    st.button(
         _wishlist_button_label(product_name),
         key=key,
         use_container_width=use_container_width,
         type="secondary",
-    ):
-        toggle_wishlist(product_name)
-        st.rerun()
+        on_click=_toggle_wishlist_callback,
+        args=(product_name,),
+    )
 
 
 def _protein_goal_badge(protein_per_100g) -> str:
@@ -1962,10 +2088,26 @@ def _protein_goal_badge(protein_per_100g) -> str:
 
 
 def _reset_swaps_view() -> None:
-    """Return to the clean home view and drop inspect/ranked-result state."""
+    """Return to the clean home view and drop inspect/AI/ranked-result state."""
     st.session_state["show_swaps_results"] = False
     st.session_state["inspect_product"] = None
+    st.session_state["show_ai_help"] = False
+    st.session_state["_collapse_sidebar_for_details"] = False
     st.session_state.pop("match_result_data", None)
+
+
+def _open_swaps_results() -> None:
+    """Find Alternatives callback: one state pass, one automatic widget rerun."""
+    st.session_state["show_swaps_results"] = True
+    st.session_state["inspect_product"] = None
+    st.session_state["show_ai_help"] = False
+    st.session_state["_collapse_sidebar_for_details"] = False
+    st.session_state.pop("match_result_data", None)
+
+
+def _close_ai_help() -> None:
+    """AI Help back-button callback (the button supplies the single rerun)."""
+    st.session_state["show_ai_help"] = False
 
 
 def _render_back_to_home(key: str) -> None:
@@ -1977,17 +2119,28 @@ def _render_back_to_home(key: str) -> None:
             '<div class="back-home-marker" aria-hidden="true"></div>',
             unsafe_allow_html=True,
         )
-        if st.button(
-            "⌂ Back to home", key=key, help="Return to the start page"
-        ):
-            _reset_swaps_view()
-            st.rerun()
+        st.button(
+            "⌂ Back to home",
+            key=key,
+            help="Return to the start page",
+            on_click=_reset_swaps_view,
+        )
 
 
 def _reset_guide_pagination() -> None:
-    """Restart the product guide at five cards each time the toggle turns on."""
+    """Restart the product guide at three cards each time the toggle turns on."""
     if st.session_state.get("show_product_guide"):
-        st.session_state["guide_visible_count"] = 5
+        st.session_state["guide_visible_count"] = GUIDE_PAGE_SIZE
+
+
+def _show_more_guide_products() -> None:
+    """View More callback; the button's own rerun repaints the next three cards."""
+    st.session_state["guide_visible_count"] += GUIDE_PAGE_SIZE
+
+
+def _show_less_guide_products() -> None:
+    """Show Less callback; reset in one pass before the automatic rerun."""
+    st.session_state["guide_visible_count"] = GUIDE_PAGE_SIZE
 
 
 def _sync_food_selection(canonical: str, search_value: str | None = None) -> None:
@@ -2035,17 +2188,17 @@ def select_food_value_callback(product: str) -> None:
     st.session_state["inspect_product"] = None
     _reset_swaps_view()
     st.session_state["food_box_ver"] = st.session_state.get("food_box_ver", 0) + 1
-    st.rerun()
 
 
 def inspect_food_value_callback(product: str) -> None:
-    """Sidebar guide `👁️ View Details`: open the full card on the main screen."""
+    """View Details / wishlist name: open the dedicated full-page overview."""
     if not product:
         return
     st.session_state["inspect_product"] = product
     st.session_state["show_swaps_results"] = False
+    st.session_state["show_ai_help"] = False
+    st.session_state["_collapse_sidebar_for_details"] = True
     st.session_state.pop("match_result_data", None)
-    st.rerun()
 
 
 def select_city_callback(widget_key: str) -> None:
@@ -2492,6 +2645,109 @@ PRODUCT_SERVING_G: dict[str, int] = {
     "Coconut Milk (Canned)":      50,
 }
 
+# ─────────────────────────────────────────────────────────────
+# Rich product overview copy (used by the dedicated details page)
+# ─────────────────────────────────────────────────────────────
+PRODUCT_ABOUT: dict[str, str] = {
+    "Whey Protein Powder": "A fast-digesting dairy protein made from milk during cheese-making. It is rich in complete protein and useful after training or when you need an easy protein top-up; best for active people who tolerate dairy.",
+    "Pea Protein Powder": "A plant protein made from yellow peas, with a solid amino-acid profile and no dairy or soy. It blends easily into shakes and cooking; best for vegan/vegetarian users or anyone avoiding dairy.",
+    "Soya Chunks (TVP)": "Defatted soy flour textured into a chewy, shelf-stable meat substitute. It delivers high protein with very little fat and absorbs flavours well; best for budget-friendly vegetarian high-protein meals.",
+    "Tofu (Firm)": "A firm soy-bean curd that is mild, versatile and high in complete plant protein. It also supplies calcium when set with calcium salts; best for vegan/vegetarian bowls, curries and grills.",
+    "Tempeh": "Fermented soybeans pressed into a firm cake; fermentation makes it easier to digest and gives a nutty flavour. It offers protein plus fibre; best for people wanting a hearty plant protein.",
+    "Edamame": "Young soybeans eaten fresh, with protein, fibre and a mild, fresh taste. They make a simple snack or side; best for plant-based eaters and lunchboxes.",
+    "Paneer": "Fresh Indian cheese with a mild flavour and a firm texture that holds up in curries. It provides protein and calcium; best for vegetarians who tolerate dairy and want filling meals.",
+    "Greek Yogurt": "Strained yogurt with a thicker texture and more protein than regular curd. It supports breakfast and snack protein goals; best for people who enjoy dairy and want a quick, creamy option.",
+    "Cottage Cheese (Low Fat)": "Fresh low-fat curds with slow-digesting casein protein. It is light yet filling and works sweet or savoury; best for breakfast, snacks or a pre-sleep protein option.",
+    "Masoor Dal (Red Lentils)": "Split red lentils that cook quickly and turn soft and creamy. They supply plant protein and fibre at a low cost; best for everyday dal, soups and khichdi.",
+    "Chana Dal": "Split chickpeas with a nutty flavour and firm bite. They offer plant protein and fibre; best for people who enjoy traditional dals and want a slower-digesting pulse.",
+    "Moong Dal": "Small, mild lentils that cook fast and are easy to digest when soaked. They provide plant protein and fibre; best for light meals, khichdi and sprouted salads.",
+    "Chickpeas (Kabuli Chana)": "Round legumes with a nutty taste and firm texture. They combine plant protein with fibre for steady energy; best for curries, salads and hummus-style dishes.",
+    "Rajma (Kidney Beans)": "Kidney-shaped beans with a hearty texture and earthy flavour. They are rich in plant protein and fibre; best for filling rice bowls and wraps when cooked thoroughly.",
+    "Rolled Oats": "Whole oat flakes that cook into a creamy, fibre-rich cereal. They provide slow-release carbohydrate and useful protein for breakfast; best for morning meals and pre-workout fuel.",
+    "Quinoa": "A gluten-free grain-like seed with a light, fluffy texture. It offers complete plant protein and fibre; best for grain bowls, salads and rice swaps.",
+    "Brown Rice": "Wholegrain rice with the bran intact, giving a nuttier taste and more fibre than white rice. It gives steady energy; best as a base for dal, sabzi and protein bowls.",
+    "Peanut Butter": "A creamy or crunchy paste of roasted groundnuts, dense in energy, healthy fats and some protein. Best in small portions for snacks, toast and smoothies.",
+    "Almond Butter": "A nut butter made from almonds, with healthy fats, vitamin E and a mild sweetness. It is energy-dense; best for toast, fruit dips and smoothies in measured servings.",
+    "Almonds": "Whole tree nuts with healthy fats, fibre, vitamin E and a satisfying crunch. They are portable and energy-dense; best as a measured snack or topping.",
+    "Cashews": "Creamy tree nuts that blend into rich sauces and dairy-free creams. They provide healthy fats and minerals; best for curries, trail mixes and creamy smoothies in small portions.",
+    "Walnuts": "Tree nuts known for their omega-3 alpha-linolenic acid and rich flavour. They pair well with sweet and savoury dishes; best as a small snack or a salad/breakfast topping.",
+    "Chia Seeds": "Tiny seeds that form a gel when soaked, adding fibre and healthy fats. They are very energy-dense; best for puddings, soaked drinks and smoothies, never eaten dry.",
+    "Flaxseeds": "Small seeds rich in fibre and plant omega-3, best used ground. They add a mild nutty note; best for people adding fibre to oats, roti dough or smoothies.",
+    "Pumpkin Seeds": "Flat green seeds with a crisp texture and decent protein and minerals. They are easy to sprinkle; best for snacks, salads and trail mixes.",
+    "Sunflower Seeds": "Small hulled seeds with a mild nutty flavour and healthy fats. They are a nut-free crunchy option; best for toppings, snacks and seed butters.",
+    "Soy Milk": "A plant milk made from soybeans, usually fortified with calcium and vitamin D. It has a neutral taste and useful protein; best for vegan/vegetarian drinks, cereal and cooking.",
+    "Almond Milk": "A light plant milk made from almonds, usually lower in calories than dairy milk. It works well in drinks and cereal; best for people wanting a nutty, dairy-free option.",
+    "Oat Milk": "A creamy plant milk made from oats, naturally slightly sweet. It froths well for coffee and cooks well; best for dairy-free drinks, cereal and baking.",
+    "Coconut Milk (Canned)": "Rich canned coconut milk with a pronounced coconut flavour and high saturated fat. It adds creaminess to curries and desserts; best for occasional cooking use in small amounts.",
+}
+
+PRODUCT_STORAGE: dict[str, str] = {
+    "Whey Protein Powder": "Keep sealed in a cool, dry place; scoop with a dry spoon and close the lid after each use.",
+    "Pea Protein Powder": "Keep sealed in a cool, dry place; use a dry scoop and avoid moisture entering the pouch.",
+    "Soya Chunks (TVP)": "Store dry in an airtight jar; once soaked, refrigerate and cook within a day.",
+    "Tofu (Firm)": "Keep refrigerated in its liquid; after opening, store submerged in fresh water and use within 2–3 days.",
+    "Tempeh": "Refrigerate and use within a few days; it also freezes well when tightly wrapped.",
+    "Edamame": "Freeze if not using fresh; refrigerate cooked pods for up to 2 days.",
+    "Paneer": "Refrigerate in an airtight box, use within 3–4 days, or freeze in cubes.",
+    "Greek Yogurt": "Keep chilled, use a clean spoon every time, and avoid long spells at room temperature.",
+    "Cottage Cheese (Low Fat)": "Keep chilled and consume soon after opening; drain excess liquid before cooking.",
+    "Masoor Dal (Red Lentils)": "Store dry in an airtight jar away from moisture; rinse before cooking.",
+    "Chana Dal": "Store dry in an airtight jar; soak before cooking for a creamier texture.",
+    "Moong Dal": "Store dry and airtight; rinse well and soak when the recipe calls for it.",
+    "Chickpeas (Kabuli Chana)": "Keep dried chickpeas airtight; cooked chickpeas refrigerate 3–4 days or freeze in portions.",
+    "Rajma (Kidney Beans)": "Keep dried beans airtight; cooked beans refrigerate 3–4 days or freeze in portions.",
+    "Rolled Oats": "Keep in a sealed container away from moisture; discard if it smells rancid.",
+    "Quinoa": "Store dry in an airtight jar; cooked quinoa keeps 3–4 days refrigerated.",
+    "Brown Rice": "Store dry in an airtight jar; cooked rice should be refrigerated promptly and eaten within 3–4 days.",
+    "Peanut Butter": "Store sealed; natural oil separation is normal—stir well. Refrigeration after opening extends freshness.",
+    "Almond Butter": "Store sealed; stir if oils separate. Refrigerate after opening for longer freshness.",
+    "Almonds": "Keep in an airtight container in a cool, dark place or fridge to prevent rancidity.",
+    "Cashews": "Keep airtight and away from heat; refrigeration helps prevent rancidity.",
+    "Walnuts": "Store airtight in the fridge or freezer because their oils go rancid quickly.",
+    "Chia Seeds": "Keep dry and sealed; soaked chia should be refrigerated and used within a day or two.",
+    "Flaxseeds": "Store whole seeds airtight; grind just before use and refrigerate ground flax.",
+    "Pumpkin Seeds": "Keep airtight in a cool, dark place or fridge to protect the oils.",
+    "Sunflower Seeds": "Store airtight and cool; roasted seeds are best used soon after opening.",
+    "Soy Milk": "Refrigerate after opening, shake the carton, and use within 4–5 days.",
+    "Almond Milk": "Refrigerate after opening, shake before pouring, and finish within 4–5 days.",
+    "Oat Milk": "Refrigerate after opening and use within 4–5 days; shake well before pouring.",
+    "Coconut Milk (Canned)": "Store unopened in a cool cupboard; once opened, refrigerate in a non-metal container and use within 3–4 days.",
+}
+
+PRODUCT_PAIRINGS: dict[str, str] = {
+    "Whey Protein Powder": "Pair with banana, oats or Greek yogurt for a fuller recovery snack.",
+    "Pea Protein Powder": "Pair with banana, oat milk or a small handful of nuts.",
+    "Soya Chunks (TVP)": "Pair with brown rice, wholegrain roti and plenty of vegetables.",
+    "Tofu (Firm)": "Pair with brown rice, quinoa, sesame and crunchy vegetables.",
+    "Tempeh": "Pair with brown rice, leafy greens and a light soy-ginger glaze.",
+    "Edamame": "Pair with brown rice, citrus, sea salt or a light soy dip.",
+    "Paneer": "Pair with wholegrain roti, brown rice or a large vegetable side.",
+    "Greek Yogurt": "Pair with berries, oats, chia seeds or a drizzle of honey.",
+    "Cottage Cheese (Low Fat)": "Pair with fruit, wholegrain toast, herbs or cracked pepper.",
+    "Masoor Dal (Red Lentils)": "Pair with brown rice, quinoa, roti or a vegetable side.",
+    "Chana Dal": "Pair with brown rice, roti or a cucumber and lemon side.",
+    "Moong Dal": "Pair with brown rice, quinoa or sprouted vegetables.",
+    "Chickpeas (Kabuli Chana)": "Pair with quinoa, rice, cucumber and lemon-tahini style dressing.",
+    "Rajma (Kidney Beans)": "Pair with brown rice, quinoa or a wholegrain wrap.",
+    "Rolled Oats": "Pair with Greek yogurt, berries, seeds or a spoon of nut butter.",
+    "Quinoa": "Pair with roasted vegetables, chickpeas, tofu or fresh herbs.",
+    "Brown Rice": "Pair with dal, paneer, tofu, beans or stir-fried vegetables.",
+    "Peanut Butter": "Pair with fruit slices, wholegrain toast or oatmeal.",
+    "Almond Butter": "Pair with apple, banana, toast or overnight oats.",
+    "Almonds": "Pair with fruit, yogurt or a small handful of seeds.",
+    "Cashews": "Pair with fruit, yogurt, oats or a light trail mix.",
+    "Walnuts": "Pair with yogurt, oats, berries or a leafy salad.",
+    "Chia Seeds": "Pair with milk, yogurt, oats or a soaked smoothie.",
+    "Flaxseeds": "Pair with oatmeal, roti dough, yogurt or smoothies.",
+    "Pumpkin Seeds": "Pair with yogurt, oats, salads or trail mix.",
+    "Sunflower Seeds": "Pair with salads, oatmeal, yogurt or seed butter.",
+    "Soy Milk": "Pair with coffee, cereal, oats or a fruit smoothie.",
+    "Almond Milk": "Pair with coffee, tea, cereal or a smoothie.",
+    "Oat Milk": "Pair with coffee, muesli, overnight oats or baking.",
+    "Coconut Milk (Canned)": "Pair with vegetables, tofu, beans and rice; keep portions modest.",
+}
+
+
 # ─────────────────────────────────────────────
 # Custom CSS — sleek, modern, consumer-grade dark-mode SaaS look
 # ─────────────────────────────────────────────
@@ -2902,21 +3158,8 @@ h1, h2, h3, .stHeading {
     }
 }
 
-/* Wishlist rows: keep name / Use / 🗑️ on one line in the narrow sidebar. */
+/* Wishlist cards now reuse the product-guide card markup and styles. */
 .wishlist-marker, .wishlist-name-marker { display: none !important; }
-[data-testid="stSidebar"] div[data-testid="stExpander"]:has(.wishlist-marker) div[data-testid="stHorizontalBlock"] {
-    flex-wrap: nowrap !important;
-    gap: 0.25rem !important;
-}
-[data-testid="stSidebar"] div[data-testid="stExpander"]:has(.wishlist-marker) div[data-testid="stColumn"] {
-    min-width: 0 !important;
-}
-[data-testid="stSidebar"] div[data-testid="stExpander"]:has(.wishlist-marker) .stButton > button {
-    min-height: 30px !important;
-    padding: 0.2rem 0.35rem !important;
-    font-size: 0.75rem !important;
-    border-radius: 8px !important;
-}
 
 /* ── Hero header — one centered flex column (mobile-safe) ── */
 .hero-block {
@@ -3222,6 +3465,82 @@ button[title="View fullscreen"], [data-testid="StyledFullScreenButton"] {
 .macro-pill.fiber   { background: rgba(168, 85, 247, 0.12); color: #A855F7; border-color: rgba(168, 85, 247, 0.35); }
 .macro-pill.calories{ background: rgba(251, 191, 36, 0.12); color: #FBBF24; border-color: rgba(251, 191, 36, 0.35); }
 
+/* ── Dedicated Product Details — rich nutrition guide ── */
+.detail-guide-marker { display: none !important; }
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.detail-guide-marker) {
+    background: linear-gradient(180deg, rgba(22, 27, 34, 0.96), rgba(13, 17, 23, 0.96)) !important;
+    border: 1px solid rgba(46, 160, 67, 0.35) !important;
+    border-radius: 14px !important;
+    padding: 1.1rem !important;
+    margin-top: 0.9rem !important;
+}
+.detail-section-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 1.05rem !important;
+    font-weight: 800 !important;
+    color: #7EE2A8 !important;
+    margin: 0 0 0.55rem !important;
+    letter-spacing: 0.01em !important;
+}
+.detail-section-title + .detail-copy,
+.detail-section-title + .detail-macro-table {
+    margin-top: 0 !important;
+}
+.detail-copy {
+    font-size: 0.92rem !important;
+    line-height: 1.65 !important;
+    color: #C9D1D9 !important;
+    margin: 0 0 0.85rem !important;
+}
+.detail-macro-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 0.86rem !important;
+    font-variant-numeric: tabular-nums !important;
+}
+.detail-macro-table th, .detail-macro-table td {
+    padding: 0.45rem 0.55rem !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+    text-align: right !important;
+}
+.detail-macro-table th:first-child, .detail-macro-table td:first-child {
+    text-align: left !important;
+    color: #94A3B8 !important;
+}
+.detail-macro-table thead th {
+    color: #7EE2A8 !important;
+    font-weight: 700 !important;
+    border-bottom-color: rgba(46, 160, 67, 0.45) !important;
+}
+.detail-macro-table tbody tr:last-child td { border-bottom: none !important; }
+.detail-mini-card {
+    background: rgba(11, 15, 25, 0.55) !important;
+    border: 1px solid rgba(255, 255, 255, 0.07) !important;
+    border-radius: 10px !important;
+    padding: 0.75rem 0.85rem !important;
+    margin-bottom: 0.7rem !important;
+}
+.detail-mini-card p { margin: 0 !important; }
+.detail-mini-label {
+    font-size: 0.72rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.09em !important;
+    color: #8B949E !important;
+    margin-bottom: 0.3rem !important;
+}
+.detail-mini-value {
+    font-size: 0.95rem !important;
+    font-weight: 650 !important;
+    color: #E6EDF3 !important;
+}
+.detail-tip-list {
+    margin: 0 !important;
+    padding-left: 1.1rem !important;
+    color: #C9D1D9 !important;
+    font-size: 0.9rem !important;
+    line-height: 1.6 !important;
+}
+
 /* ── Landing (empty state) — compact ── */
 .landing {
     position: relative;
@@ -3382,8 +3701,10 @@ div[data-testid="stVerticalBlockElement"]:has(.how-guide-anchor) + div[data-test
     fill: #7EE2A8 !important;
 }
 
-/* ── Top-bar AI assistant toggle + dark glass chat panel ── */
-.ai-help-toggle-marker, .ai-help-marker { display: none !important; }
+/* ── Top-bar Help toggle + dedicated dark glass AI page ── */
+.ai-help-toggle-marker, .ai-help-marker, .ai-help-back-marker {
+    display: none !important;
+}
 div[data-testid="stVerticalBlockElement"]:has(.ai-help-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
     min-height: 46px !important;
     padding: 0.5rem 0.9rem !important;
@@ -3395,30 +3716,58 @@ div[data-testid="stVerticalBlockElement"]:has(.ai-help-toggle-marker) + div[data
     border-radius: 10px !important;
     transition: all 0.15s ease !important;
 }
-div[data-testid="stVerticalBlockElement"]:has(.ai-help-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
-    background: rgba(46, 160, 67, 0.20) !important;
-    border-color: #3FB950 !important;
-    color: #A7F3D0 !important;
+@media (hover: hover) {
+    div[data-testid="stVerticalBlockElement"]:has(.ai-help-toggle-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+        background: rgba(46, 160, 67, 0.20) !important;
+        border-color: #3FB950 !important;
+        color: #A7F3D0 !important;
+    }
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) {
-    background-color: #161B22 !important;
-    border: 1px solid #2EA043 !important;
-    border-radius: 14px !important;
-    padding: 16px !important;
+    background: linear-gradient(145deg, #161B22, #0D1117) !important;
+    border: 1px solid rgba(46, 160, 67, 0.45) !important;
+    border-radius: 16px !important;
+    padding: 20px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
     margin-bottom: 16px !important;
 }
 .ai-help-heading {
     font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 1.1rem !important;
-    font-weight: 750 !important;
+    font-size: 1.2rem !important;
+    font-weight: 800 !important;
     color: #E6EDF3 !important;
     line-height: 1.3 !important;
 }
+.ai-help-subtitle {
+    font-size: 0.92rem !important;
+    line-height: 1.55 !important;
+    color: #9BA7B4 !important;
+    margin: 0.35rem 0 1.1rem !important;
+}
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) .stButton > button {
-    font-size: 0.8rem !important;
-    padding: 0.35rem 0.5rem !important;
-    border: 1px solid #30363D !important;
-    border-radius: 9px !important;
+    min-height: 42px !important;
+    padding: 0.35rem 0.7rem !important;
+    font-size: 0.82rem !important;
+    font-weight: 650 !important;
+    color: #A7F3D0 !important;
+    background: rgba(46, 160, 67, 0.12) !important;
+    border: 1px solid rgba(46, 160, 67, 0.35) !important;
+    border-radius: 999px !important;
+    transition: all 0.15s ease !important;
+}
+@media (hover: hover) {
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) .stButton > button:hover {
+        background: rgba(46, 160, 67, 0.22) !important;
+        border-color: rgba(46, 160, 67, 0.65) !important;
+        color: #FFFFFF !important;
+    }
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) [data-testid="stChatMessage"] {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-help-marker) [data-testid="stChatInput"] {
+    width: 100% !important;
 }
 
 /* ── Sidebar header ── */
@@ -3597,14 +3946,15 @@ div[data-testid="stExpander"]:has(.filters-expander-marker) .stRadio div[role="r
     background-color: #161B22 !important;
     border: 1px solid #30363D !important;
     border-radius: 12px !important;
-    padding: 10px !important;
-    margin-bottom: 10px !important;
+    padding: 12px !important;
+    margin-bottom: 12px !important;
 }
 .guide-thumb {
     display: block;
     width: 100%;
     height: 100px;
     object-fit: cover;
+    object-position: center;
     border-radius: 8px !important;
     margin-bottom: 0.5rem;
 }
@@ -3658,18 +4008,27 @@ div[data-testid="stExpander"]:has(.filters-expander-marker) .stRadio div[role="r
     margin-top: 0.55rem !important;
 }
 
-/* ── Sidebar guide pagination — subtle counter + emerald "View More" ── */
+/* ── Sidebar guide pagination — premium emerald "View More" button ── */
 .guide-view-more-marker, .guide-show-less-marker { display: none !important; }
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.guide-view-more-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
-    min-height: 34px !important;
-    padding: 0.3rem 0.6rem !important;
-    font-size: 0.8rem !important;
+    background: linear-gradient(135deg, rgba(46, 160, 67, 0.2), rgba(22, 27, 34, 0.95)) !important;
+    border: 1px solid rgba(46, 160, 67, 0.65) !important;
+    color: #6EE798 !important;
     font-weight: 700 !important;
-    color: #7EE2A8 !important;
-    background: rgba(46, 160, 67, 0.10) !important;
-    border: 1px solid #2EA043 !important;
-    border-radius: 8px !important;
+    font-size: 15px !important;
+    letter-spacing: 0.03em !important;
+    border-radius: 10px !important;
+    padding: 9px 16px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
     margin-top: 0.4rem !important;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+@media (hover: hover) {
+    [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.guide-view-more-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover {
+        background: rgba(46, 160, 67, 0.32) !important;
+        border-color: #3FB950 !important;
+        color: #FFFFFF !important;
+    }
 }
 [data-testid="stSidebar"] div[data-testid="stVerticalBlockElement"]:has(.guide-show-less-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button {
     min-height: 30px !important;
@@ -3770,6 +4129,47 @@ div[data-testid="stHorizontalBlock"]:has(.back-home-marker) > div:nth-child(2) b
     div[data-testid="stColumn"]:has(.back-home-marker) button[data-testid="stBaseButton-secondary"]:hover p,
     div[data-testid="stHorizontalBlock"]:has(.back-home-marker) > div:nth-child(2) .stButton > button:hover p,
     div[data-testid="stHorizontalBlock"]:has(.back-home-marker) > div:nth-child(2) button[data-testid="stBaseButton-secondary"]:hover p {
+        color: #FFFFFF !important;
+    }
+}
+
+/* ── AI Help back pill — same styling as details, but top-left aligned ── */
+.ai-help-back-marker { display: none !important; }
+div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] {
+    display: flex !important;
+    justify-content: flex-start !important;
+}
+div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button,
+div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"] {
+    background-color: rgba(46, 160, 67, 0.12) !important;
+    border: 1px solid rgba(46, 160, 67, 0.55) !important;
+    border-radius: 10px !important;
+    padding: 8px 20px !important;
+    color: #6EE798 !important;
+    font-size: 15px !important;
+    font-weight: 500 !important;
+    line-height: 1.2 !important;
+    width: auto !important;
+    margin: 0.25rem 0 0.85rem !important;
+    box-shadow: none !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button p,
+div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"] p {
+    color: #6EE798 !important;
+    font-size: 15px !important;
+    font-weight: 500 !important;
+    margin: 0 !important;
+}
+@media (hover: hover) {
+    div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover,
+    div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"]:hover {
+        background-color: rgba(46, 160, 67, 0.22) !important;
+        border-color: #3FB950 !important;
+        color: #FFFFFF !important;
+    }
+    div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] .stButton > button:hover p,
+    div[data-testid="stVerticalBlockElement"]:has(.ai-help-back-marker) + div[data-testid="stVerticalBlockElement"] button[data-testid="stBaseButton-secondary"]:hover p {
         color: #FFFFFF !important;
     }
 }
@@ -4040,6 +4440,10 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
 </style>
 """, unsafe_allow_html=True)
 
+# Re-apply the touch-first defaults after the dashboard theme so mobile blur
+# and transition rules cannot win the cascade on first tap.
+st.markdown(f"<style>{_TOUCH_FIRST_CSS}</style>", unsafe_allow_html=True)
+
 # NOTE: Authentication CSS now lives INSIDE the logged-out block near the top
 # of this file. It must be injected BEFORE st.stop(), otherwise the login screen
 # never receives it (the old copy here was dead code after st.stop()).
@@ -4049,7 +4453,7 @@ section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
 # Data helpers
 # ─────────────────────────────────────────────
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=3600, show_spinner=False)
 def fetch_product_list() -> list[str]:
     """
     Fetch all product names from GET /products with a 2.5 s probe timeout.
@@ -4066,7 +4470,7 @@ def fetch_product_list() -> list[str]:
         raise BackendUnavailable(API_BASE) from exc
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=3600, show_spinner=False)
 def fetch_city_list() -> list[str]:
     """Fetch destination cities from GET /cities with the same fast timeout."""
     try:
@@ -4077,7 +4481,7 @@ def fetch_city_list() -> list[str]:
         raise BackendUnavailable(API_BASE) from exc
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_product_csv() -> pd.DataFrame:
     """Load products.csv to retrieve original product macros for comparison."""
     csv_path = Path(__file__).parent.parent / "data" / "products.csv"
@@ -4086,7 +4490,7 @@ def load_product_csv() -> pd.DataFrame:
     return df
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_city_list() -> list[str]:
     """Destination cities derived from the dataset so the UI never drifts from the data."""
     try:
@@ -4188,7 +4592,7 @@ def search_cities(searchterm: str) -> list[str]:
     return _ordered_city_suggestions(query, cities)[:8]
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_original_macros(product_name: str) -> dict | None:
     """Return the macro dict for the original product from local CSV."""
     df = load_product_csv()
@@ -4209,8 +4613,9 @@ def _as_bool(value) -> bool:
     return str(value).strip().upper() == "TRUE"
 
 
+@st.cache_resource(show_spinner=False)
 def product_image(name: str) -> Path | None:
-    """Return the locally stored photo for a product, if one exists."""
+    """Return the locally stored photo path for a product, if one exists."""
     for ext in (".jpg", ".jpeg", ".png", ".webp"):
         candidate = PRODUCT_IMAGE_DIR / f"{_slug(name)}{ext}"
         if candidate.exists():
@@ -4218,9 +4623,9 @@ def product_image(name: str) -> Path | None:
     return None
 
 
-@st.cache_data(ttl=60)
+@st.cache_resource(show_spinner=False)
 def product_image_src(name: str) -> str | None:
-    """Return a data-URI for embedding a product photo in custom HTML."""
+    """Return a cached data-URI for embedding a product photo in custom HTML."""
     image = product_image(name)
     if not image:
         return None
@@ -4229,7 +4634,7 @@ def product_image_src(name: str) -> str | None:
     return f"data:{mime};base64,{encoded}"
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_product_details() -> dict[str, dict]:
     """Every product row as a dict, with the city list parsed out.
 
@@ -4354,6 +4759,20 @@ def _ai_catalog_text(details: dict[str, dict]) -> str:
     return "\n".join(lines)
 
 
+def _ai_practical_guide_text(details: dict[str, dict]) -> str:
+    """Serving / best-time / tips companion to the raw products.csv macros."""
+    lines = []
+    for name in sorted(details):
+        how_to = PRODUCT_HOW_TO_USE.get(name, {})
+        serving = how_to.get("serving") or f"{PRODUCT_SERVING_G.get(name, 100)} g"
+        best_time = how_to.get("best_time") or "Any time of day"
+        tips = " | ".join(how_to.get("tips") or []) or "No stored tips"
+        lines.append(
+            f"{name} | serving={serving} | best_time={best_time} | tips={tips}"
+        )
+    return "\n".join(lines)
+
+
 def _ai_system_prompt(context: dict, details: dict[str, dict]) -> str:
     context_text = (
         f"Selected product: {context['selected_product'] or 'none'}\n"
@@ -4365,10 +4784,25 @@ def _ai_system_prompt(context: dict, details: dict[str, dict]) -> str:
     )
     return f"""You are the MacroMatch Nutrition & Product Assistant inside the
 MacroMatch food-swap app. Answer the user's question concisely and accurately,
-using ONLY the product facts and user context below. All nutrition values are
-per 100 g; simple arithmetic (for example, goal percentages) is allowed.
+using ONLY the product facts and user context below. Macro values are per 100 g;
+simple arithmetic (for example, goal percentages) is allowed. Serving advice
+comes from the practical guide, not from guessing.
 
 Rules:
+- Detect the user's intent first: how-to/serving, benefits, comparison, travel,
+  or general macro lookup. Answer that intent directly; never dump every macro.
+- Match the user's language. If they write Hinglish/Hindi (for example,
+  "kaise khaye", "fayde", "kitna"), reply in simple, friendly Hinglish with
+  clear bullets. Otherwise reply in natural English.
+- For how-to questions, use the food's Serving Size, Best Time and Tips &
+  Ways to Eat from the practical guide. Give simple numbered/bulleted steps and
+  end with one short macro line.
+- For benefits questions, highlight nutritional strengths and how much of the
+  user's daily protein goal one serving covers.
+- For comparisons, put the two named foods side by side on protein, carbs, fat,
+  fibre and calories, then give a one-line practical takeaway.
+- For travel questions, respect destination availability and suggest portable,
+  measured ways to eat the food.
 - Be brief: usually 2-5 short bullets or one short paragraph.
 - Only recommend foods from the catalogue below, and respect the active diet
   rules and allergens whenever making suggestions.
@@ -4382,6 +4816,9 @@ USER CONTEXT
 
 MACROMATCH PRODUCT CATALOGUE (data/products.csv)
 {_ai_catalog_text(details)}
+
+PRACTICAL FOOD GUIDE (serving size, best time, tips & ways to eat)
+{_ai_practical_guide_text(details)}
 """
 
 
@@ -4435,40 +4872,457 @@ def _ai_macro_summary(detail: dict) -> str:
     )
 
 
+# ── Intent vocabulary shared by the deterministic fallback and the LLM prompt ──
+_AI_HOW_PHRASES = (
+    "kaise khaye", "kaise khaaye", "kaise khana", "khaye", "khaaye", "khana",
+    "how to eat", "how to use", "ways to eat", "way to eat", "use",
+    "recipe", "serving", "kitna", "kitni", "kab khaye", "best time", "kab",
+)
+_AI_BENEFIT_PHRASES = (
+    "fayde", "faayde", "fayda", "faayda", "benefits", "benefit", "why eat",
+    "healthy", "weight loss", "fat loss", "muscle", "high protein",
+    "protein rich", "good for",
+    "accha", "achha", "labh",
+)
+_AI_COMPARE_PHRASES = ("vs", "versus", "compare", "comparison", "better", "ya")
+_AI_TRAVEL_PHRASES = (
+    "travel", "trip", "journey", "safar", "snack", "portable", "pack",
+)
+_AI_HINGLISH_PHRASES = (
+    "kaise", "khaye", "khaaye", "khana", "kitna", "kitni", "fayde",
+    "faayde", "fayda", "kya", "kab", "ya", "accha", "achha", "ke liye",
+)
+
+
+def _ai_text(question: str) -> str:
+    return re.sub(r"\s+", " ", str(question or "").strip().lower())
+
+
+def _ai_has_phrase(q: str, phrases: tuple[str, ...]) -> bool:
+    """Word-boundary matching for single words, substring for Hinglish phrases."""
+    for phrase in phrases:
+        if " " in phrase:
+            if phrase in q:
+                return True
+        elif re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", q):
+            return True
+    return False
+
+
+def _ai_food_mentions(question: str, details: dict[str, dict]) -> list[str]:
+    """Resolve canonical, short, alias and local-name food mentions in a query."""
+    q = _ai_text(question)
+    found: list[str] = []
+    for name in sorted(details):
+        phrases = {name.lower()}
+        short_name = re.sub(r"\s*\([^)]*\)", "", name).strip().lower()
+        if short_name:
+            phrases.add(short_name)
+        for part in re.split(r"[/()]", PRODUCT_LOCAL_NAMES.get(name, "")):
+            part = part.strip().lower()
+            if part:
+                phrases.add(part)
+        for alias, canonical in PRODUCT_DISPLAY_ALIASES.items():
+            if canonical == name:
+                phrases.add(alias.lower())
+        if any(
+            re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", q)
+            for phrase in phrases
+            if phrase
+        ):
+            found.append(name)
+    return found
+
+
+def _ai_resolve_food(
+    question: str, details: dict[str, dict], context: dict
+) -> str | None:
+    """Use an explicitly named food, else fall back to the Step 1 selection."""
+    mentions = _ai_food_mentions(question, details)
+    if mentions:
+        return mentions[0]
+    selected = context.get("selected_product")
+    return selected if selected in details else None
+
+
+def _ai_allowed(detail: dict, context: dict) -> bool:
+    diets = set(context.get("diets") or [])
+    allergens = set(context.get("allergens") or [])
+    if "vegan" in diets and not detail.get("vegan"):
+        return False
+    if "vegetarian" in diets and not detail.get("vegetarian"):
+        return False
+    if "dairy_free" in diets and not detail.get("dairy_free"):
+        return False
+    if "gluten_free" in diets and not detail.get("gluten_free"):
+        return False
+    if "low_sugar" in diets and not detail.get("low_sugar"):
+        return False
+    if "soy" in allergens and detail.get("contains_soy"):
+        return False
+    if "nuts" in allergens and detail.get("contains_nuts"):
+        return False
+    if "dairy" in allergens and detail.get("contains_dairy"):
+        return False
+    return True
+
+
+def _ai_goal(context: dict, key: str, default: float) -> float:
+    try:
+        value = float(context.get(key) or default)
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
+def _ai_serving_grams(name: str) -> int:
+    try:
+        return int(PRODUCT_SERVING_G.get(name, 100))
+    except (TypeError, ValueError):
+        return 100
+
+
+def _ai_serving_summary(name: str, detail: dict) -> str:
+    grams = _ai_serving_grams(name)
+    factor = grams / 100.0
+    return (
+        f"per {grams:g} g serving: P {float(detail['protein']) * factor:g}g · "
+        f"C {float(detail['carbs']) * factor:g}g · "
+        f"F {float(detail['fat']) * factor:g}g · "
+        f"{float(detail['calories']) * factor:.0f} kcal"
+    )
+
+
+def _ai_protein_coverage(
+    name: str, detail: dict, context: dict
+) -> tuple[float, int, float]:
+    goal = _ai_goal(context, "protein_goal", 120)
+    protein = float(detail["protein"]) * _ai_serving_grams(name) / 100.0
+    percent = round(protein / goal * 100) if goal else 0
+    return protein, percent, goal
+
+
+def _ai_strengths(detail: dict) -> list[str]:
+    protein = float(detail["protein"])
+    carbs = float(detail["carbs"])
+    fat = float(detail["fat"])
+    fiber = float(detail["fiber"])
+    strengths: list[str] = []
+    if protein >= 20:
+        strengths.append("Very high in protein for a 100 g portion.")
+    elif protein >= 12:
+        strengths.append("A solid protein option for a 100 g portion.")
+    if fiber >= 5:
+        strengths.append("High in fibre, which helps keep meals satisfying.")
+    elif fiber >= 2.5:
+        strengths.append("Adds useful fibre to your day.")
+    if fat >= 10:
+        strengths.append(
+            "Rich in healthy fats — tasty, but measure the serving because "
+            "calories add up quickly."
+        )
+    if max(0.0, carbs - fiber) <= 10 and protein >= 10:
+        strengths.append("Lower in net carbs, so it can fit a keto-style day.")
+    if detail.get("vegan"):
+        strengths.append("Vegan-friendly.")
+    if detail.get("gluten_free"):
+        strengths.append("Gluten-free.")
+    if detail.get("low_sugar"):
+        strengths.append("Low in sugar.")
+    return strengths[:4]
+
+
+def _ai_how_to_answer(
+    name: str, detail: dict, context: dict, hinglish: bool
+) -> str:
+    """Step-by-step serving/best-time/tips answer for how-to style questions."""
+    how_to = PRODUCT_HOW_TO_USE.get(name, {})
+    serving = how_to.get("serving") or f"{_ai_serving_grams(name)} g"
+    best_time = how_to.get("best_time") or "Any time of day"
+    tips = list(how_to.get("tips") or [])
+    if not tips:
+        tips = ["Use a measured portion and pair it with your usual meal."]
+
+    heading = (
+        f"**{name} kaise khaye — easy guide:**"
+        if hinglish
+        else f"**How to eat {name} — simple guide:**"
+    )
+    lines = [
+        heading,
+        f"1. **Serving size ({'kitna lein' if hinglish else 'how much'})**: {serving}",
+        f"2. **Best time ({'kab khaye' if hinglish else 'when'})**: {best_time}",
+        f"3. **{'Kaise use karein' if hinglish else 'Ways to eat'}**:",
+    ]
+    lines.extend(f"   - {tip}" for tip in tips[:3])
+    caution = PRODUCT_CAUTIONS.get(name)
+    if caution:
+        lines.append(f"4. **Caution / {'savdhan' if hinglish else 'who should avoid'}**: {caution}")
+    lines.append(
+        f"\nQuick macro line: {_ai_macro_summary(detail)}; "
+        f"{_ai_serving_summary(name, detail)}."
+    )
+    return "\n".join(lines)
+
+
+def _ai_benefits_answer(
+    question: str, name: str, detail: dict, context: dict, hinglish: bool
+) -> str:
+    """Benefits-first answer that still ties back to the user's protein goal."""
+    q = _ai_text(question)
+    heading = (
+        f"**{name} ke fayde — kyun accha hai:**"
+        if hinglish
+        else f"**Why {name} is a good pick:**"
+    )
+    lines = [heading]
+    strengths = _ai_strengths(detail)
+    lines.extend(f"- {strength}" for strength in strengths or [
+        "It is a useful catalogue food that can fit a balanced day."
+    ])
+
+    protein, percent, goal = _ai_protein_coverage(name, detail, context)
+    lines.append(
+        f"- Protein goal: one {_ai_serving_grams(name)} g serving gives "
+        f"{protein:g} g protein — about {percent}% of your {goal:g} g daily goal."
+    )
+    about = PRODUCT_ABOUT.get(name)
+    if about:
+        first_sentence = about.split(".")[0].strip()
+        lines.append(f"- In short: {first_sentence}.")
+    pairing = PRODUCT_PAIRINGS.get(name)
+    if pairing:
+        lines.append(f"- Easy way to use it: {pairing}")
+
+    if _ai_has_phrase(q, ("weight loss", "fat loss", "weight")):
+        lines.append(
+            "- For weight loss: keep the serving measured; protein and fibre "
+            "help you feel satisfied without overshooting calories."
+        )
+    if _ai_has_phrase(q, ("muscle", "workout", "gym")):
+        lines.append(
+            "- For muscle goals: use it as a protein top-up alongside your "
+            "main meals and training routine."
+        )
+    caution = PRODUCT_CAUTIONS.get(name)
+    if caution:
+        lines.append(f"- Caution: {caution}")
+    return "\n".join(lines)
+
+
+def _ai_compare_answer(
+    question: str, details: dict[str, dict], context: dict, hinglish: bool
+) -> str:
+    """Side-by-side comparison of two named foods (or selected + nearest)."""
+    mentions = _ai_food_mentions(question, details)
+    selected = context.get("selected_product")
+    selected = selected if selected in details else None
+
+    if len(mentions) >= 2:
+        first_name, second_name = mentions[0], mentions[1]
+    elif mentions and selected and selected != mentions[0]:
+        first_name, second_name = selected, mentions[0]
+    elif selected:
+        swaps = _smart_swaps(selected, details[selected], details, limit=1)
+        if not swaps:
+            return "Tell me two catalogue foods to compare and I'll line up their macros."
+        first_name, second_name = selected, swaps[0]
+    else:
+        return "Tell me two catalogue foods to compare and I'll line up their macros."
+
+    left, right = details[first_name], details[second_name]
+    heading = (
+        f"**{first_name} vs {second_name} — comparison:**"
+        if hinglish
+        else f"**{first_name} vs {second_name} (per 100 g):**"
+    )
+    lines = [
+        heading,
+        "",
+        f"| Nutrient | {first_name} | {second_name} |",
+        "|---|---:|---:|",
+    ]
+    for label, key, unit in (
+        ("Protein", "protein", " g"),
+        ("Carbs", "carbs", " g"),
+        ("Fat", "fat", " g"),
+        ("Fibre", "fiber", " g"),
+        ("Energy", "calories", " kcal"),
+    ):
+        lines.append(f"| {label} | {float(left[key]):g}{unit} | {float(right[key]):g}{unit} |")
+
+    if float(left["protein"]) > float(right["protein"]):
+        lines.append(f"- **{first_name}** has more protein per 100 g.")
+    elif float(right["protein"]) > float(left["protein"]):
+        lines.append(f"- **{second_name}** has more protein per 100 g.")
+    if float(right["calories"]) < float(left["calories"]):
+        lines.append(f"- **{second_name}** is lower in calories per 100 g.")
+    elif float(left["calories"]) < float(right["calories"]):
+        lines.append(f"- **{first_name}** is lower in calories per 100 g.")
+    lines.append(
+        f"- Quick macro line: {first_name} — {_ai_macro_summary(left)}; "
+        f"{second_name} — {_ai_macro_summary(right)}."
+    )
+    return "\n".join(lines)
+
+
+def _ai_travel_answer(
+    question: str, details: dict[str, dict], context: dict, hinglish: bool
+) -> str:
+    """Travel intent: portable format, serving, city availability and one tip."""
+    city = context.get("selected_city") or ""
+    mentions = _ai_food_mentions(question, details)
+    if mentions:
+        name = mentions[0]
+        detail = details[name]
+        how_to = PRODUCT_HOW_TO_USE.get(name, {})
+        tip = (
+            list(how_to.get("tips") or [])
+            or ["Keep a measured portion in a small airtight container."]
+        )[0]
+        available = (
+            "Yes"
+            if city and city in detail.get("cities", [])
+            else f"Not listed for {city or 'your city'}"
+        )
+        lines = [
+            f"**{name} for travel — quick guide:**"
+            if not hinglish
+            else f"**{name} travel ke liye — quick guide:**",
+            f"- Serving: {how_to.get('serving') or f'{_ai_serving_grams(name)} g'}",
+            f"- Best time: {how_to.get('best_time') or 'Any time of day'}",
+            f"- Pack it: {tip}",
+            f"- Available in {city or 'your city'}: {available}",
+            f"- {_ai_serving_summary(name, detail)}",
+        ]
+        return "\n".join(lines)
+
+    pool = [(name, detail) for name, detail in details.items() if _ai_allowed(detail, context)]
+    in_city = [
+        (name, detail) for name, detail in pool
+        if city and city in detail.get("cities", [])
+    ]
+    pool = in_city or pool
+    pool.sort(
+        key=lambda item: (
+            float(item[1]["protein"]) * 2.5
+            + float(item[1]["fiber"]) * 1.5
+            + (12 if item[1].get("low_sugar") else 0)
+            - float(item[1]["carbs"]) * 0.25
+            - float(item[1]["calories"]) * 0.04
+        ),
+        reverse=True,
+    )
+    if not pool:
+        return (
+            "No catalogue food matches every filter you have set. "
+            "Remove one diet or allergen rule and I can suggest options."
+        )
+    heading = (
+        f"**Travel-friendly picks available in {city}:**"
+        if in_city and city and not hinglish
+        else "**Travel-friendly picks from the catalogue:**"
+        if not hinglish
+        else f"**Travel ke liye best picks — {city or 'catalogue'}:**"
+    )
+    lines = [heading]
+    for name, detail in pool[:3]:
+        how_to = PRODUCT_HOW_TO_USE.get(name, {})
+        tip = (
+            list(how_to.get("tips") or [])
+            or ["Carry a measured portion in a small container."]
+        )[0]
+        lines.append(
+            f"- **{name}**: "
+            f"{how_to.get('serving') or f'{_ai_serving_grams(name)} g'} serving; "
+            f"{tip} {_ai_serving_summary(name, detail)}"
+        )
+    lines.append("- Tip: portion nut butters and nuts before leaving home.")
+    return "\n".join(lines)
+
+
+def _ai_general_answer(
+    question: str, details: dict[str, dict], context: dict, hinglish: bool
+) -> str:
+    """Macro lookup with practical tips; useful even with no explicit intent."""
+    name = _ai_resolve_food(question, details, context)
+    if name:
+        detail = details[name]
+        how_to = PRODUCT_HOW_TO_USE.get(name, {})
+        tips = list(how_to.get("tips") or [])[:2]
+        if not tips:
+            tips = ["Use a measured portion.", "Pair it with a balanced meal."]
+        heading = (
+            f"**{name} — quick details:**"
+            if hinglish
+            else f"**{name} at a glance:**"
+        )
+        lines = [
+            heading,
+            f"- Per 100 g: {_ai_macro_summary(detail)}",
+            f"- Per serving: {_ai_serving_summary(name, detail)}",
+            f"- Serving size: {how_to.get('serving') or f'{_ai_serving_grams(name)} g'}",
+            f"- Best time: {how_to.get('best_time') or 'Any time of day'}",
+            "- 2 quick tips:",
+        ]
+        lines.extend(f"  - {tip}" for tip in tips)
+        return "\n".join(lines)
+
+    pool = [(n, d) for n, d in details.items() if _ai_allowed(d, context)]
+    pool.sort(key=lambda item: float(item[1]["protein"]), reverse=True)
+    if not pool:
+        return (
+            "No catalogue food matches every filter you have set. "
+            "Try removing one diet or allergen rule."
+        )
+    lines = [
+        "**Strongest protein options that fit your rules:**"
+        if not hinglish
+        else "**Aapke rules ke hisaab se best protein options:**"
+    ]
+    lines.extend(
+        f"- **{n}** — {_ai_macro_summary(d)}" for n, d in pool[:3]
+    )
+    lines.append("Ask me how to eat one, its benefits, or a comparison.")
+    return "\n".join(lines)
+
+
 def _deterministic_ai_answer(
     question: str, details: dict[str, dict], context: dict
 ) -> str:
-    """Data-backed answer that always works, even with no API key/network."""
-    q = question.lower()
-    diets = set(context["diets"])
-    allergens = set(context["allergens"])
-    goal = context["protein_goal"] or 120.0
-    calories = context["calorie_goal"] or 2000.0
-    city = context["selected_city"]
+    """Intent-aware, data-backed answer that works with no API key/network."""
+    q = _ai_text(question)
+    hinglish = _ai_has_phrase(q, _AI_HINGLISH_PHRASES)
 
-    def allowed(detail: dict) -> bool:
-        if "vegan" in diets and not detail.get("vegan"):
-            return False
-        if "vegetarian" in diets and not detail.get("vegetarian"):
-            return False
-        if "dairy_free" in diets and not detail.get("dairy_free"):
-            return False
-        if "gluten_free" in diets and not detail.get("gluten_free"):
-            return False
-        if "low_sugar" in diets and not detail.get("low_sugar"):
-            return False
-        if "soy" in allergens and detail.get("contains_soy"):
-            return False
-        if "nuts" in allergens and detail.get("contains_nuts"):
-            return False
-        if "dairy" in allergens and detail.get("contains_dairy"):
-            return False
-        return True
+    # Compare first so "almond butter vs peanut butter benefits" is not stolen
+    # by the benefits or macro-lookup branches.
+    if _ai_has_phrase(q, _AI_COMPARE_PHRASES):
+        return _ai_compare_answer(q, details, context, hinglish)
+
+    if _ai_has_phrase(q, _AI_HOW_PHRASES):
+        name = _ai_resolve_food(q, details, context)
+        if name:
+            return _ai_how_to_answer(name, details[name], context, hinglish)
+
+    if _ai_has_phrase(q, _AI_BENEFIT_PHRASES):
+        name = _ai_resolve_food(q, details, context)
+        if name:
+            return _ai_benefits_answer(q, name, details[name], context, hinglish)
+
+    if _ai_has_phrase(q, _AI_TRAVEL_PHRASES):
+        return _ai_travel_answer(q, details, context, hinglish)
+
+    goal = _ai_goal(context, "protein_goal", 120)
+    calories = _ai_goal(context, "calorie_goal", 2000)
+    city = context.get("selected_city") or ""
 
     def goal_note(detail: dict) -> str:
-        pct = round(detail["protein"] / goal * 100) if goal else 0
-        kcal_pct = round(detail["calories"] / calories * 100) if calories else 0
-        return f"{pct}% of your {goal:g} g protein goal · {kcal_pct}% of your {calories:g} kcal goal per 100 g"
+        pct = round(float(detail["protein"]) / goal * 100) if goal else 0
+        kcal_pct = round(float(detail["calories"]) / calories * 100) if calories else 0
+        return (
+            f"{pct}% of your {goal:g} g protein goal · "
+            f"{kcal_pct}% of your {calories:g} kcal goal per 100 g"
+        )
 
     def lines_for(items: list[tuple[str, dict]]) -> list[str]:
         return [
@@ -4476,119 +5330,23 @@ def _deterministic_ai_answer(
             for name, detail in items
         ]
 
-    # Direct question about one catalogue food.
-    named = [
-        (name, details[name])
-        for name in sorted(details)
-        if name.lower() in q
-    ]
-    if named and len(named) == 1:
-        name, detail = named[0]
-        diet_labels = [
-            label
-            for key, label in (
-                ("vegan", "vegan"),
-                ("vegetarian", "vegetarian"),
-                ("dairy_free", "dairy-free"),
-                ("gluten_free", "gluten-free"),
-                ("low_sugar", "low-sugar"),
-            )
-            if detail.get(key)
-        ]
-        allergen_labels = [
-            label
-            for key, label in (
-                ("contains_soy", "soy"),
-                ("contains_nuts", "nuts"),
-                ("contains_dairy", "dairy"),
-            )
-            if detail.get(key)
-        ]
-        return "\n".join(
-            [
-                f"**{name}** ({detail.get('category', 'product')}), per 100 g:",
-                f"- {_ai_macro_summary(detail)}",
-                f"- {goal_note(detail)}",
-                f"- Diet tags: {', '.join(diet_labels) or 'none listed'}.",
-                f"- Contains: {', '.join(allergen_labels) or 'no listed major allergens'}.",
-                f"- Available in: {', '.join(detail.get('cities', [])) or 'no city data listed'}.",
-            ]
-        )
-
-    # Selected-food macro comparison.
-    if "compare" in q or "comparison" in q:
-        selected = context.get("selected_product")
-        selected_detail = details.get(selected)
-        if not selected_detail:
-            return (
-                "Pick a food in Step 1 first, then ask me to compare it. "
-                "I can compare any of the 30 catalogue foods per 100 g."
-            )
-        higher = [
+    high_protein = _ai_has_phrase(
+        q, ("high", "best", "top", "more", "boost")
+    ) and _ai_has_phrase(q, ("protein",))
+    if high_protein or _ai_has_phrase(q, ("vegetarian", "vegan", "diet")):
+        pool = [
             (name, detail)
             for name, detail in details.items()
-            if name != selected and detail["protein"] > selected_detail["protein"] and allowed(detail)
+            if _ai_allowed(detail, context)
         ]
-        higher.sort(key=lambda item: item[1]["protein"], reverse=True)
-        answer = [
-            f"**{selected}** (your selected food), per 100 g:",
-            f"- {_ai_macro_summary(selected_detail)}",
-            f"- {goal_note(selected_detail)}",
-        ]
-        if higher:
-            answer.append("\nHigher-protein catalogue options that fit your rules:")
-            answer.extend(lines_for(higher[:3]))
-        else:
-            answer.append(
-                "\nNo higher-protein catalogue option matches your current rules. "
-                "Try relaxing a diet or allergen filter."
-            )
-        return "\n".join(answer)
-
-    # Travel / snack planning. Destination availability matters here.
-    if "travel" in q or "snack" in q or "trip" in q:
-        pool = [(name, detail) for name, detail in details.items() if allowed(detail)]
-        in_city = [
-            (name, detail) for name, detail in pool if city and city in detail.get("cities", [])
-        ]
-        pool = in_city or pool
-        pool.sort(
-            key=lambda item: (
-                item[1]["protein"] * 2.5
-                + item[1]["fiber"] * 1.5
-                + (12 if item[1].get("low_sugar") else 0)
-                - item[1]["carbs"] * 0.25
-                - item[1]["calories"] * 0.04
-            ),
-            reverse=True,
-        )
-        if not pool:
-            return (
-                "No catalogue food matches every filter you have set. "
-                "Remove one diet or allergen rule and I can suggest options."
-            )
-        intro = (
-            f"Portable picks available in **{city}**"
-            if in_city and city
-            else "Portable picks from the catalogue"
-        )
-        return "\n".join([intro + " (per 100 g):", *lines_for(pool[:5])])
-
-    # High-protein / general diet suggestions.
-    high_protein = (
-        "protein" in q
-        and any(word in q for word in ("high", "best", "top", "more", "boost"))
-    )
-    if high_protein or "vegetarian" in q or "vegan" in q or "diet" in q:
-        pool = [(name, detail) for name, detail in details.items() if allowed(detail)]
-        if "vegetarian" in q or "vegan" in q:
+        if _ai_has_phrase(q, ("vegetarian", "vegan")):
             require_vegan = "vegan" in q
             pool = [
                 (name, detail)
                 for name, detail in pool
                 if (detail.get("vegan") if require_vegan else detail.get("vegetarian"))
             ]
-        pool.sort(key=lambda item: item[1]["protein"], reverse=True)
+        pool.sort(key=lambda item: float(item[1]["protein"]), reverse=True)
         if not pool:
             return (
                 "No catalogue food matches every filter you have set. "
@@ -4603,40 +5361,21 @@ def _deterministic_ai_answer(
         )
         return "\n".join([heading + " (per 100 g):", *lines_for(pool[:5])])
 
-    # Availability question for the current destination.
     if city and city.lower() in q:
         pool = [
             (name, detail)
             for name, detail in details.items()
-            if allowed(detail) and city in detail.get("cities", [])
+            if _ai_allowed(detail, context) and city in detail.get("cities", [])
         ]
         if pool:
-            pool.sort(key=lambda item: item[1]["protein"], reverse=True)
+            pool.sort(key=lambda item: float(item[1]["protein"]), reverse=True)
             return "\n".join(
                 [f"Catalogue foods available in **{city}** (per 100 g):",
                  *lines_for(pool[:5])]
             )
 
-    # Friendly general answer.
-    selected = context.get("selected_product")
-    selected_detail = details.get(selected)
-    pool = [(name, detail) for name, detail in details.items() if allowed(detail)]
-    pool.sort(key=lambda item: item[1]["protein"], reverse=True)
-    answer = []
-    if selected_detail:
-        answer.append(
-            f"Your selected food is **{selected}**: {_ai_macro_summary(selected_detail)}."
-        )
-    answer.append(
-        f"Across the {len(details)} catalogue foods, the strongest protein options "
-        f"that fit your current rules are:"
-    )
-    answer.extend(lines_for(pool[:3]))
-    answer.append(
-        f"Ask me to compare two foods, plan travel snacks for {city or 'your city'}, "
-        "or suggest high-protein vegetarian options."
-    )
-    return "\n".join(answer)
+    # Any product lookup now gets macros plus practical tips, never a bare dump.
+    return _ai_general_answer(q, details, context, hinglish)
 
 
 def _generate_ai_answer(question: str) -> str:
@@ -4667,30 +5406,56 @@ def _submit_ai_question(question: str) -> None:
     st.session_state["ai_chat_history"] = history[-20:]
 
 
+def _submit_ai_prompt(prompt: str) -> None:
+    """Quick-chip callback: append the answer in the button's single rerun."""
+    _submit_ai_question(prompt)
+
+
+def _open_ai_help() -> None:
+    """Top-bar Help button: open the dedicated AI view from a clean home."""
+    st.session_state["show_ai_help"] = True
+    st.session_state["inspect_product"] = None
+    st.session_state["show_swaps_results"] = False
+    st.session_state["_collapse_sidebar_for_details"] = False
+    st.session_state.pop("match_result_data", None)
+
+
+def _render_ai_back_to_home(key: str) -> None:
+    """Top-left dark-emerald back button for the dedicated AI help page."""
+    st.markdown(
+        '<div class="ai-help-back-marker" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
+    st.button(
+        "⌂ Back to home",
+        key=key,
+        help="Return to the start page",
+        on_click=_close_ai_help,
+    )
+
+
 def _render_ai_help() -> None:
-    """Dark glass chat panel, toggled from the top bar next to How it Works."""
+    """Dedicated full-page AI assistant with a top-left back button."""
     if not st.session_state.get("show_ai_help"):
         return
+
+    # Same dark-emerald pill as the details/swaps views, but left-aligned.
+    _render_ai_back_to_home("ai_help_back_to_home")
 
     with st.container(border=True):
         st.markdown(
             '<div class="ai-help-marker" aria-hidden="true"></div>',
             unsafe_allow_html=True,
         )
-        header_col, close_col = st.columns([5, 1])
-        with header_col:
-            st.markdown(
-                '<div class="ai-help-heading">🤖 MacroMatch Nutrition &amp; Product Assistant</div>',
-                unsafe_allow_html=True,
-            )
-            st.caption(
-                "Grounded in MacroMatch's 30 foods, your current picks, "
-                "diet rules and goals."
-            )
-        with close_col:
-            if st.button("✕ Close", key="ai_help_close", use_container_width=True):
-                st.session_state["show_ai_help"] = False
-                st.rerun()
+        st.markdown(
+            '<div class="ai-help-heading">🤖 MacroMatch Nutrition &amp; Product Assistant</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="ai-help-subtitle">Ask anything about our 30 foods, '
+            "macros, travel swaps, or your personal diet goals.</div>",
+            unsafe_allow_html=True,
+        )
 
         suggestions = [
             "💪 High-protein vegetarian options",
@@ -4698,19 +5463,20 @@ def _render_ai_help() -> None:
             "✈️ Best travel snacks for my diet",
         ]
         quick_col1, quick_col2, quick_col3 = st.columns(3)
-        pending_prompt: str | None = None
         for col, label in zip(
             (quick_col1, quick_col2, quick_col3), suggestions
         ):
             with col:
-                if st.button(
+                st.button(
                     label,
                     key=f"ai_quick_{label[:12]}",
                     use_container_width=True,
                     type="secondary",
-                ):
-                    pending_prompt = label
+                    on_click=_submit_ai_prompt,
+                    args=(label,),
+                )
 
+        st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
         for message in st.session_state.get("ai_chat_history", []):
             with st.chat_message(message.get("role", "assistant")):
                 st.markdown(message.get("content", ""))
@@ -4718,11 +5484,10 @@ def _render_ai_help() -> None:
         chat_prompt = st.chat_input(
             "Ask anything about foods, macros, or your diet..."
         )
-        question = chat_prompt or pending_prompt
-        if question:
-            _submit_ai_question(question)
-            # A single rerun renders the appended user/assistant pair in order,
-            # for both chat_input submissions and quick-prompt taps.
+        if chat_prompt:
+            _submit_ai_question(chat_prompt)
+            # chat_input already returns through a rerun; this second pass only
+            # renders the freshly appended user/assistant pair in order.
             st.rerun()
 
 
@@ -4783,8 +5548,224 @@ def _badges_html(detail: dict) -> str:
     )
 
 
-def render_product_spotlight(name: str, detail: dict, keto: bool = False) -> None:
-    """Photo + nutrition, local name, net carbs (keto-highlighted), how-to-use, and caution."""
+def _goal_number(key: str, default: float) -> float:
+    try:
+        value = float(st.session_state.get(key, default))
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
+def _goal_percent(value: float, goal: float) -> float:
+    return value / goal * 100 if goal else 0.0
+
+
+def _nutrition_table_html(
+    detail: dict, serving_g: int, protein_goal: float, calorie_goal: float
+) -> str:
+    """Exact per-100 g and per-serving macros with daily-goal context."""
+    factor = serving_g / 100.0
+    rows = []
+    for label, key in (
+        ("Protein", "protein"),
+        ("Carbs", "carbs"),
+        ("Fat", "fat"),
+        ("Fibre", "fiber"),
+        ("Energy", "calories"),
+    ):
+        per_100 = float(detail[key])
+        per_serving = per_100 * factor
+
+        def cell(value: float) -> str:
+            text = f"{value:.0f} kcal" if key == "calories" else f"{value:g} g"
+            if key == "protein":
+                text += f" <span style='color:#7EE2A8;'>({_goal_percent(value, protein_goal):.0f}% goal)</span>"
+            elif key == "calories":
+                text += f" <span style='color:#FBBF24;'>({_goal_percent(value, calorie_goal):.0f}% goal)</span>"
+            return text
+
+        rows.append(
+            f"<tr><td>{label}</td><td>{cell(per_100)}</td>"
+            f"<td>{cell(per_serving)}</td></tr>"
+        )
+    return (
+        '<table class="detail-macro-table">'
+        "<thead><tr><th>Nutrient</th><th>Per 100 g</th>"
+        f"<th>Per {serving_g:g} g</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table>"
+    )
+
+
+def _smart_swaps(
+    name: str, detail: dict, details: dict[str, dict], limit: int = 2
+) -> list[str]:
+    """Nearby catalogue foods by macro distance, preferring the same category."""
+    scored: list[tuple[float, str]] = []
+    for other_name, other_detail in details.items():
+        if other_name == name:
+            continue
+        distance = 0.0
+        for key in MACRO_COLS:
+            base = float(detail[key]) or 1.0
+            distance += ((float(other_detail[key]) - float(detail[key])) / base) ** 2
+        if other_detail.get("category") == detail.get("category"):
+            distance *= 0.55
+        scored.append((distance, other_name))
+    scored.sort(key=lambda item: item[0])
+    return [other_name for _, other_name in scored[:limit]]
+
+
+def _render_complete_food_guide(
+    name: str, detail: dict, keto: bool, details: dict[str, dict]
+) -> None:
+    """Full-page education card shown only in the dedicated details view."""
+    how_to = PRODUCT_HOW_TO_USE.get(name, {})
+    serving_g = int(PRODUCT_SERVING_G.get(name, 100))
+    protein_goal = _goal_number("daily_protein_goal", 120)
+    calorie_goal = _goal_number("daily_calorie_goal", 2000)
+    about = PRODUCT_ABOUT.get(
+        name,
+        f"{name} is one of MacroMatch's 30 catalogue foods. Use the macro table "
+        "below to compare it with your daily goals.",
+    )
+    tips = list(how_to.get("tips") or [])
+    swaps = _smart_swaps(name, detail, details)
+    caution = PRODUCT_CAUTIONS.get(name)
+    flags_html = (
+        _badges_html(detail)
+        or '<span class="detail-mini-value">No flags listed.</span>'
+    )
+
+    with st.container(border=True):
+        st.markdown(
+            '<div class="detail-guide-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown("#### 🍽️ Complete Food & Nutrition Guide")
+
+        st.markdown(
+            '<div class="detail-section-title">💚 About This Food &amp; Health Benefits</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="detail-copy">{html.escape(about)}</div>',
+            unsafe_allow_html=True,
+        )
+
+        macro_col, tips_col = st.columns([1.05, 1], gap="medium")
+        with macro_col:
+            st.markdown(
+                '<div class="detail-section-title">🍴 Serving Size &amp; Daily Goal Impact</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"""
+                <div class="detail-mini-card">
+                    <p class="detail-mini-label">Serving Size</p>
+                    <p class="detail-mini-value">{html.escape(str(how_to.get('serving', f'{serving_g} g')))}</p>
+                </div>
+                <div class="detail-mini-card">
+                    <p class="detail-mini-label">⏰ Best Time to Have</p>
+                    <p class="detail-mini-value">{html.escape(str(how_to.get('best_time', 'Any time')))}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                _nutrition_table_html(detail, serving_g, protein_goal, calorie_goal),
+                unsafe_allow_html=True,
+            )
+            if keto:
+                net_carbs = max(0.0, detail["carbs"] - detail["fiber"])
+                st.caption(
+                    f"Keto view: {net_carbs:g} g net carbs per 100 g "
+                    f"({net_carbs * serving_g / 100:g} g per serving)."
+                )
+
+        with tips_col:
+            st.markdown(
+                '<div class="detail-section-title">💡 Tips &amp; Ways to Eat</div>',
+                unsafe_allow_html=True,
+            )
+            if tips:
+                tips_html = "".join(
+                    f"<li>{html.escape(tip)}</li>" for tip in tips
+                )
+                st.markdown(
+                    f'<ul class="detail-tip-list">{tips_html}</ul>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    '<div class="detail-copy">No preparation notes are stored for this food yet.</div>',
+                    unsafe_allow_html=True,
+                )
+            pairing = PRODUCT_PAIRINGS.get(name)
+            if pairing:
+                st.markdown(
+                    f"""
+                    <div class="detail-mini-card">
+                        <p class="detail-mini-label">🥗 Pairing Ideas</p>
+                        <p class="detail-mini-value">{html.escape(pairing)}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown(
+            '<div class="detail-section-title">🔁 Smart Swaps &amp; Storage / Caution Notes</div>',
+            unsafe_allow_html=True,
+        )
+        swap_col, caution_col = st.columns([1, 1], gap="medium")
+        with swap_col:
+            if swaps:
+                swap_html = "".join(
+                    f"<li>{html.escape(swap)} — {_ai_macro_summary(details[swap])}</li>"
+                    for swap in swaps
+                    if swap in details
+                )
+                st.markdown(
+                    '<div class="detail-copy" style="margin-bottom:0.35rem !important;">'
+                    "Closest catalogue alternatives by macro profile "
+                    "(same category preferred):</div>"
+                    f'<ul class="detail-tip-list">{swap_html}</ul>',
+                    unsafe_allow_html=True,
+                )
+            storage = PRODUCT_STORAGE.get(name)
+            if storage:
+                st.markdown(
+                    f"""
+                    <div class="detail-mini-card">
+                        <p class="detail-mini-label">📦 Storage</p>
+                        <p class="detail-mini-value">{html.escape(storage)}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        with caution_col:
+            st.markdown(
+                '<div class="detail-mini-card">'
+                '<p class="detail-mini-label">🏷️ Diet &amp; Allergen Flags</p>'
+                f"{flags_html}"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            if caution:
+                st.markdown(
+                    f'<div class="caution-box"><strong>⚠️ Caution / Who Should Avoid:</strong> {html.escape(caution)}</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.caption(
+                    "No special caution is listed for this food. Check local "
+                    "packaging for allergen and cross-contamination details."
+                )
+
+
+def render_product_spotlight(
+    name: str, detail: dict, keto: bool = False, all_details: dict[str, dict] | None = None
+) -> None:
+    """Main nutrition summary followed by the complete food & nutrition guide."""
     # ── Pre-compute net carbs ──────────────────────────────────────────
     net_carbs = max(0.0, detail["carbs"] - detail["fiber"])
     nc_cls    = "net-carbs-keto" if keto else "net-carbs-normal"
@@ -4842,65 +5823,96 @@ def render_product_spotlight(name: str, detail: dict, keto: bool = False) -> Non
             with st.expander(f"📍 Available in {len(detail['cities'])} cities"):
                 st.write(", ".join(detail["cities"]))
 
-    # ── How to Use / Eat section ──────────────────────────────────────
-    how_to  = PRODUCT_HOW_TO_USE.get(name)
-    caution = PRODUCT_CAUTIONS.get(name)
-    if how_to:
-        st.markdown("#### 🍽️ How to Eat / Use")
-        col_a, col_b = st.columns([1, 1], gap="medium")
-        with col_a:
-            st.markdown(
-                f"""
-                <div style="
-                    background:#1e293b;
-                    border:1px solid #334155;
-                    border-radius:12px;
-                    padding:0.8rem 1rem;
-                    margin-bottom:0.5rem;
-                ">
-                    <p style="margin:0 0 0.2rem;color:#b0b8c4;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;">Serving Size</p>
-                    <p style="margin:0;font-size:1rem;font-weight:600;color:#f1f5f9;">{how_to['serving']}</p>
-                </div>
-                <div style="
-                    background:#1e293b;
-                    border:1px solid #334155;
-                    border-radius:12px;
-                    padding:0.8rem 1rem;
-                ">
-                    <p style="margin:0 0 0.2rem;color:#b0b8c4;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;">⏰ Best Time to Have</p>
-                    <p style="margin:0;font-size:0.95rem;color:#f1f5f9;">{how_to['best_time']}</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
+    # Full education card: about, serving math, tips, swaps, storage, caution.
+    _render_complete_food_guide(
+        name,
+        detail,
+        keto,
+        all_details if all_details is not None else load_product_details(),
+    )
+
+
+def _render_sidebar_product_card(
+    item_name: str,
+    detail: dict,
+    *,
+    key_prefix: str,
+    wishlist_label: str | None = None,
+    on_wishlist_click=None,
+) -> None:
+    """Shared dark card for the product guide and the My Wishlist section."""
+    image_src = product_image_src(item_name)
+    if image_src:
+        image_html = (
+            f'<img class="guide-thumb" src="{image_src}" '
+            f'alt="{html.escape(item_name, quote=True)}">'
+        )
+    else:
+        image_html = (
+            '<div class="guide-emoji">'
+            f'{PRODUCT_EMOJI.get(item_name, "🥗")}</div>'
+        )
+
+    macros_html = (
+        f'<span class="macro-pill protein">Protein {detail["protein"]:g}g</span>'
+        f'<span class="macro-pill carbs">Carbs {detail["carbs"]:g}g</span>'
+        f'<span class="macro-pill fat">Fat {detail["fat"]:g}g</span>'
+        f'<span class="macro-pill calories">{detail["calories"]:g} kcal</span>'
+        '<span class="macro-unit">per 100 g</span>'
+    )
+
+    with st.container(border=True):
+        st.markdown(
+            '<div class="guide-card">'
+            f"{image_html}"
+            f'<div class="guide-title">{PRODUCT_EMOJI.get(item_name, "🥗")} '
+            f"{html.escape(item_name)}</div>"
+            f'<div class="guide-category">{html.escape(detail["category"])}</div>'
+            f'<div class="guide-macros">{macros_html}</div>'
+            f'<div class="guide-tags">{_badges_html(detail)}</div>'
+            f'<div class="guide-cities">📍 {len(detail["cities"])} cities</div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        # Identical 3-button row in both surfaces. "Select" is auto-collapsed
+        # on mobile by the parent-document listener; "View Details" triggers
+        # the one-shot collapse on the dedicated details page.
+        col_sel, col_det, col_wish = st.columns([1, 1.15, 1])
+        with col_sel:
+            st.button(
+                "Select",
+                key=f"{key_prefix}_select_{item_name}",
+                use_container_width=True,
+                type="secondary",
+                on_click=select_food_value_callback,
+                args=(item_name,),
             )
-        with col_b:
-            tips_html = "".join(
-                f'<li style="margin-bottom:0.4rem;color:#cbd5e1;">{tip}</li>'
-                for tip in how_to["tips"]
+        with col_det:
+            st.button(
+                "👁️ View Details",
+                key=f"{key_prefix}_details_{item_name}",
+                use_container_width=True,
+                type="secondary",
+                on_click=inspect_food_value_callback,
+                args=(item_name,),
             )
-            st.markdown(
-                f"""
-                <div style="
-                    background:#1e293b;
-                    border:1px solid #334155;
-                    border-radius:12px;
-                    padding:0.8rem 1rem;
-                    height:100%;
-                ">
-                    <p style="margin:0 0 0.5rem;color:#b0b8c4;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;">💡 Tips & Ways to Eat</p>
-                    <ul style="margin:0;padding-left:1.1rem;list-style:none;">
-                        {tips_html}
-                    </ul>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        # ── Caution callout ───────────────────────────────────────────
-        if caution:
-            st.markdown(
-                f'<div class="caution-box"><strong>⚠️ Caution / Who Should Avoid:</strong> {caution}</div>',
-                unsafe_allow_html=True,
-            )
+        with col_wish:
+            if wishlist_label is None:
+                render_wishlist_button(
+                    item_name,
+                    key=f"{key_prefix}_wish_{item_name}",
+                    use_container_width=True,
+                )
+            else:
+                st.button(
+                    wishlist_label,
+                    key=f"{key_prefix}_heart_{item_name}",
+                    use_container_width=True,
+                    type="secondary",
+                    on_click=on_wishlist_click or toggle_wishlist,
+                    args=(item_name,),
+                    help=f"Remove {item_name} from wishlist",
+                )
 
 
 def render_product_guide(details: dict[str, dict]) -> None:
@@ -4908,68 +5920,11 @@ def render_product_guide(details: dict[str, dict]) -> None:
     all_products = sorted(details)
     visible_products = all_products[:st.session_state["guide_visible_count"]]
     for item_name in visible_products:
-        detail = details[item_name]
-        image_src = product_image_src(item_name)
-        if image_src:
-            image_html = (
-                f'<img class="guide-thumb" src="{image_src}" '
-                f'alt="{html.escape(item_name, quote=True)}">'
-            )
-        else:
-            image_html = (
-                '<div class="guide-emoji">'
-                f'{PRODUCT_EMOJI.get(item_name, "🥗")}</div>'
-            )
-
-        macros_html = (
-            f'<span class="macro-pill protein">Protein {detail["protein"]:g}g</span>'
-            f'<span class="macro-pill carbs">Carbs {detail["carbs"]:g}g</span>'
-            f'<span class="macro-pill fat">Fat {detail["fat"]:g}g</span>'
-            f'<span class="macro-pill calories">{detail["calories"]:g} kcal</span>'
-            '<span class="macro-unit">per 100 g</span>'
+        _render_sidebar_product_card(
+            item_name,
+            details[item_name],
+            key_prefix="guide",
         )
-
-        with st.container(border=True):
-            st.markdown(
-                '<div class="guide-card">'
-                f"{image_html}"
-                f'<div class="guide-title">{PRODUCT_EMOJI.get(item_name, "🥗")} '
-                f"{html.escape(item_name)}</div>"
-                f'<div class="guide-category">{html.escape(detail["category"])}</div>'
-                f'<div class="guide-macros">{macros_html}</div>'
-                f'<div class="guide-tags">{_badges_html(detail)}</div>'
-                f'<div class="guide-cities">📍 {len(detail["cities"])} cities</div>'
-                "</div>",
-                unsafe_allow_html=True,
-            )
-            # All three buttons update state before their single rerun. On
-            # mobile, the injected parent-document listener collapses the
-            # sidebar after Select, View Details, or a wishlist tap.
-            col_sel, col_det, col_wish = st.columns([1, 1.15, 1])
-            with col_sel:
-                st.button(
-                    "Select",
-                    key=f"guide_select_{item_name}",
-                    use_container_width=True,
-                    type="secondary",
-                    on_click=select_food_value_callback,
-                    args=(item_name,),
-                )
-            with col_det:
-                st.button(
-                    "👁️ View Details",
-                    key=f"guide_details_{item_name}",
-                    use_container_width=True,
-                    type="secondary",
-                    on_click=inspect_food_value_callback,
-                    args=(item_name,),
-                )
-            with col_wish:
-                render_wishlist_button(
-                    item_name,
-                    key=f"wishlist_guide_{item_name}",
-                    use_container_width=True,
-                )
 
     st.caption(f"Showing {len(visible_products)} of {len(all_products)} products")
 
@@ -4978,22 +5933,24 @@ def render_product_guide(details: dict[str, dict]) -> None:
             '<div class="guide-view-more-marker" aria-hidden="true"></div>',
             unsafe_allow_html=True,
         )
-        if st.button(
-            f"👇 View More (+{min(5, len(all_products) - st.session_state.guide_visible_count)} more)",
+        st.button(
+            "View More",
             key="guide_view_more",
             use_container_width=True,
-        ):
-            st.session_state["guide_visible_count"] += 5
-            st.rerun()
+            on_click=_show_more_guide_products,
+        )
 
-    if st.session_state["guide_visible_count"] > 5:
+    if st.session_state["guide_visible_count"] > GUIDE_PAGE_SIZE:
         st.markdown(
             '<div class="guide-show-less-marker" aria-hidden="true"></div>',
             unsafe_allow_html=True,
         )
-        if st.button("🔼 Show Less", key="guide_show_less", use_container_width=True):
-            st.session_state["guide_visible_count"] = 5
-            st.rerun()
+        st.button(
+            "Show Less",
+            key="guide_show_less",
+            use_container_width=True,
+            on_click=_show_less_guide_products,
+        )
 
 
 def call_api(payload: dict) -> requests.Response | None:
@@ -5087,42 +6044,40 @@ def render_how_it_works() -> None:
         )
 
 
-# ─────────────────────────────────────────────
-# Hero header
-# ─────────────────────────────────────────────
-st.markdown(f"""
-<div class="hero-block">
-    <span class="logo-pill">
-        <img src="{LOGO_SRC}" alt="MacroMatch logo" class="hero-logo">
-    </span>
-    <div class="hero-title">MacroMatch</div>
-    <div class="hero-tagline">Your macros, anywhere.</div>
-</div>
-""", unsafe_allow_html=True)
-st.markdown('<hr class="section-divider hero-divider">', unsafe_allow_html=True)
+if not show_product_details and not show_ai_help:
+    # ─────────────────────────────────────────────
+    # Hero header (home + results only)
+    # ─────────────────────────────────────────────
+    st.markdown(f"""
+    <div class="hero-block">
+        <span class="logo-pill">
+            <img src="{LOGO_SRC}" alt="MacroMatch logo" class="hero-logo">
+        </span>
+        <div class="hero-title">MacroMatch</div>
+        <div class="hero-tagline">Your macros, anywhere.</div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown('<hr class="section-divider hero-divider">', unsafe_allow_html=True)
 
-# Pinned directly under the header, before the search card. The AI help toggle
-# sits beside the how-it-works bar with its own emerald-accented style.
-col_how, col_ai = st.columns([1.3, 1], vertical_alignment="center")
-with col_how:
-    render_how_it_works()
-with col_ai:
-    st.markdown(
-        '<div class="ai-help-toggle-marker" aria-hidden="true"></div>',
-        unsafe_allow_html=True,
-    )
-    if st.button(
-        "🤖 Ask AI Diet & Product Help",
-        key="ai_help_toggle",
-        use_container_width=True,
-    ):
-        st.session_state["show_ai_help"] = not st.session_state.get(
-            "show_ai_help", False
+    # Pinned directly under the header, before the search card. The AI help
+    # toggle sits beside the how-it-works bar with its emerald-accented style.
+    col_how, col_ai = st.columns([1.3, 1], vertical_alignment="center")
+    with col_how:
+        render_how_it_works()
+    with col_ai:
+        st.markdown(
+            '<div class="ai-help-toggle-marker" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
         )
-        st.rerun()
+        if st.button(
+            "❓ Help",
+            key="ai_help_toggle",
+            use_container_width=True,
+            on_click=_open_ai_help,
+        ):
+            pass
 
-# The chat panel opens directly beneath the toggle, above the search card.
-_render_ai_help()
+    # The dedicated AI Help page renders after the sidebar, below.
 
 
 # ─────────────────────────────────────────────
@@ -5166,6 +6121,10 @@ with st.sidebar:
         st.session_state["supabase_recovery_mode"] = False
         st.session_state.pop("_preferences_user_id", None)
         st.session_state.pop("_preferences_filters_pending", None)
+        st.session_state.pop("_saved_matches_cache_user", None)
+        for _key in list(st.session_state):
+            if str(_key).startswith("saved_matches::"):
+                st.session_state.pop(_key, None)
         st.rerun()
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
@@ -5184,9 +6143,11 @@ with st.sidebar:
         render_saved_matches(saved_matches_slot)
 
     # ─── Per-user wishlist (persisted in Supabase Auth user_metadata) ────
+    # Loaded here so wishlist cards and the product guide share one renderer.
+    product_details = load_product_details()
     wishlist_items = _normalize_wishlist(st.session_state.get("wishlist", []))
     with st.expander(
-        f"❤️ My Wishlist ({len(st.session_state.get('wishlist', []))})", expanded=False
+        f"❤️ My Wishlist ({len(wishlist_items)})", expanded=False
     ):
         st.markdown(
             '<div class="wishlist-marker" aria-hidden="true"></div>',
@@ -5196,44 +6157,19 @@ with st.sidebar:
             st.caption("No favorite foods saved yet. Tap 🤍 Wishlist on any product!")
         else:
             for food_name in wishlist_items:
-                col_name, col_use, col_del = st.columns([3, 1, 1])
-                with col_name:
-                    # Hidden marker lets the mobile sidebar-close listener
-                    # recognise a food-name tap without matching Use / 🗑️.
-                    st.markdown(
-                        '<div class="wishlist-name-marker" aria-hidden="true"></div>',
-                        unsafe_allow_html=True,
-                    )
-                    st.button(
-                        food_name,
-                        key=f"wishlist_name_{food_name}",
-                        use_container_width=True,
-                        type="secondary",
-                        on_click=inspect_food_value_callback,
-                        args=(food_name,),
-                    )
-                with col_use:
-                    st.button(
-                        "Use",
-                        key=f"wishlist_use_{food_name}",
-                        use_container_width=True,
-                        type="secondary",
-                        on_click=select_food_value_callback,
-                        args=(food_name,),
-                    )
-                with col_del:
-                    st.button(
-                        "🗑️",
-                        key=f"wishlist_remove_{food_name}",
-                        use_container_width=True,
-                        type="secondary",
-                        on_click=toggle_wishlist,
-                        args=(food_name,),
-                        help=f"Remove {food_name} from wishlist",
-                    )
+                wishlist_detail = product_details.get(food_name)
+                if wishlist_detail is None:
+                    st.caption(f"⚠️ {food_name} is no longer in the catalogue.")
+                    continue
+                _render_sidebar_product_card(
+                    food_name,
+                    wishlist_detail,
+                    key_prefix="wish",
+                    wishlist_label="❤️",
+                    on_wishlist_click=_remove_wishlist_item,
+                )
 
     # ─── Product guide (moved here from the bottom of the main page) ─────
-    product_details = load_product_details()
     st.markdown(
         '<div class="sidebar-section-title">📖 Product guide</div>',
         unsafe_allow_html=True,
@@ -5336,6 +6272,44 @@ with st.sidebar:
         """,
         unsafe_allow_html=True,
     )
+
+
+# ─────────────────────────────────────────────
+# Dedicated AI Help page — replaces the entire main screen
+# ─────────────────────────────────────────────
+if show_ai_help:
+    _render_ai_help()
+    st.stop()
+
+
+# ─────────────────────────────────────────────
+# Dedicated Product Details page — replaces the entire main screen
+# ─────────────────────────────────────────────
+if show_product_details:
+    details_map = load_product_details()
+    inspected_name = st.session_state.get("inspect_product")
+    inspected_detail = details_map.get(inspected_name)
+
+    if not inspected_detail:
+        # Stale state (e.g. a product removed from the CSV) → clean home.
+        st.session_state["inspect_product"] = None
+        st.session_state["_collapse_sidebar_for_details"] = False
+        st.rerun()
+
+    # One-shot mobile collapse requested by View Details / wishlist-name taps.
+    if st.session_state.pop("_collapse_sidebar_for_details", False):
+        components.html(_MOBILE_DETAILS_COLLAPSE_JS, height=0, scrolling=False)
+
+    _render_back_to_home("back_to_home_details")
+    st.markdown("### 🥗 Product Overview")
+    details_context = _ai_current_context()
+    render_product_spotlight(
+        inspected_name,
+        inspected_detail,
+        keto="keto" in details_context["diets"],
+        all_details=details_map,
+    )
+    st.stop()
 
 
 @st.fragment(key="search_controls")
@@ -5599,16 +6573,13 @@ with st.container(border=True):
             key="priority_radio",
         )
 
-    if st.button(
+    st.button(
         "🔍 Find Alternatives",
         use_container_width=True,
         type="primary",
         key="find_alternatives",
-    ):
-        st.session_state["show_swaps_results"] = True
-        st.session_state["inspect_product"] = None  # hide any open details view
-        st.session_state.pop("match_result_data", None)  # force a fresh API call
-        st.rerun()
+        on_click=_open_swaps_results,
+    )
 
     show_swaps_results = st.session_state["show_swaps_results"]
 
@@ -5617,34 +6588,16 @@ with st.container(border=True):
 # Main area — results
 # ─────────────────────────────────────────────
 
-inspect_product = st.session_state.get("inspect_product")
-
+# Default home: only the clean Step 1 / 2 / 3 search card is shown here.
+# Details mode already returned above, so the search form is fully hidden.
 if not show_swaps_results:
-    if inspect_product is not None:
-        # Details view: the full card + How to Eat / Use stay on the MAIN screen,
-        # never crammed into the narrow sidebar.
-        inspect_detail = product_details.get(inspect_product)
-        if inspect_detail:
-            _render_back_to_home("back_to_home_details")
-            st.markdown("### 🥗 Your Regular Food")
-            render_product_spotlight(
-                inspect_product,
-                inspect_detail,
-                keto="keto" in selected_diets,
-            )
-            st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
-        else:
-            # Stale state (e.g. a product removed from the CSV) → clean home.
-            st.session_state["inspect_product"] = None
-
-    # Default home: only the clean Step 1 / 2 / 3 search card is shown.
     render_footer()
     st.stop()
 
 
 # ── Back to home ──────────────────────────────
 # In the swaps view this stays at the very top, immediately before the results
-# container. The regular-food card is home/details-only, never in the sidebar.
+# container. The product card now lives on its own details page, not here.
 _render_back_to_home("back_to_home")
 
 
@@ -5901,23 +6854,21 @@ with st.container(border=True):
                             use_container_width=True,
                         )
                     with col_save:
-                        if st.button(
+                        st.button(
                             "💾 Save Match",
                             key=f"save_swap_{rank_i + 1}",
                             use_container_width=True,
                             type="primary",
-                        ):
-                            if save_match(
-                                CURRENT_USER_ID,
+                            on_click=_save_match_callback,
+                            args=(
                                 selected_product,
                                 selected_city,
                                 selected_diets,
                                 selected_allergens,
                                 priority_label,
                                 [alt],
-                            ):
-                                st.session_state["saved_match_flash"] = True
-                                st.rerun()
+                            ),
+                        )
 
     with tab_nutrition:
         # ── Exact macro table + chart (second tab) ────────────────────────────

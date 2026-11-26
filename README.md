@@ -45,17 +45,23 @@ nutrition data, constrained by availability, diet rules, and allergens.**
 - **LLM explanations with a safety net** — Claude describes *why* each match
   fits; authentication, rate-limit, network, and parsing failures fall back to
   deterministic, data-driven text.
-- **Interactive AI Diet & Product Help** — a top-bar chat assistant answers food,
-  macro-comparison, travel-planning and personal-goal questions using the 30-product
-  catalogue plus current filters; it also has a deterministic catalogue fallback
-  when no LLM key is configured.
+- **Interactive AI Diet & Product Help** — a top-bar **Help** button opens a
+  dedicated full-page assistant (no search form or other dashboard clutter) that
+  understands how-to, benefits, comparison, travel and macro-lookup intent in
+  English or Hinglish. It uses the 30-product catalogue plus current filters, and
+  its no-key fallback gives practical serving/best-time/tips guidance instead of
+  raw macro dumps.
 - **Persistent wishlist** — favorite foods are saved in Supabase Auth
-  `user_metadata`, with one-tap details/use/remove rows in the sidebar.
+  `user_metadata` and rendered as the same rich product cards as the guide, with
+  one-tap **Select**, **View Details**, and **❤️** remove actions.
 - **Rich Streamlit UI** — ranked cards with product thumbnails, macro comparison
-  tables, bar charts, and a dark, card-based layout.
+  tables, bar charts, and a dark, card-based layout. Touch targets remove the
+  mobile 300 ms tap delay and sticky hover lag, while cached images, CSV data and
+  saved-match state keep desktop clicks just as snappy.
 - **Product guide with photos** — the selected product and every catalogue item
   show a photo, category, macros per 100 g, diet/allergen badges and city
-  availability, so unfamiliar foods are easy to recognise.
+  availability; **View Details** opens a dedicated full-page Product Overview
+  with serving-size macro math, tips, smart swaps, storage and caution notes.
 - **Email/Password & Google OAuth Sign-In** — powered by Supabase Auth, with
   persistent user accounts (cloud-hosted; passwords are handled by Supabase and
   never stored locally) and **Saved Match History** protected by Row-Level
